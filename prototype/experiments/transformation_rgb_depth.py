@@ -18,10 +18,10 @@ DEPTH_FPS = 30
 RGB_FPS = 30
 
 # Coordinates of table corners
-CORNER_TOP_LEFT = (158, 60)
-CORNER_TOP_RIGHT = (1211, 65)
-CORNER_BOTTOM_LEFT = (157, 582)
-CORNER_BOTTOM_RIGHT = (1203, 592)
+CORNER_TOP_LEFT = (196, 96)
+CORNER_TOP_RIGHT = (1143, 108)
+CORNER_BOTTOM_LEFT = (196, 565)
+CORNER_BOTTOM_RIGHT = (1131, 579)
 
 BLACK_BORDER_HEIGHT = 80  # px
 
@@ -36,6 +36,8 @@ class TransformationRGBDepth():
     align = None
     clipping_distance = None
     colorizer = None
+
+    display_mode = "RGB"
 
     def __init__(self):
         # Create a pipeline
@@ -75,9 +77,9 @@ class TransformationRGBDepth():
     def init_colorizer(self):
         self.colorizer = rs.colorizer()
         self.colorizer.set_option(rs.option.color_scheme, 0)
-        self.colorizer.set_option(rs.option.histogram_equalization_enabled, 0)
+        self.colorizer.set_option(rs.option.histogram_equalization_enabled, 1)
         self.colorizer.set_option(rs.option.min_distance, 0.3)  # meter
-        self.colorizer.set_option(rs.option.max_distance, 1.1)  # meter
+        self.colorizer.set_option(rs.option.max_distance, 2)  # meter
 
     # Streaming loop
     def loop(self):
@@ -102,14 +104,21 @@ class TransformationRGBDepth():
                 color_image = cv2.resize(color_image, (OUTPUT_IMAGE_WIDTH, OUTPUT_IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
                 depth_colormap = cv2.resize(depth_colormap, (OUTPUT_IMAGE_WIDTH, OUTPUT_IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
 
-                #cv2.imshow('window', color_image)
-                cv2.imshow('window', depth_colormap)
+                if self.display_mode == "RGB":
+                    cv2.imshow('window', color_image)
+                else:
+                    cv2.imshow('window', depth_colormap)
 
                 key = cv2.waitKey(1)
                 # Press esc or 'q' to close the image window
                 if key & 0xFF == ord('q') or key == 27:
                     cv2.destroyAllWindows()
                     break
+                elif key == 49:  # Key 1:
+                    if self.display_mode == "RGB":
+                        self.display_mode = "depth"
+                    else:
+                        self.display_mode = "RGB"
         finally:
             self.pipeline.stop()
 
