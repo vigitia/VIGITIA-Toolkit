@@ -6,7 +6,7 @@ import numpy as np
 # Built upon: https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/align-depth2color.py
 
 '''
-Current distance between camera and table: 105.5cm
+Current distance between camera and table: 137.5cm
 '''
 
 DEPTH_RES_X = 1280
@@ -37,7 +37,10 @@ class TransformationRGBDepth():
     clipping_distance = None
     colorizer = None
 
+    black_image = np.zeros((OUTPUT_IMAGE_WIDTH, OUTPUT_IMAGE_HEIGHT, 3))
     display_mode = "RGB"
+
+    stored_image = None
 
     def __init__(self):
         # Create a pipeline
@@ -58,7 +61,7 @@ class TransformationRGBDepth():
 
         # We will be removing the background of objects more than
         #  clipping_distance_in_meters meters away
-        clipping_distance_in_meters = 1.6  # 1 meter
+        clipping_distance_in_meters = 1.5  # 1 meter
         self.clipping_distance = clipping_distance_in_meters / depth_scale
 
         # Create an align object
@@ -71,15 +74,21 @@ class TransformationRGBDepth():
         cv2.namedWindow("window", cv2.WND_PROP_FULLSCREEN)
         cv2.setWindowProperty("window", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
+        cv2.setMouseCallback('window', self.mouse_click)
+
         self.init_colorizer()
         self.loop()
+
+    def mouse_click(self, event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            print(x, y)
 
     def init_colorizer(self):
         self.colorizer = rs.colorizer()
         self.colorizer.set_option(rs.option.color_scheme, 0)
-        self.colorizer.set_option(rs.option.histogram_equalization_enabled, 1)
-        self.colorizer.set_option(rs.option.min_distance, 0.3)  # meter
-        self.colorizer.set_option(rs.option.max_distance, 2)  # meter
+        self.colorizer.set_option(rs.option.histogram_equalization_enabled, 0)
+        self.colorizer.set_option(rs.option.min_distance, 1.0)  # meter
+        self.colorizer.set_option(rs.option.max_distance, 1.5)  # meter
 
     # Streaming loop
     def loop(self):
@@ -106,8 +115,12 @@ class TransformationRGBDepth():
 
                 if self.display_mode == "RGB":
                     cv2.imshow('window', color_image)
-                else:
+                elif self.display_mode == "depth":
                     cv2.imshow('window', depth_colormap)
+                elif self.display_mode == "off":
+                    cv2.imshow('window', self.black_image)
+                elif self.display_mode == 'memory':
+                    cv2.imshow('window', self.stored_image)
 
                 key = cv2.waitKey(1)
                 # Press esc or 'q' to close the image window
@@ -119,6 +132,12 @@ class TransformationRGBDepth():
                         self.display_mode = "depth"
                     else:
                         self.display_mode = "RGB"
+                elif key == 50:  # Key 2
+                    self.display_mode = "off"
+                elif key == 51:  # Key 3
+                    self.display_mode = 'memory'
+                    #self.stored_image = cv2.bitwise_not(color_image)
+                    self.stored_image = color_image
         finally:
             self.pipeline.stop()
 
