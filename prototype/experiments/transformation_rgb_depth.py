@@ -6,7 +6,7 @@ import numpy as np
 # Built upon: https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/align-depth2color.py
 
 '''
-Current distance between camera and table: 137.5cm
+Current distance between camera and table: 121.5cm
 '''
 
 DEPTH_RES_X = 1280
@@ -23,7 +23,10 @@ CORNER_TOP_RIGHT = (1226, 97)
 CORNER_BOTTOM_LEFT = (164, 620)
 CORNER_BOTTOM_RIGHT = (1222, 628)
 
-BLACK_BORDER_HEIGHT = 80  # px
+BORDER_TOP = 115  # px
+BORDER_BOTTOM = 0  # px
+BORDER_LEFT = 0  # px
+BORDER_RIGHT = 60  # px
 
 # Output image (currently needs to be 16x9 because the projector can project this)
 OUTPUT_IMAGE_WIDTH = 1920
@@ -34,7 +37,6 @@ class TransformationRGBDepth():
 
     pipeline = None
     align = None
-    clipping_distance = None
     colorizer = None
 
     black_image = np.zeros((OUTPUT_IMAGE_WIDTH, OUTPUT_IMAGE_HEIGHT, 3))
@@ -54,15 +56,22 @@ class TransformationRGBDepth():
         # Start streaming
         profile = self.pipeline.start(config)
 
+        # Set ROI (https://github.com/IntelRealSense/librealsense/issues/3427)
+        dev = profile.get_device()
+        for sensor in dev.sensors:
+            if not sensor.is_depth_sensor():
+                break
+        roi_sensor = sensor.as_roi_sensor()
+        sensor_roi = roi_sensor.get_region_of_interest()
+        sensor_roi.min_x, sensor_roi.max_x = CORNER_TOP_LEFT[0], CORNER_TOP_RIGHT[0]
+        sensor_roi.min_y, sensor_roi.max_y = CORNER_TOP_LEFT[1], CORNER_BOTTOM_RIGHT[1]
+        roi_sensor.set_region_of_interest(sensor_roi)
+        print(sensor_roi.min_x, sensor_roi.max_x, sensor_roi.min_y, sensor_roi.max_y)
+
         # Getting the depth sensor's depth scale (see rs-align example for explanation)
         depth_sensor = profile.get_device().first_depth_sensor()
         depth_scale = depth_sensor.get_depth_scale()
         print("Depth Scale is: ", depth_scale)
-
-        # We will be removing the background of objects more than
-        #  clipping_distance_in_meters meters away
-        clipping_distance_in_meters = 1.5  # 1 meter
-        self.clipping_distance = clipping_distance_in_meters / depth_scale
 
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
@@ -87,8 +96,8 @@ class TransformationRGBDepth():
         self.colorizer = rs.colorizer()
         self.colorizer.set_option(rs.option.color_scheme, 0)
         self.colorizer.set_option(rs.option.histogram_equalization_enabled, 0)
-        self.colorizer.set_option(rs.option.min_distance, 1.0)  # meter
-        self.colorizer.set_option(rs.option.max_distance, 1.5)  # meter
+        self.colorizer.set_option(rs.option.min_distance, 0.9)  # meter
+        self.colorizer.set_option(rs.option.max_distance, 1.6)  # meter
 
     # Streaming loop
     def loop(self):
@@ -103,8 +112,8 @@ class TransformationRGBDepth():
                 depth_colormap = self.perspective_transformation(depth_colormap)
 
                 # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
-                color_image = cv2.copyMakeBorder(color_image, top=115, bottom=0, left=0, right=60, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
-                depth_colormap = cv2.copyMakeBorder(depth_colormap, top=115, bottom=0, left=0, right=60, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                color_image = cv2.copyMakeBorder(color_image, top=BORDER_TOP, bottom=BORDER_BOTTOM, left=BORDER_LEFT, right=BORDER_RIGHT, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                depth_colormap = cv2.copyMakeBorder(depth_colormap, top=BORDER_TOP, bottom=BORDER_BOTTOM, left=BORDER_LEFT, right=BORDER_RIGHT, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
 
                 # Upscale to 1920x1080 px
                 color_image = cv2.resize(color_image, (OUTPUT_IMAGE_WIDTH, OUTPUT_IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
@@ -135,6 +144,9 @@ class TransformationRGBDepth():
                     self.display_mode = 'memory'
                     #self.stored_image = cv2.bitwise_not(color_image)
                     self.stored_image = color_image
+                elif key == 52:
+                    cv2.imwrite('depth.png', depth_colormap)
+                    cv2.imwrite('color.png', color_image)
         finally:
             self.pipeline.stop()
 
