@@ -18,10 +18,10 @@ DEPTH_FPS = 30
 RGB_FPS = 30
 
 # Coordinates of table corners
-CORNER_TOP_LEFT = (196, 96)
-CORNER_TOP_RIGHT = (1143, 108)
-CORNER_BOTTOM_LEFT = (196, 565)
-CORNER_BOTTOM_RIGHT = (1131, 579)
+CORNER_TOP_LEFT = (162, 95)
+CORNER_TOP_RIGHT = (1226, 97)
+CORNER_BOTTOM_LEFT = (164, 620)
+CORNER_BOTTOM_RIGHT = (1222, 628)
 
 BLACK_BORDER_HEIGHT = 80  # px
 
@@ -96,18 +96,15 @@ class TransformationRGBDepth():
             while True:
                 # Get frameset of color and depth
                 frames = self.pipeline.wait_for_frames()
-                # frames.get_depth_frame() is a 640x360 depth image
-
                 color_image, depth_colormap = self.align_frames(frames)
 
+                # Perspective Transformation on images
                 color_image = self.perspective_transformation(color_image)
                 depth_colormap = self.perspective_transformation(depth_colormap)
 
-                # print(depth_colormap.shape)
-
                 # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
-                color_image = cv2.copyMakeBorder(color_image, top=0, bottom=BLACK_BORDER_HEIGHT, left=0, right=0, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
-                depth_colormap = cv2.copyMakeBorder(depth_colormap, top=0, bottom=BLACK_BORDER_HEIGHT, left=0, right=0, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                color_image = cv2.copyMakeBorder(color_image, top=115, bottom=0, left=0, right=60, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                depth_colormap = cv2.copyMakeBorder(depth_colormap, top=115, bottom=0, left=0, right=60, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
 
                 # Upscale to 1920x1080 px
                 color_image = cv2.resize(color_image, (OUTPUT_IMAGE_WIDTH, OUTPUT_IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
@@ -156,7 +153,7 @@ class TransformationRGBDepth():
         # Generate color image
         color_image = np.asanyarray(color_frame.get_data())
 
-        # Transform the deph map into a RGB image
+        # Transform the depth map into a RGB image
         depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
         #depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
 
