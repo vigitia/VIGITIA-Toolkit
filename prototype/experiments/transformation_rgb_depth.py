@@ -18,19 +18,21 @@ DEPTH_FPS = 30
 RGB_FPS = 30
 
 # Coordinates of table corners
-CORNER_TOP_LEFT = (162, 95)
-CORNER_TOP_RIGHT = (1226, 97)
-CORNER_BOTTOM_LEFT = (164, 620)
-CORNER_BOTTOM_RIGHT = (1222, 628)
+CORNER_TOP_LEFT = (42, 135)
+CORNER_TOP_RIGHT = (1191, 138)
+CORNER_BOTTOM_LEFT = (37, 707)
+CORNER_BOTTOM_RIGHT = (1192, 714)
 
-BORDER_TOP = 115  # px
-BORDER_BOTTOM = 0  # px
-BORDER_LEFT = 0  # px
-BORDER_RIGHT = 60  # px
+BORDER_TOP = 0  # px
+BORDER_BOTTOM = 115  # px
+BORDER_LEFT = 60  # px
+BORDER_RIGHT = 0  # px
 
 # Output image (currently needs to be 16x9 because the projector can project this)
 OUTPUT_IMAGE_WIDTH = 1920
 OUTPUT_IMAGE_HEIGHT = 1080
+
+CALIBRATE = False
 
 
 class TransformationRGBDepth():
@@ -57,16 +59,16 @@ class TransformationRGBDepth():
         profile = self.pipeline.start(config)
 
         # Set ROI (https://github.com/IntelRealSense/librealsense/issues/3427)
-        dev = profile.get_device()
-        for sensor in dev.sensors:
-            if not sensor.is_depth_sensor():
-                break
-        roi_sensor = sensor.as_roi_sensor()
-        sensor_roi = roi_sensor.get_region_of_interest()
-        sensor_roi.min_x, sensor_roi.max_x = CORNER_TOP_LEFT[0], CORNER_TOP_RIGHT[0]
-        sensor_roi.min_y, sensor_roi.max_y = CORNER_TOP_LEFT[1], CORNER_BOTTOM_RIGHT[1]
-        roi_sensor.set_region_of_interest(sensor_roi)
-        print(sensor_roi.min_x, sensor_roi.max_x, sensor_roi.min_y, sensor_roi.max_y)
+        # dev = profile.get_device()
+        # for sensor in dev.sensors:
+        #     if not sensor.is_depth_sensor():
+        #         break
+        # roi_sensor = sensor.as_roi_sensor()
+        # sensor_roi = roi_sensor.get_region_of_interest()
+        # sensor_roi.min_x, sensor_roi.max_x = CORNER_TOP_LEFT[0], CORNER_TOP_RIGHT[0]
+        # sensor_roi.min_y, sensor_roi.max_y = CORNER_TOP_LEFT[1], CORNER_BOTTOM_RIGHT[1]
+        # roi_sensor.set_region_of_interest(sensor_roi)
+        # print(sensor_roi.min_x, sensor_roi.max_x, sensor_roi.min_y, sensor_roi.max_y)
 
         # Getting the depth sensor's depth scale (see rs-align example for explanation)
         depth_sensor = profile.get_device().first_depth_sensor()
@@ -90,7 +92,7 @@ class TransformationRGBDepth():
 
     def mouse_click(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
-            print(x, y)
+            print((x, y))
 
     def init_colorizer(self):
         self.colorizer = rs.colorizer()
@@ -107,17 +109,22 @@ class TransformationRGBDepth():
                 frames = self.pipeline.wait_for_frames()
                 color_image, depth_colormap = self.align_frames(frames)
 
+                color_image = cv2.flip(color_image, -1)
+                depth_colormap = cv2.flip(depth_colormap, -1)
+
                 # Perspective Transformation on images
                 color_image = self.perspective_transformation(color_image)
                 depth_colormap = self.perspective_transformation(depth_colormap)
 
-                # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
-                color_image = cv2.copyMakeBorder(color_image, top=BORDER_TOP, bottom=BORDER_BOTTOM, left=BORDER_LEFT, right=BORDER_RIGHT, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
-                depth_colormap = cv2.copyMakeBorder(depth_colormap, top=BORDER_TOP, bottom=BORDER_BOTTOM, left=BORDER_LEFT, right=BORDER_RIGHT, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                if not CALIBRATE:
+                    # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
+                    color_image = cv2.copyMakeBorder(color_image, top=BORDER_TOP, bottom=BORDER_BOTTOM, left=BORDER_LEFT, right=BORDER_RIGHT, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                    depth_colormap = cv2.copyMakeBorder(depth_colormap, top=BORDER_TOP, bottom=BORDER_BOTTOM, left=BORDER_LEFT, right=BORDER_RIGHT, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
 
-                # Upscale to 1920x1080 px
-                color_image = cv2.resize(color_image, (OUTPUT_IMAGE_WIDTH, OUTPUT_IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
-                depth_colormap = cv2.resize(depth_colormap, (OUTPUT_IMAGE_WIDTH, OUTPUT_IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
+                    # Upscale to 1920x1080 px
+
+                    color_image = cv2.resize(color_image, (OUTPUT_IMAGE_WIDTH, OUTPUT_IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
+                    depth_colormap = cv2.resize(depth_colormap, (OUTPUT_IMAGE_WIDTH, OUTPUT_IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
 
                 if self.display_mode == "RGB":
                     cv2.imshow('window', color_image)
@@ -185,7 +192,8 @@ class TransformationRGBDepth():
         pts1 = np.float32([list(CORNER_TOP_LEFT), list(CORNER_TOP_RIGHT), list(CORNER_BOTTOM_LEFT), list(CORNER_BOTTOM_RIGHT)])
         pts2 = np.float32([[0, 0], [x, 0], [0, x / 2], [x, x / 2]])
         matrix = cv2.getPerspectiveTransform(pts1, pts2)
-        frame = cv2.warpPerspective(frame, matrix, (x, x / 2))
+        if not CALIBRATE:
+            frame = cv2.warpPerspective(frame, matrix, (x, int(x / 2)))
 
         return frame
 
