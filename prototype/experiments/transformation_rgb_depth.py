@@ -3,7 +3,10 @@ import pyrealsense2 as rs
 import cv2
 import numpy as np
 
+from hand_tracker import HandTracker
+
 # Built upon: https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/align-depth2color.py
+# Code for Hand Tracking and Models from https://github.com/metalwhale/hand_tracking
 
 '''
 Current distance between camera and table: 121.5cm
@@ -34,6 +37,35 @@ OUTPUT_IMAGE_HEIGHT = 1080
 
 CALIBRATE = False
 
+PALM_MODEL_PATH = "./palm_detection_without_custom_op.tflite"
+LANDMARK_MODEL_PATH = "./hand_landmark.tflite"
+ANCHORS_PATH = "./anchors.csv"
+
+POINT_COLOR = (0, 255, 0)
+CONNECTION_COLOR = (255, 255, 0)
+THICKNESS = 2
+
+#        8   12  16  20
+#        |   |   |   |
+#        7   11  15  19
+#    4   |   |   |   |
+#    |   6   10  14  18
+#    3   |   |   |   |
+#    |   5---9---13--17
+#    2    \         /
+#     \    \       /
+#      1    \     /
+#       \    \   /
+#        ------0-
+connections = [
+    (0, 1), (1, 2), (2, 3), (3, 4),
+    (5, 6), (6, 7), (7, 8),
+    (9, 10), (10, 11), (11, 12),
+    (13, 14), (14, 15), (15, 16),
+    (17, 18), (18, 19), (19, 20),
+    (0, 5), (5, 9), (9, 13), (13, 17), (0, 17)
+]
+
 
 class TransformationRGBDepth():
 
@@ -41,10 +73,10 @@ class TransformationRGBDepth():
     align = None
     colorizer = None
 
-    black_image = np.zeros((OUTPUT_IMAGE_WIDTH, OUTPUT_IMAGE_HEIGHT, 3))
-    display_mode = "RGB"
-
+    display_mode = "off"
     stored_image = None
+    hand_detector = None
+    show_hand_model = False
 
     def __init__(self):
         # Create a pipeline
@@ -88,7 +120,17 @@ class TransformationRGBDepth():
         cv2.setMouseCallback('window', self.mouse_click)
 
         self.init_colorizer()
+        self.init_hand_detector()
         self.loop()
+
+    def init_hand_detector(self):
+        self.detector = HandTracker(
+            PALM_MODEL_PATH,
+            LANDMARK_MODEL_PATH,
+            ANCHORS_PATH,
+            box_shift=0.2,
+            box_enlarge=1.3
+        )
 
     def mouse_click(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -109,6 +151,9 @@ class TransformationRGBDepth():
                 frames = self.pipeline.wait_for_frames()
                 color_image, depth_colormap = self.align_frames(frames)
 
+                color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
+
+                # Flip image vertically and horizontally (instead of rotating the camera 180° on the current setup)
                 color_image = cv2.flip(color_image, -1)
                 depth_colormap = cv2.flip(depth_colormap, -1)
 
@@ -116,22 +161,34 @@ class TransformationRGBDepth():
                 color_image = self.perspective_transformation(color_image)
                 depth_colormap = self.perspective_transformation(depth_colormap)
 
-                if not CALIBRATE:
-                    # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
-                    color_image = cv2.copyMakeBorder(color_image, top=BORDER_TOP, bottom=BORDER_BOTTOM, left=BORDER_LEFT, right=BORDER_RIGHT, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
-                    depth_colormap = cv2.copyMakeBorder(depth_colormap, top=BORDER_TOP, bottom=BORDER_BOTTOM, left=BORDER_LEFT, right=BORDER_RIGHT, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
-
-                    # Upscale to 1920x1080 px
-
-                    color_image = cv2.resize(color_image, (OUTPUT_IMAGE_WIDTH, OUTPUT_IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
-                    depth_colormap = cv2.resize(depth_colormap, (OUTPUT_IMAGE_WIDTH, OUTPUT_IMAGE_HEIGHT), interpolation=cv2.INTER_AREA)
+                # Hand detection
+                points, _ = self.detector(color_image)
 
                 if self.display_mode == "RGB":
+                    if not CALIBRATE:
+                        color_image = self.add_hand_tracking_points(color_image, points, depth_colormap)
+                        color_image = cv2.cvtColor(color_image, cv2.COLOR_RGB2BGR)
+                        # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
+                        color_image = cv2.copyMakeBorder(color_image, top=BORDER_TOP, bottom=BORDER_BOTTOM,
+                                                         left=BORDER_LEFT, right=BORDER_RIGHT,
+                                                         borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
                     cv2.imshow('window', color_image)
                 elif self.display_mode == "depth":
+                    # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
+                    if not CALIBRATE:
+                        depth_colormap = self.add_hand_tracking_points(depth_colormap, points, depth_colormap)
+                        depth_colormap = cv2.copyMakeBorder(depth_colormap, top=BORDER_TOP, bottom=BORDER_BOTTOM,
+                                                            left=BORDER_LEFT, right=BORDER_RIGHT,
+                                                            borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+
                     cv2.imshow('window', depth_colormap)
                 elif self.display_mode == "off":
-                    cv2.imshow('window', self.black_image)
+                    black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
+                    black_image = self.add_hand_tracking_points(black_image, points, depth_colormap)
+                    black_image = cv2.copyMakeBorder(black_image, top=BORDER_TOP, bottom=BORDER_BOTTOM,
+                                                     left=BORDER_LEFT, right=BORDER_RIGHT,
+                                                     borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                    cv2.imshow('window', black_image)
                 elif self.display_mode == 'memory':
                     cv2.imshow('window', self.stored_image)
 
@@ -154,15 +211,38 @@ class TransformationRGBDepth():
                 elif key == 52:
                     cv2.imwrite('depth.png', depth_colormap)
                     cv2.imwrite('color.png', color_image)
+                elif key == 104:  # H
+                    self.show_hand_model = not self.show_hand_model
         finally:
             self.pipeline.stop()
+
+    def add_hand_tracking_points(self, frame, points, depth_image):
+        if points is not None:
+            point_id = 0
+            for point in points:
+                x, y = point
+                if point_id == 8:
+                    cv2.circle(frame, (int(x), int(y)), THICKNESS * 5, (255, 0, 0), -1)
+                    #depth = depth_image.get_distance(int(x), int(y))
+                    #print(depth)
+                else:
+                    if self.show_hand_model:
+                        cv2.circle(frame, (int(x), int(y)), THICKNESS * 2, POINT_COLOR, -1)
+                point_id += 1
+            if self.show_hand_model:
+                for connection in connections:
+                    x0, y0 = points[connection[0]]
+                    x1, y1 = points[connection[1]]
+                    cv2.line(frame, (int(x0), int(y0)), (int(x1), int(y1)), CONNECTION_COLOR, THICKNESS)
+
+        return frame
 
     # Align the depth frame to color frame
     def align_frames(self, frames):
         aligned_frames = self.align.process(frames)
 
         # Get aligned frames
-        aligned_depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
+        aligned_depth_frame = aligned_frames.get_depth_frame()
         color_frame = aligned_frames.get_color_frame()
 
         # Validate that both frames are valid
