@@ -225,7 +225,13 @@ class TransformationRGBDepth:
                     ret, thresh = cv2.threshold(copy, 100, 255, 0)
                     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                     copy = np.zeros((copy.shape[0], copy.shape[1], 3), np.uint8)
-                    cv2.drawContours(copy, contours, -1, (0, 255, 0), 1)
+                    #cv2.drawContours(copy, contours, -1, (0, 255, 0), 1)
+                    for contour in contours:
+                        (x, y), radius = cv2.minEnclosingCircle(contour)
+                        center = (int(x), int(y))
+                        radius = int(radius*1.5)
+                        if radius < copy.shape[0]/2:
+                            copy = cv2.circle(copy, center, radius, (255, 255, 255), cv2.FILLED)
 
 
                     copy = self.add_border(copy)
