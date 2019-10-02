@@ -35,7 +35,7 @@ CORNER_BOTTOM_RIGHT = (1231, 627)
 BORDER_TOP = 100  # px
 BORDER_BOTTOM = 0  # px
 BORDER_LEFT = 0  # px
-BORDER_RIGHT = 40  # px
+BORDER_RIGHT = 50  # px
 
 # Paths to the Models needed for hand tracking
 PALM_MODEL_PATH = "./palm_detection_without_custom_op.tflite"
@@ -75,6 +75,7 @@ class TransformationRGBDepth:
     pipeline = None
     align = None
     colorizer = None
+    last_color_frame = None
     stored_image = None
     hand_detector = None
 
@@ -164,6 +165,8 @@ class TransformationRGBDepth:
                 frames = self.pipeline.wait_for_frames()
                 color_image, depth_colormap, aligned_depth_frame = self.align_frames(frames)
 
+                self.last_color_frame = color_image
+
                 # Hand detection
                 if self.hand_tracking_enabled and self.frame % 4 == 0:
                     self.hand_points, _ = self.detector(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
@@ -206,9 +209,26 @@ class TransformationRGBDepth:
                     cv2.imshow('window', black_image)
                 elif self.display_mode == 'memory':
                     copy = self.stored_image.copy()
+
+                    # Invert image
                     #copy = cv2.bitwise_not(copy)
-                    copy = cv2.Canny(copy, 100, 200)
-                    #copy = self.add_border(copy)
+
+                    # Canny Edge Detection
+                    # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
+                    # copy = cv2.cvtColor(copy, cv2.COLOR_BGR2GRAY)
+                    # copy = cv2.bilateralFilter(copy, 11, 17, 17)
+                    # copy = cv2.Canny(copy, 100, 200)
+
+                    # Contours
+                    copy = cv2.cvtColor(copy, cv2.COLOR_BGR2GRAY)
+                    copy = cv2.bilateralFilter(copy, 11, 17, 17)
+                    ret, thresh = cv2.threshold(copy, 100, 255, 0)
+                    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                    copy = np.zeros((copy.shape[0], copy.shape[1], 3), np.uint8)
+                    cv2.drawContours(copy, contours, -1, (0, 255, 0), 1)
+
+
+                    copy = self.add_border(copy)
                     cv2.imshow('window', copy)
 
                 key = cv2.waitKey(1)
@@ -230,8 +250,8 @@ class TransformationRGBDepth:
         elif key == 50:  # Key 2
             self.display_mode = "off"
         elif key == 51:  # Key 3
+            self.stored_image = self.perspective_transformation(self.last_color_frame.copy())
             self.display_mode = 'memory'
-            self.stored_image = color_image
         elif key == 52:  # Key 4
             cv2.imwrite('depth.png', depth_colormap)
             cv2.imwrite('color.png', color_image)
