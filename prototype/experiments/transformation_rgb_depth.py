@@ -78,6 +78,9 @@ class TransformationRGBDepth():
     hand_detector = None
     show_hand_model = False
 
+    depth_scale = 0
+    last_distance = -1
+
     def __init__(self):
         # Create a pipeline
         self.pipeline = rs.pipeline()
@@ -104,8 +107,8 @@ class TransformationRGBDepth():
 
         # Getting the depth sensor's depth scale (see rs-align example for explanation)
         depth_sensor = profile.get_device().first_depth_sensor()
-        depth_scale = depth_sensor.get_depth_scale()
-        print("Depth Scale is: ", depth_scale)
+        self.depth_scale = depth_sensor.get_depth_scale()
+        print("Depth Scale is: ",  self.depth_scale)
 
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
@@ -149,25 +152,25 @@ class TransformationRGBDepth():
             while True:
                 # Get frameset of color and depth
                 frames = self.pipeline.wait_for_frames()
-                color_image, depth_colormap = self.align_frames(frames)
+                color_image, depth_colormap, aligned_depth_frame = self.align_frames(frames)
 
-                color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
+                # Hand detection
+                points, _ = self.detector(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
+                if points is not None:
+                    self.last_distance = aligned_depth_frame.get_distance(int(points[8][0]), int(points[8][1]))
+                else:
+                    self.last_distance = -1
+
+                cv2.imshow('window', color_image)
+                pass
 
                 # Flip image vertically and horizontally (instead of rotating the camera 180° on the current setup)
                 color_image = cv2.flip(color_image, -1)
                 depth_colormap = cv2.flip(depth_colormap, -1)
 
-                # Perspective Transformation on images
-                color_image = self.perspective_transformation(color_image)
-                depth_colormap = self.perspective_transformation(depth_colormap)
-
-                # Hand detection
-                points, _ = self.detector(color_image)
-
                 if self.display_mode == "RGB":
                     if not CALIBRATE:
                         color_image = self.add_hand_tracking_points(color_image, points, depth_colormap)
-                        color_image = cv2.cvtColor(color_image, cv2.COLOR_RGB2BGR)
                         # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
                         color_image = cv2.copyMakeBorder(color_image, top=BORDER_TOP, bottom=BORDER_BOTTOM,
                                                          left=BORDER_LEFT, right=BORDER_RIGHT,
@@ -177,6 +180,8 @@ class TransformationRGBDepth():
                     # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
                     if not CALIBRATE:
                         depth_colormap = self.add_hand_tracking_points(depth_colormap, points, depth_colormap)
+                        # Perspective Transformation on images
+                        depth_colormap = self.perspective_transformation(depth_colormap)
                         depth_colormap = cv2.copyMakeBorder(depth_colormap, top=BORDER_TOP, bottom=BORDER_BOTTOM,
                                                             left=BORDER_LEFT, right=BORDER_RIGHT,
                                                             borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
@@ -185,9 +190,14 @@ class TransformationRGBDepth():
                 elif self.display_mode == "off":
                     black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
                     black_image = self.add_hand_tracking_points(black_image, points, depth_colormap)
+                    black_image = cv2.flip(black_image, -1)
+                    black_image = self.perspective_transformation(black_image)
                     black_image = cv2.copyMakeBorder(black_image, top=BORDER_TOP, bottom=BORDER_BOTTOM,
                                                      left=BORDER_LEFT, right=BORDER_RIGHT,
                                                      borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                    if not self.last_distance == -1:
+                        cv2.putText(img=black_image, text=str(int(self.last_distance * 100)) + " cm", org=(100, 100),
+                                    fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
                     cv2.imshow('window', black_image)
                 elif self.display_mode == 'memory':
                     cv2.imshow('window', self.stored_image)
@@ -223,8 +233,8 @@ class TransformationRGBDepth():
                 x, y = point
                 if point_id == 8:
                     cv2.circle(frame, (int(x), int(y)), THICKNESS * 5, (255, 0, 0), -1)
-                    #depth = depth_image.get_distance(int(x), int(y))
-                    #print(depth)
+                    pixel = depth_image[0]
+                    meters = pixel * self.depth_scale
                 else:
                     if self.show_hand_model:
                         cv2.circle(frame, (int(x), int(y)), THICKNESS * 2, POINT_COLOR, -1)
@@ -254,9 +264,8 @@ class TransformationRGBDepth():
 
         # Transform the depth map into a RGB image
         depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
-        #depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
 
-        return color_image, depth_colormap
+        return color_image, depth_colormap, aligned_depth_frame
 
     # Based on: https://www.youtube.com/watch?v=PtCQH93GucA
     def perspective_transformation(self, frame):
