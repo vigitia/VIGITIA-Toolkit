@@ -8,9 +8,8 @@ from hand_tracker import HandTracker
 # Built upon: https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/align-depth2color.py
 # Code for Hand Tracking and Models from https://github.com/metalwhale/hand_tracking
 
-'''
-Current distance between camera and table: 112cm
-'''
+# Current distance between camera and table in cm
+DISTANCE_CAMERA_TABLE = 112  # cm
 
 # Camera Settings
 DEPTH_RES_X = 1280
@@ -26,20 +25,17 @@ OUTPUT_IMAGE_WIDTH = 1920
 OUTPUT_IMAGE_HEIGHT = 1080
 
 # Coordinates of table corners for perspective transformation
-CORNER_TOP_LEFT = (42, 135)
-CORNER_TOP_RIGHT = (1191, 138)
-CORNER_BOTTOM_LEFT = (37, 707)
-CORNER_BOTTOM_RIGHT = (1192, 714)
+CORNER_TOP_LEFT = (92, 33)
+CORNER_TOP_RIGHT = (1243, 55)
+CORNER_BOTTOM_LEFT = (85, 608)
+CORNER_BOTTOM_RIGHT = (1231, 627)
 
 # Since the projection field of the projector is larger than the table,
 # we need to add black borders on at least two sides
-BORDER_TOP = 0  # px
-BORDER_BOTTOM = 115  # px
-BORDER_LEFT = 60  # px
-BORDER_RIGHT = 0  # px
-
-# If calibration mode is on, the user can select the table corners
-CALIBRATE = False
+BORDER_TOP = 100  # px
+BORDER_BOTTOM = 0  # px
+BORDER_LEFT = 0  # px
+BORDER_RIGHT = 40  # px
 
 # Paths to the Models needed for hand tracking
 PALM_MODEL_PATH = "./palm_detection_without_custom_op.tflite"
@@ -79,13 +75,18 @@ class TransformationRGBDepth:
     pipeline = None
     align = None
     colorizer = None
-
-    display_mode = "off"
     stored_image = None
     hand_detector = None
+
+    # If calibration mode is on, the user can select the table corners
+    calibration_mode = False
+    display_mode = "off"
+    hand_tracking_enabled = False
     show_hand_model = False
 
+    frame = 0
     depth_scale = 0
+    hand_points = None
     last_distance = -1
 
     def __init__(self):
@@ -158,54 +159,57 @@ class TransformationRGBDepth:
     def loop(self):
         try:
             while True:
+                self.frame += 1
                 # Get frameset of color and depth
                 frames = self.pipeline.wait_for_frames()
                 color_image, depth_colormap, aligned_depth_frame = self.align_frames(frames)
 
                 # Hand detection
-                points, _ = self.detector(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
-                if points is not None:
-                    self.last_distance = aligned_depth_frame.get_distance(int(points[8][0]), int(points[8][1]))
-                else:
-                    self.last_distance = -1
+                if self.hand_tracking_enabled and self.frame % 4 == 0:
+                    self.hand_points, _ = self.detector(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
+                    if self.hand_points is not None:
+                        self.last_distance = aligned_depth_frame.get_distance(int(self.hand_points[8][0]), int(self.hand_points[8][1]))
+                    else:
+                        self.last_distance = -1
 
                 # Flip image vertically and horizontally (instead of rotating the camera 180° on the current setup)
-                color_image = cv2.flip(color_image, -1)
-                depth_colormap = cv2.flip(depth_colormap, -1)
+                #color_image = cv2.flip(color_image, -1)
+                #depth_colormap = cv2.flip(depth_colormap, -1)
 
                 if self.display_mode == "RGB":
-                    if not CALIBRATE:
-                        color_image = self.add_hand_tracking_points(color_image, points)
+                    if not self.calibration_mode:
+                        color_image = self.add_hand_tracking_points(color_image, self.hand_points)
+                        # Perspective Transformation on images
+                        color_image = self.perspective_transformation(color_image)
                         # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
-                        color_image = cv2.copyMakeBorder(color_image, top=BORDER_TOP, bottom=BORDER_BOTTOM,
-                                                         left=BORDER_LEFT, right=BORDER_RIGHT,
-                                                         borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                        color_image = self.add_border(color_image)
                     cv2.imshow('window', color_image)
                 elif self.display_mode == "depth":
                     # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
-                    if not CALIBRATE:
-                        depth_colormap = self.add_hand_tracking_points(depth_colormap, points)
+                    if not self.calibration_mode:
+                        depth_colormap = self.add_hand_tracking_points(depth_colormap, self.hand_points)
                         # Perspective Transformation on images
                         depth_colormap = self.perspective_transformation(depth_colormap)
-                        depth_colormap = cv2.copyMakeBorder(depth_colormap, top=BORDER_TOP, bottom=BORDER_BOTTOM,
-                                                            left=BORDER_LEFT, right=BORDER_RIGHT,
-                                                            borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                        depth_colormap = self.add_border(depth_colormap)
 
                     cv2.imshow('window', depth_colormap)
                 elif self.display_mode == "off":
                     black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
-                    black_image = self.add_hand_tracking_points(black_image, points)
-                    black_image = cv2.flip(black_image, -1)
+                    black_image = self.add_hand_tracking_points(black_image, self.hand_points)
+                    #black_image = cv2.flip(black_image, -1)
                     black_image = self.perspective_transformation(black_image)
-                    black_image = cv2.copyMakeBorder(black_image, top=BORDER_TOP, bottom=BORDER_BOTTOM,
-                                                     left=BORDER_LEFT, right=BORDER_RIGHT,
-                                                     borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                    black_image = self.add_border(black_image)
                     if not self.last_distance == -1:
-                        cv2.putText(img=black_image, text=str(int(self.last_distance * 100)) + " cm", org=(100, 100),
+                        cv2.putText(img=black_image, text=str(int(self.last_distance * 100)) + " cm",
+                                    org=(int(color_image.shape[1]/6), int(color_image.shape[0]/4)),
                                     fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
                     cv2.imshow('window', black_image)
                 elif self.display_mode == 'memory':
-                    cv2.imshow('window', self.stored_image)
+                    copy = self.stored_image.copy()
+                    #copy = cv2.bitwise_not(copy)
+                    copy = cv2.Canny(copy, 100, 200)
+                    #copy = self.add_border(copy)
+                    cv2.imshow('window', copy)
 
                 key = cv2.waitKey(1)
                 # Press esc or 'q' to close the image window
@@ -227,15 +231,32 @@ class TransformationRGBDepth:
             self.display_mode = "off"
         elif key == 51:  # Key 3
             self.display_mode = 'memory'
-            # self.stored_image = cv2.bitwise_not(color_image)
             self.stored_image = color_image
         elif key == 52:  # Key 4
             cv2.imwrite('depth.png', depth_colormap)
             cv2.imwrite('color.png', color_image)
         elif key == 99:  # C as in Calibrate
-            pass
+            self.calibration_mode = not self.calibration_mode
         elif key == 104:  # H as in Hand
-            self.show_hand_model = not self.show_hand_model
+            if not self.hand_tracking_enabled:
+                self.hand_tracking_enabled = True
+            else:
+                if not self.show_hand_model:
+                    self.show_hand_model = True
+                else:
+                    self.show_hand_model = False
+                    self.hand_tracking_enabled = False
+                    self.hand_points = None
+                    self.last_distance = -1
+
+    def add_border(self, frame):
+        frame = cv2.copyMakeBorder(frame, top=BORDER_TOP, bottom=BORDER_BOTTOM,
+                                   left=BORDER_LEFT, right=BORDER_RIGHT,
+                                   borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+
+        return frame
+
+
 
     def add_hand_tracking_points(self, frame, points):
         if points is not None:
@@ -282,7 +303,7 @@ class TransformationRGBDepth:
         x = frame.shape[1]
 
         # Draw circles to mark the screen corners. Only show them if calibration mode is on
-        if CALIBRATE:
+        if self.calibration_mode:
             cv2.circle(frame, CORNER_TOP_LEFT, 1, (0, 0, 255), -1)
             cv2.circle(frame, CORNER_TOP_RIGHT, 1, (0, 0, 255), -1)
             cv2.circle(frame, CORNER_BOTTOM_LEFT, 1, (0, 0, 255), -1)
@@ -292,7 +313,7 @@ class TransformationRGBDepth:
         pts2 = np.float32([[0, 0], [x, 0], [0, x / 2], [x, x / 2]])
         matrix = cv2.getPerspectiveTransform(pts1, pts2)
         # Only do the perspective transformation if calibration mode is off.
-        if not CALIBRATE:
+        if not self.calibration_mode:
             frame = cv2.warpPerspective(frame, matrix, (x, int(x / 2)))
 
         return frame
