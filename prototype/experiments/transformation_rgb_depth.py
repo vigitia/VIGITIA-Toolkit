@@ -201,6 +201,7 @@ class TransformationRGBDepth:
                     black_image = self.add_hand_tracking_points(black_image, self.hand_points)
                     #black_image = cv2.flip(black_image, -1)
                     black_image = self.perspective_transformation(black_image)
+                    #black_image = self.hightlight_objects(self.perspective_transformation(color_image))
                     black_image = self.add_border(black_image)
                     if not self.last_distance == -1:
                         cv2.putText(img=black_image, text=str(int(self.last_distance * 100)) + " cm",
@@ -220,19 +221,7 @@ class TransformationRGBDepth:
                     # copy = cv2.Canny(copy, 100, 200)
 
                     # Contours
-                    copy = cv2.cvtColor(copy, cv2.COLOR_BGR2GRAY)
-                    copy = cv2.bilateralFilter(copy, 11, 17, 17)
-                    ret, thresh = cv2.threshold(copy, 100, 255, 0)
-                    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-                    copy = np.zeros((copy.shape[0], copy.shape[1], 3), np.uint8)
-                    #cv2.drawContours(copy, contours, -1, (0, 255, 0), 1)
-                    for contour in contours:
-                        (x, y), radius = cv2.minEnclosingCircle(contour)
-                        center = (int(x), int(y))
-                        radius = int(radius*1.5)
-                        if radius < copy.shape[0]/2:
-                            copy = cv2.circle(copy, center, radius, (255, 255, 255), cv2.FILLED)
-
+                    copy = self.hightlight_objects(copy)
 
                     copy = self.add_border(copy)
                     cv2.imshow('window', copy)
@@ -246,6 +235,22 @@ class TransformationRGBDepth:
                     self.check_key_inputs(key, color_image, depth_colormap)
         finally:
             self.pipeline.stop()
+
+    def hightlight_objects(self, frame):
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        frame = cv2.bilateralFilter(frame, 11, 17, 17)
+        ret, thresh = cv2.threshold(frame, 100, 255, 0)
+        contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        frame = np.zeros((frame.shape[0], frame.shape[1], 3), np.uint8)
+        # cv2.drawContours(copy, contours, -1, (0, 255, 0), 1)
+        for contour in contours:
+            (x, y), radius = cv2.minEnclosingCircle(contour)
+            center = (int(x), int(y))
+            radius = int(radius * 1.5)
+            if radius < frame.shape[0] / 2:
+                frame = cv2.circle(frame, center, radius, (255, 255, 255), cv2.FILLED)
+
+        return frame
 
     def check_key_inputs(self, key, color_image, depth_colormap):
         if key == 49:  # Key 1:
