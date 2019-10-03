@@ -1,6 +1,7 @@
 import sys
 import pyrealsense2 as rs
 import cv2
+import cv2.aruco as aruco
 import numpy as np
 
 from hand_tracker import HandTracker
@@ -9,7 +10,7 @@ from hand_tracker import HandTracker
 # Code for Hand Tracking and Models from https://github.com/metalwhale/hand_tracking
 
 # Current distance between camera and table in cm
-DISTANCE_CAMERA_TABLE = 112  # cm
+DISTANCE_CAMERA_TABLE = 110  # cm
 
 # Camera Settings
 DEPTH_RES_X = 1280
@@ -25,10 +26,10 @@ OUTPUT_IMAGE_WIDTH = 1920
 OUTPUT_IMAGE_HEIGHT = 1080
 
 # Coordinates of table corners for perspective transformation
-CORNER_TOP_LEFT = (92, 33)
-CORNER_TOP_RIGHT = (1243, 55)
-CORNER_BOTTOM_LEFT = (85, 608)
-CORNER_BOTTOM_RIGHT = (1231, 627)
+CORNER_TOP_LEFT = (79, 45)
+CORNER_TOP_RIGHT = (1261, 72)
+CORNER_BOTTOM_LEFT = (72, 638)
+CORNER_BOTTOM_RIGHT = (1249, 654)
 
 # Since the projection field of the projector is larger than the table,
 # we need to add black borders on at least two sides
@@ -61,12 +62,12 @@ THICKNESS = 2
 #       \    \   /
 #        ------0-
 CONNECTIONS = [
-    (0, 1), (1, 2), (2, 3), (3, 4),
+    (0, 1), (1, 2), (2, 3), (2, 5), (3, 4),
     (5, 6), (6, 7), (7, 8),
     (9, 10), (10, 11), (11, 12),
     (13, 14), (14, 15), (15, 16),
     (17, 18), (18, 19), (19, 20),
-    (0, 5), (5, 9), (9, 13), (13, 17), (0, 17)
+    (5, 9), (9, 13), (13, 17), (0, 17)
 ]
 
 
@@ -79,10 +80,14 @@ class TransformationRGBDepth:
     stored_image = None
     hand_detector = None
 
+    aruco_dictionary = None
+    aruco_detector_parameters = None
+
     # If calibration mode is on, the user can select the table corners
     calibration_mode = False
     display_mode = "off"
     hand_tracking_enabled = False
+    aruco_markers_enabled = False
     show_hand_model = False
 
     frame = 0
@@ -134,6 +139,7 @@ class TransformationRGBDepth:
 
         self.init_colorizer()
         self.init_hand_detector()
+        self.init_aruco_tracking()
         self.loop()
 
     def mouse_click(self, event, x, y, flags, param):
@@ -148,13 +154,12 @@ class TransformationRGBDepth:
         self.colorizer.set_option(rs.option.max_distance, 1.6)  # meter
 
     def init_hand_detector(self):
-        self.detector = HandTracker(
-            PALM_MODEL_PATH,
-            LANDMARK_MODEL_PATH,
-            ANCHORS_PATH,
-            box_shift=0.2,
-            box_enlarge=1.3
-        )
+        self.detector = HandTracker(PALM_MODEL_PATH, LANDMARK_MODEL_PATH, ANCHORS_PATH, box_shift=0.2, box_enlarge=1.3)
+
+    def init_aruco_tracking(self):
+        self.aruco_dictionary = aruco.Dictionary_get(aruco.DICT_4X4_100)
+        self.aruco_detector_parameters = aruco.DetectorParameters_create()
+        self.aruco_detector_parameters.adaptiveThreshConstant = 10
 
     # Streaming loop
     def loop(self):
@@ -168,7 +173,7 @@ class TransformationRGBDepth:
                 self.last_color_frame = color_image
 
                 # Hand detection
-                if self.hand_tracking_enabled and self.frame % 4 == 0:
+                if self.hand_tracking_enabled and self.frame % 8 == 0:
                     self.hand_points, _ = self.detector(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
                     if self.hand_points is not None:
                         self.last_distance = aligned_depth_frame.get_distance(int(self.hand_points[8][0]), int(self.hand_points[8][1]))
@@ -184,6 +189,9 @@ class TransformationRGBDepth:
                         color_image = self.add_hand_tracking_points(color_image, self.hand_points)
                         # Perspective Transformation on images
                         color_image = self.perspective_transformation(color_image)
+                        if self.aruco_markers_enabled:
+                            color_image = self.track_aruco_markers(color_image, color_image)
+
                         # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
                         color_image = self.add_border(color_image)
                     cv2.imshow('window', color_image)
@@ -200,8 +208,10 @@ class TransformationRGBDepth:
                     black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
                     black_image = self.add_hand_tracking_points(black_image, self.hand_points)
                     #black_image = cv2.flip(black_image, -1)
-                    black_image = self.perspective_transformation(black_image)
+                    #black_image = self.perspective_transformation(black_image)
                     #black_image = self.hightlight_objects(self.perspective_transformation(color_image))
+                    if self.aruco_markers_enabled:
+                        black_image = self.track_aruco_markers(black_image, self.perspective_transformation(color_image))
                     black_image = self.add_border(black_image)
                     if not self.last_distance == -1:
                         cv2.putText(img=black_image, text=str(int(self.last_distance * 100)) + " cm",
@@ -236,12 +246,13 @@ class TransformationRGBDepth:
         finally:
             self.pipeline.stop()
 
+    # Put a white circle around all objects on the table, like a spotlight
     def hightlight_objects(self, frame):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         frame = cv2.bilateralFilter(frame, 11, 17, 17)
-        ret, thresh = cv2.threshold(frame, 100, 255, 0)
+        ret, thresh = cv2.threshold(frame, 100, 255, 0)  # Define treshold here. Still needs tweaking
         contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        frame = np.zeros((frame.shape[0], frame.shape[1], 3), np.uint8)
+        frame = np.zeros((frame.shape[0], frame.shape[1], 3), np.uint8)  # draw the contours on a black canvas
         # cv2.drawContours(copy, contours, -1, (0, 255, 0), 1)
         for contour in contours:
             (x, y), radius = cv2.minEnclosingCircle(contour)
@@ -249,6 +260,25 @@ class TransformationRGBDepth:
             radius = int(radius * 1.5)
             if radius < frame.shape[0] / 2:
                 frame = cv2.circle(frame, center, radius, (255, 255, 255), cv2.FILLED)
+
+        return frame
+
+    # Code for tracking Aruco markers taken from https://github.com/njanirudh/Aruco_Tracker
+    def track_aruco_markers(self, frame, frame_color):
+        gray = cv2.cvtColor(frame_color, cv2.COLOR_BGR2GRAY)
+        corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, self.aruco_dictionary,
+                                                              parameters=self.aruco_detector_parameters)
+
+        # check if the ids list is not empty
+        if np.all(ids is not None):
+            # draw a square around the markers
+            aruco.drawDetectedMarkers(frame, corners)
+
+            marker_ids = ''
+            for i in range(ids.size):
+                marker_ids += str(ids[i][0]) + ', '
+
+            cv2.putText(frame, marker_ids, (20, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
 
         return frame
 
@@ -266,6 +296,8 @@ class TransformationRGBDepth:
         elif key == 52:  # Key 4
             cv2.imwrite('depth.png', depth_colormap)
             cv2.imwrite('color.png', color_image)
+        elif key == 97: # A as in Aruco Markers
+            self.aruco_markers_enabled = not self.aruco_markers_enabled
         elif key == 99:  # C as in Calibrate
             self.calibration_mode = not self.calibration_mode
         elif key == 104:  # H as in Hand
