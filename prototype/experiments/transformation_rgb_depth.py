@@ -93,7 +93,7 @@ class TransformationRGBDepth:
     frame = 0
     depth_scale = 0
     hand_points = None
-    last_distance = -1
+    last_distance = None
 
     def __init__(self):
         # Create a pipeline
@@ -173,19 +173,35 @@ class TransformationRGBDepth:
                 frames = self.pipeline.wait_for_frames()
                 color_image, depth_colormap, aligned_depth_frame = self.align_frames(frames)
 
+                depth_data = aligned_depth_frame.get_data()
+                np_image = np.asanyarray(depth_data)
+                #distance = np_image[int(len(np_image) / 2)][int(len(np_image[0]) / 2)] * self.depth_scale * 100
+                #print(str("%.2f" % distance) + ' cm')
+
+                #distance = cv2.mean(np_image * self.depth_scale)
+                #print(distance)
+
+                # for i in range(color_image.shape[0]):
+                #     for j in range(color_image.shape[1]):
+                #         distance = np_image[i][j] * self.depth_scale
+                #         if distance > 1.08:
+                #             color_image[i, j] = (0, 0, 0)
+
                 self.last_color_frame = color_image
 
                 # Hand detection
                 if self.hand_tracking_enabled and self.frame % 8 == 0:
                     self.hand_points, _ = self.detector(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
                     if self.hand_points is not None:
-                        self.last_distance = aligned_depth_frame.get_distance(int(self.hand_points[8][0]), int(self.hand_points[8][1]))
+                        # The fingertip in the google mediapipe handtracking model has the ID 8.
+                        distance_camera_fingertip = int(aligned_depth_frame.get_distance(int(self.hand_points[8][0]), int(self.hand_points[8][1])) * 100)
+                        distance_fingertip_table = DISTANCE_CAMERA_TABLE - distance_camera_fingertip
+                        if distance_fingertip_table < 0:
+                            self.last_distance = 0
+                        else:
+                            self.last_distance = distance_fingertip_table
                     else:
-                        self.last_distance = -1
-
-                # Flip image vertically and horizontally (instead of rotating the camera 180° on the current setup)
-                #color_image = cv2.flip(color_image, -1)
-                #depth_colormap = cv2.flip(depth_colormap, -1)
+                        self.last_distance = None
 
                 if self.display_mode == "RGB":
                     if not self.calibration_mode:
