@@ -276,6 +276,12 @@ class TransformationRGBDepth:
 
                     copy = self.add_border(copy)
                     cv2.imshow('window', copy)
+                elif self.display_mode == "pattern":
+                    black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
+                    black_image = self.pattern_example(black_image, self.perspective_transformation(color_image))
+
+                    black_image = self.add_border(black_image)
+                    cv2.imshow('window', black_image)
 
                 key = cv2.waitKey(1)
                 # Press esc or 'q' to close the image window
@@ -317,7 +323,7 @@ class TransformationRGBDepth:
         # Get centroid
         centroid = self.centroid(points)
 
-        # Move to origing
+        # Move to origin
         points = points - centroid
 
         # Rotate (see: https://scipython.com/book/chapter-6-numpy/examples/creating-a-rotation-matrix-in-numpy/)
@@ -342,29 +348,19 @@ class TransformationRGBDepth:
         # Code for tracking Aruco markers taken from https://github.com/njanirudh/Aruco_Tracker
     def track_aruco_markers(self, frame, frame_color):
         gray = cv2.cvtColor(frame_color, cv2.COLOR_BGR2GRAY)
-        corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, self.aruco_dictionary,
-                                                              parameters=self.aruco_detector_parameters)
-
+        corners, ids, rejected_points = aruco.detectMarkers(gray, self.aruco_dictionary,
+                                                            parameters=self.aruco_detector_parameters)
         angle = 0
 
         # check if the ids list is not empty
         if np.all(ids is not None):
             for i in range(len(ids)):
-                if ids[i] == 42:  # ID of the wooden tracker
+                if ids[i] == 4:
 
-                    tracker_point_one = corners[i][0][0]
-                    tracker_point_two = corners[i][0][1]
-                    tracker_centroid = self.centroid(corners[i][0])
-                    cv2.circle(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), 5, (0, 0, 255), -1)
+                    angle = self.calculate_aruco_marker_rotation(corners[i][0], frame)
+                    tracker_relative_x, tracker_relative_y = self.calculate_aruco_marker_relative_pos(corners[i][0], frame)
 
-                    tracker_relative_x = (tracker_centroid[0] / frame.shape[1]) * 100
-                    tracker_relative_y = (tracker_centroid[1] / frame.shape[0]) * 100
-
-                    v1 = np.array([frame.shape[0], 0])
-                    v2 = np.array([tracker_point_two[0] - tracker_point_one[0], tracker_point_two[1] - tracker_point_one[1]])
-
-                    angle = self.calculate_angle(v1, v2)
-
+                    # Display info. ONLY FOR TESTING PURPOSES
                     cv2.putText(img=frame, text=str(int(angle)) + ' Grad' +
                                 ' Rel X: ' + str(int(tracker_relative_x)) + '%' +
                                 ' Rel Y: ' + str(int(tracker_relative_y)) + '%',
@@ -376,6 +372,27 @@ class TransformationRGBDepth:
 
         return frame, angle
 
+    # Calculate the rotation of an aruco marker relative to the frame
+    # Returns the angle in the range from 0° to 360°
+    def calculate_aruco_marker_rotation(self, aruco_marker_corners, frame):
+        tracker_point_one = aruco_marker_corners[0]
+        tracker_point_two = aruco_marker_corners[1]
+        v1 = np.array([frame.shape[0], 0])
+        v2 = np.array([tracker_point_two[0] - tracker_point_one[0], tracker_point_two[1] - tracker_point_one[1]])
+
+        angle = self.calculate_angle(v1, v2)
+        return angle
+
+    # Calculates the relative position of the given marker on the frame
+    # Returns a percentage for the x and the y pos of the marker
+    def calculate_aruco_marker_relative_pos(self, aruco_marker_corners, frame):
+        tracker_centroid = self.centroid(aruco_marker_corners)
+        cv2.circle(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), 5, (0, 0, 255), -1)
+        tracker_relative_x = (tracker_centroid[0] / frame.shape[1]) * 100
+        tracker_relative_y = (tracker_centroid[1] / frame.shape[0]) * 100
+
+        return tracker_relative_x, tracker_relative_y
+
     def calculate_angle(self, v1, v2):
         # https://stackoverflow.com/questions/2827393/angles-between-two-n-dimensional-vectors-in-python
         angle = np.math.atan2(np.linalg.det([v1, v2]), np.dot(v1, v2))
@@ -385,7 +402,9 @@ class TransformationRGBDepth:
         return angle
 
     def check_key_inputs(self, key, color_image, depth_colormap):
-        if key == 49:  # Key 1:
+        if key == 48:  # Key 0
+            self.display_mode = 'pattern'
+        elif key == 49:  # Key 1
             if self.display_mode == "RGB":
                 self.display_mode = "depth"
             else:
@@ -416,6 +435,7 @@ class TransformationRGBDepth:
         elif key == 111:  # O as in Outline:
             self.outline_enabled = not self.outline_enabled
 
+    # Adds black borders to the given frame
     def add_border(self, frame):
         frame = cv2.copyMakeBorder(frame, top=BORDER_TOP, bottom=BORDER_BOTTOM,
                                    left=BORDER_LEFT, right=BORDER_RIGHT,
@@ -480,6 +500,11 @@ class TransformationRGBDepth:
         # Only do the perspective transformation if calibration mode is off.
         if not self.calibration_mode:
             frame = cv2.warpPerspective(frame, matrix, (x, int(x / 2)))
+
+        return frame
+
+    def pattern_example(self, frame, frame_color):
+        frame, angle = self.track_aruco_markers(frame, frame_color)
 
         return frame
 
