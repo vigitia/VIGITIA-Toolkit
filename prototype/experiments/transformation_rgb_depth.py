@@ -26,10 +26,10 @@ OUTPUT_IMAGE_WIDTH = 1920
 OUTPUT_IMAGE_HEIGHT = 1080
 
 # Coordinates of table corners for perspective transformation
-CORNER_TOP_LEFT = (79, 45)
-CORNER_TOP_RIGHT = (1261, 72)
-CORNER_BOTTOM_LEFT = (72, 638)
-CORNER_BOTTOM_RIGHT = (1249, 654)
+CORNER_TOP_LEFT = (85, 65)
+CORNER_TOP_RIGHT = (1263, 85)
+CORNER_BOTTOM_LEFT = (77, 657)
+CORNER_BOTTOM_RIGHT = (1256, 668)
 
 # Since the projection field of the projector is larger than the table,
 # we need to add black borders on at least two sides
@@ -109,20 +109,23 @@ class TransformationRGBDepth:
 
         # TODO: Make this code work to set ROI for Auto exposure on the table surface
         # Set ROI (https://github.com/IntelRealSense/librealsense/issues/3427)
-        # dev = profile.get_device()
-        # for sensor in dev.sensors:
-        #     if not sensor.is_depth_sensor():
-        #         break
-        # roi_sensor = sensor.as_roi_sensor()
-        # sensor_roi = roi_sensor.get_region_of_interest()
-        # sensor_roi.min_x, sensor_roi.max_x = CORNER_TOP_LEFT[0], CORNER_TOP_RIGHT[0]
-        # sensor_roi.min_y, sensor_roi.max_y = CORNER_TOP_LEFT[1], CORNER_BOTTOM_RIGHT[1]
-        # roi_sensor.set_region_of_interest(sensor_roi)
-        # print(sensor_roi.min_x, sensor_roi.max_x, sensor_roi.min_y, sensor_roi.max_y)
+        dev = profile.get_device()
+        for sensor in dev.sensors:
+            if not sensor.is_depth_sensor():
+                break
+        roi_sensor = sensor.as_roi_sensor()
+        sensor_roi = roi_sensor.get_region_of_interest()
+        #sensor_roi.min_x, sensor_roi.max_x = CORNER_TOP_LEFT[0], CORNER_TOP_RIGHT[0]
+        #sensor_roi.min_y, sensor_roi.max_y = CORNER_TOP_LEFT[1], CORNER_BOTTOM_RIGHT[1]
+        #roi_sensor.set_region_of_interest(sensor_roi)
+        print(sensor_roi.min_x, sensor_roi.max_x, sensor_roi.min_y, sensor_roi.max_y)
 
         # Getting the depth sensor's depth scale (see rs-align example for explanation)
         depth_sensor = profile.get_device().first_depth_sensor()
         self.depth_scale = depth_sensor.get_depth_scale()
+        depth_sensor.set_option(rs.option.laser_power, 360)
+
+        depth_sensor.set_option(rs.option.depth_units, 0.0001)
 
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
@@ -150,8 +153,8 @@ class TransformationRGBDepth:
         self.colorizer = rs.colorizer()
         self.colorizer.set_option(rs.option.color_scheme, 0)   # Define the color scheme
         self.colorizer.set_option(rs.option.histogram_equalization_enabled, 0)
-        self.colorizer.set_option(rs.option.min_distance, 0.9)  # meter
-        self.colorizer.set_option(rs.option.max_distance, 1.6)  # meter
+        self.colorizer.set_option(rs.option.min_distance, 1.0)  # meter
+        self.colorizer.set_option(rs.option.max_distance, 1.3)  # meter
 
     def init_hand_detector(self):
         self.detector = HandTracker(PALM_MODEL_PATH, LANDMARK_MODEL_PATH, ANCHORS_PATH, box_shift=0.2, box_enlarge=1.3)
@@ -319,8 +322,6 @@ class TransformationRGBDepth:
 
         return frame
 
-
-
     def add_hand_tracking_points(self, frame, points):
         if points is not None:
             point_id = 0
@@ -367,10 +368,10 @@ class TransformationRGBDepth:
 
         # Draw circles to mark the screen corners. Only show them if calibration mode is on
         if self.calibration_mode:
-            cv2.circle(frame, CORNER_TOP_LEFT, 1, (0, 0, 255), -1)
-            cv2.circle(frame, CORNER_TOP_RIGHT, 1, (0, 0, 255), -1)
-            cv2.circle(frame, CORNER_BOTTOM_LEFT, 1, (0, 0, 255), -1)
-            cv2.circle(frame, CORNER_BOTTOM_RIGHT, 1, (0, 0, 255), -1)
+            cv2.circle(frame, CORNER_TOP_LEFT, 2, (0, 0, 255), -1)
+            cv2.circle(frame, CORNER_TOP_RIGHT, 2, (0, 0, 255), -1)
+            cv2.circle(frame, CORNER_BOTTOM_LEFT, 2, (0, 0, 255), -1)
+            cv2.circle(frame, CORNER_BOTTOM_RIGHT, 2, (0, 0, 255), -1)
 
         pts1 = np.float32([list(CORNER_TOP_LEFT), list(CORNER_TOP_RIGHT), list(CORNER_BOTTOM_LEFT), list(CORNER_BOTTOM_RIGHT)])
         pts2 = np.float32([[0, 0], [x, 0], [0, x / 2], [x, x / 2]])
