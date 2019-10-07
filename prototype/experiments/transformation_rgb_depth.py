@@ -213,7 +213,7 @@ class TransformationRGBDepth:
                         # Perspective Transformation on images
                         color_image = self.perspective_transformation(color_image)
                         if self.outline_enabled:
-                            color_image = self.hightlight_objects(color_image, False)
+                            color_image = self.highlight_objects(color_image, False)
                         if self.aruco_markers_enabled:
                             color_image = self.track_aruco_markers(color_image, color_image)
 
@@ -244,7 +244,7 @@ class TransformationRGBDepth:
                     black_image = self.perspective_transformation(black_image)
 
                     if self.outline_enabled:
-                        black_image = self.hightlight_objects(self.perspective_transformation(color_image), True)
+                        black_image = self.highlight_objects(self.perspective_transformation(color_image), True)
                     if self.aruco_markers_enabled:
                         black_image, angle = self.track_aruco_markers(black_image, self.perspective_transformation(color_image))
 
@@ -288,7 +288,7 @@ class TransformationRGBDepth:
             self.pipeline.stop()
 
     # Put a white circle around all objects on the table, like a spotlight
-    def hightlight_objects(self, frame, draw_on_black=True):
+    def highlight_objects(self, frame, draw_on_black=True):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         frame = cv2.bilateralFilter(frame, 11, 17, 17)
         ret, thresh = cv2.threshold(frame, 100, 255, 0)  # Define treshold here. Still needs tweaking
@@ -320,8 +320,7 @@ class TransformationRGBDepth:
         # Move to origing
         points = points - centroid
 
-        # Rotate
-        # https://scipython.com/book/chapter-6-numpy/examples/creating-a-rotation-matrix-in-numpy/
+        # Rotate (see: https://scipython.com/book/chapter-6-numpy/examples/creating-a-rotation-matrix-in-numpy/)
         points = np.dot(points, rotation_matrix.T)
 
         # Move back to original position
@@ -353,15 +352,22 @@ class TransformationRGBDepth:
             for i in range(len(ids)):
                 if ids[i] == 42:  # ID of the wooden tracker
 
-                    marker_point_one = corners[i][0][0]
-                    marker_point_two = corners[i][0][1]
+                    tracker_point_one = corners[i][0][0]
+                    tracker_point_two = corners[i][0][1]
+                    tracker_centroid = self.centroid(corners[i][0])
+                    cv2.circle(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), 5, (0, 0, 255), -1)
+
+                    tracker_relative_x = (tracker_centroid[0] / frame.shape[1]) * 100
+                    tracker_relative_y = (tracker_centroid[1] / frame.shape[0]) * 100
 
                     v1 = np.array([frame.shape[0], 0])
-                    v2 = np.array([marker_point_two[0] - marker_point_one[0], marker_point_two[1] - marker_point_one[1]])
+                    v2 = np.array([tracker_point_two[0] - tracker_point_one[0], tracker_point_two[1] - tracker_point_one[1]])
 
                     angle = self.calculate_angle(v1, v2)
 
-                    cv2.putText(img=frame, text=str(int(angle)) + ' Grad',
+                    cv2.putText(img=frame, text=str(int(angle)) + ' Grad' +
+                                ' Rel X: ' + str(int(tracker_relative_x)) + '%' +
+                                ' Rel Y: ' + str(int(tracker_relative_y)) + '%',
                                 org=(int(frame.shape[1] / 6), int(frame.shape[0] / 4)),
                                 fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
 
