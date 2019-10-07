@@ -304,10 +304,31 @@ class TransformationRGBDepth:
 
         # check if the ids list is not empty
         if np.all(ids is not None):
+            for i in range(len(ids)):
+                if ids[i] == 42:  # ID of the wooden tracker
+
+                    marker_point_one = corners[i][0][0]
+                    marker_point_two = corners[i][0][1]
+
+                    v1 = np.array([frame.shape[0], 0])
+                    v2 = np.array([marker_point_two[0] - marker_point_one[0], marker_point_two[1] - marker_point_one[1]])
+
+                    cv2.putText(img=frame, text=str(int(self.calculate_angle(v1, v2))) + ' Grad',
+                                org=(int(frame.shape[1] / 6), int(frame.shape[0] / 4)),
+                                fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
+
             # draw a square around the markers
             aruco.drawDetectedMarkers(frame, corners, ids)
 
         return frame
+
+    def calculate_angle(self, v1, v2):
+        # https://stackoverflow.com/questions/2827393/angles-between-two-n-dimensional-vectors-in-python
+        angle = np.math.atan2(np.linalg.det([v1, v2]), np.dot(v1, v2))
+        angle = np.degrees(angle)
+        if angle < 0:
+            angle = angle + 360
+        return angle
 
     def check_key_inputs(self, key, color_image, depth_colormap):
         if key == 49:  # Key 1:
