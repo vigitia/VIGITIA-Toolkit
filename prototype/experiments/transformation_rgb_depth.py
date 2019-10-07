@@ -26,10 +26,10 @@ OUTPUT_IMAGE_WIDTH = 1920
 OUTPUT_IMAGE_HEIGHT = 1080
 
 # Coordinates of table corners for perspective transformation
-CORNER_TOP_LEFT = (73, 53)
-CORNER_TOP_RIGHT = (1259, 78)
-CORNER_BOTTOM_LEFT = (66, 648)
-CORNER_BOTTOM_RIGHT = (1247, 661)
+CORNER_TOP_LEFT = (85, 45)
+CORNER_TOP_RIGHT = (1269, 94)
+CORNER_BOTTOM_LEFT = (67, 641)
+CORNER_BOTTOM_RIGHT = (1248, 675)
 
 # Since the projection field of the projector is larger than the table,
 # we need to add black borders on at least two sides
@@ -70,6 +70,9 @@ CONNECTIONS = [
     (5, 9), (9, 13), (13, 17), (0, 17)
 ]
 
+FABRIC_PATTERN_ONE = np.array([[-77, -56], [-41, -56], [116, -63], [191, -17], [156, 23], [85, -19], [96, 94],
+                                [-83, 102], [-77, -11], [-174, 28], [-188, -24]])
+
 
 class TransformationRGBDepth:
 
@@ -95,6 +98,8 @@ class TransformationRGBDepth:
     depth_scale = 0
     hand_points = None
     last_distance = None
+
+    last_fabric_pattern_angle = 0
 
     #fgbg = cv2.cv2.createBackgroundSubtractorMOG2()
     fgbg = cv2.cv2.createBackgroundSubtractorKNN()
@@ -215,7 +220,7 @@ class TransformationRGBDepth:
                         if self.outline_enabled:
                             color_image = self.highlight_objects(color_image, False)
                         if self.aruco_markers_enabled:
-                            color_image = self.track_aruco_markers(color_image, color_image)
+                            color_image, angle, tracker_centroid = self.track_aruco_markers(color_image, color_image)
 
                         # Canny Edge Detection
                         # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
@@ -246,14 +251,8 @@ class TransformationRGBDepth:
                     if self.outline_enabled:
                         black_image = self.highlight_objects(self.perspective_transformation(color_image), True)
                     if self.aruco_markers_enabled:
-                        black_image, angle = self.track_aruco_markers(black_image, self.perspective_transformation(color_image))
-
-                        # Experiments for rotating images:
-                        points = np.array([[345, 198], [381, 198], [539, 191], [614, 237], [579, 278], [508, 235],
-                                       [519, 349], [339, 357], [345, 243], [248, 283], [234, 230]])
-
-                        points = self.rotate_points(points, angle)
-                        cv2.polylines(black_image, [points], 1, (255, 255, 255), thickness=3)
+                        black_image, angle, tracker_centroid = self.track_aruco_markers(black_image,
+                                                                                        self.perspective_transformation(color_image))
 
                     black_image = self.add_border(black_image)
                     if self.last_distance is not None:
@@ -277,8 +276,9 @@ class TransformationRGBDepth:
                     copy = self.add_border(copy)
                     cv2.imshow('window', copy)
                 elif self.display_mode == "pattern":
+                    color_image = self.perspective_transformation(color_image)
                     black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
-                    black_image = self.pattern_example(black_image, self.perspective_transformation(color_image))
+                    self.pattern_example(black_image, color_image)
 
                     black_image = self.add_border(black_image)
                     cv2.imshow('window', black_image)
@@ -325,6 +325,7 @@ class TransformationRGBDepth:
 
         # Move to origin
         points = points - centroid
+        #print(points.astype(int).tolist())
 
         # Rotate (see: https://scipython.com/book/chapter-6-numpy/examples/creating-a-rotation-matrix-in-numpy/)
         points = np.dot(points, rotation_matrix.T)
@@ -351,6 +352,7 @@ class TransformationRGBDepth:
         corners, ids, rejected_points = aruco.detectMarkers(gray, self.aruco_dictionary,
                                                             parameters=self.aruco_detector_parameters)
         angle = 0
+        tracker_centroid = None
 
         # check if the ids list is not empty
         if np.all(ids is not None):
@@ -358,19 +360,22 @@ class TransformationRGBDepth:
                 if ids[i] == 4:
 
                     angle = self.calculate_aruco_marker_rotation(corners[i][0], frame)
-                    tracker_relative_x, tracker_relative_y = self.calculate_aruco_marker_relative_pos(corners[i][0], frame)
+                    tracker_centroid = self.centroid(corners[i][0])
+                    tracker_relative_x, tracker_relative_y = self.calculate_aruco_marker_relative_pos(tracker_centroid, frame)
+
+                    cv2.circle(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), 5, (0, 0, 255), -1)
 
                     # Display info. ONLY FOR TESTING PURPOSES
-                    cv2.putText(img=frame, text=str(int(angle)) + ' Grad' +
-                                ' Rel X: ' + str(int(tracker_relative_x)) + '%' +
-                                ' Rel Y: ' + str(int(tracker_relative_y)) + '%',
-                                org=(int(frame.shape[1] / 6), int(frame.shape[0] / 4)),
-                                fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
+                    # cv2.putText(img=frame, text=str(int(angle)) + ' Grad' +
+                    #             ' Rel X: ' + str(int(tracker_relative_x * 100)) + '%' +
+                    #             ' Rel Y: ' + str(int(tracker_relative_y * 100)) + '%',
+                    #             org=(int(frame.shape[1] / 6), int(frame.shape[0] / 4)),
+                    #             fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
 
             # draw a square around the markers
             aruco.drawDetectedMarkers(frame, corners, ids)
 
-        return frame, angle
+        return frame, angle, tracker_centroid
 
     # Calculate the rotation of an aruco marker relative to the frame
     # Returns the angle in the range from 0° to 360°
@@ -385,12 +390,9 @@ class TransformationRGBDepth:
 
     # Calculates the relative position of the given marker on the frame
     # Returns a percentage for the x and the y pos of the marker
-    def calculate_aruco_marker_relative_pos(self, aruco_marker_corners, frame):
-        tracker_centroid = self.centroid(aruco_marker_corners)
-        cv2.circle(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), 5, (0, 0, 255), -1)
-        tracker_relative_x = (tracker_centroid[0] / frame.shape[1]) * 100
-        tracker_relative_y = (tracker_centroid[1] / frame.shape[0]) * 100
-
+    def calculate_aruco_marker_relative_pos(self, tracker_centroid, frame):
+        tracker_relative_x = (tracker_centroid[0] / frame.shape[1])
+        tracker_relative_y = (tracker_centroid[1] / frame.shape[0])
         return tracker_relative_x, tracker_relative_y
 
     def calculate_angle(self, v1, v2):
@@ -504,9 +506,51 @@ class TransformationRGBDepth:
         return frame
 
     def pattern_example(self, frame, frame_color):
-        frame, angle = self.track_aruco_markers(frame, frame_color)
+        frame, angle, tracker_centroid = self.track_aruco_markers(frame, frame_color)
 
-        return frame
+        if tracker_centroid is not None:
+            self.display_fabric_pattern(frame, FABRIC_PATTERN_ONE, tracker_centroid, angle)
+
+    def display_fabric_pattern(self, frame, pattern_points, tracker_centroid, angle):
+        # Move the pattern to the desired spot on the table. Take the marker pos on the frame to calculate a good
+        # position for the Polygon
+        pattern_points = self.rotate_points(pattern_points, angle)
+        pattern_points = self.calculate_fabric_pos_offset(tracker_centroid, pattern_points, frame)
+        centroid_of_pattern = self.centroid(pattern_points)
+        cv2.line(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), (int(centroid_of_pattern[0]),
+                 int(centroid_of_pattern[1])), (255, 0, 0), 1)
+
+        cv2.polylines(frame, [pattern_points], 1, (255, 255, 255), thickness=3)
+
+    def calculate_fabric_pos_offset(self, tracker_centroid, pattern_points, frame):
+        tracker_relative_x, tracker_relative_y = self.calculate_aruco_marker_relative_pos(tracker_centroid, frame)
+        if tracker_relative_x <= 0.5:
+            x = int(tracker_centroid[0] + frame.shape[1] / 2)
+        else:
+            x = int(tracker_centroid[0] - frame.shape[1] / 2)
+        y = abs(int(tracker_centroid[1] - frame.shape[0]))
+        offset = [x, y]
+        pattern_points = pattern_points + offset
+
+        x = 0
+        y = 0
+        fabric_bounding_rect = cv2.boundingRect(pattern_points)
+        #cv2.rectangle(frame, fabric_bounding_rect, (255, 0, 0), 3)
+        print(fabric_bounding_rect, frame.shape[0], frame.shape[1])
+        if fabric_bounding_rect[0] < 0:
+            x = abs(fabric_bounding_rect[0])
+        if fabric_bounding_rect[0] + fabric_bounding_rect[2] > frame.shape[1]:
+            x = -1 * (fabric_bounding_rect[0] + fabric_bounding_rect[2] - frame.shape[1])
+
+        if fabric_bounding_rect[1] < 0:
+            y = abs(fabric_bounding_rect[1])
+        if fabric_bounding_rect[1] + fabric_bounding_rect[3] > frame.shape[0]:
+            y = -1 * (fabric_bounding_rect[1] + fabric_bounding_rect[3] - frame.shape[0])
+
+        offset = [x, y]
+        pattern_points = pattern_points + offset
+
+        return pattern_points
 
 
 def main():
