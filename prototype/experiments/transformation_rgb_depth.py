@@ -26,14 +26,14 @@ OUTPUT_IMAGE_WIDTH = 1920
 OUTPUT_IMAGE_HEIGHT = 1080
 
 # Coordinates of table corners for perspective transformation
-CORNER_TOP_LEFT = (85, 65)
-CORNER_TOP_RIGHT = (1263, 85)
-CORNER_BOTTOM_LEFT = (77, 657)
-CORNER_BOTTOM_RIGHT = (1256, 668)
+CORNER_TOP_LEFT = (73, 53)
+CORNER_TOP_RIGHT = (1259, 78)
+CORNER_BOTTOM_LEFT = (66, 648)
+CORNER_BOTTOM_RIGHT = (1247, 661)
 
 # Since the projection field of the projector is larger than the table,
 # we need to add black borders on at least two sides
-BORDER_TOP = 100  # px
+BORDER_TOP = 38  # px
 BORDER_BOTTOM = 0  # px
 BORDER_LEFT = 0  # px
 BORDER_RIGHT = 50  # px
@@ -212,6 +212,8 @@ class TransformationRGBDepth:
                         color_image = self.add_hand_tracking_points(color_image, self.hand_points)
                         # Perspective Transformation on images
                         color_image = self.perspective_transformation(color_image)
+                        if self.outline_enabled:
+                            color_image = self.hightlight_objects(color_image, False)
                         if self.aruco_markers_enabled:
                             color_image = self.track_aruco_markers(color_image, color_image)
 
@@ -242,14 +244,23 @@ class TransformationRGBDepth:
                     black_image = self.perspective_transformation(black_image)
 
                     if self.outline_enabled:
-                        black_image = self.hightlight_objects(self.perspective_transformation(color_image))
+                        black_image = self.hightlight_objects(self.perspective_transformation(color_image), True)
                     if self.aruco_markers_enabled:
-                        black_image = self.track_aruco_markers(black_image, self.perspective_transformation(color_image))
+                        black_image, angle = self.track_aruco_markers(black_image, self.perspective_transformation(color_image))
+
+                        # Experiments for rotating images:
+                        points = np.array([[345, 198], [381, 198], [539, 191], [614, 237], [579, 278], [508, 235],
+                                       [519, 349], [339, 357], [345, 243], [248, 283], [234, 230]])
+
+                        points = self.rotate_points(points, angle)
+                        cv2.polylines(black_image, [points], 1, (255, 255, 255), thickness=3)
+
                     black_image = self.add_border(black_image)
                     if self.last_distance is not None:
                         cv2.putText(img=black_image, text=str(self.last_distance) + " cm",
                                     org=(int(color_image.shape[1]/6), int(color_image.shape[0]/4)),
                                     fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
+
                     cv2.imshow('window', black_image)
                 elif self.display_mode == 'memory':
                     copy = self.stored_image.copy()
@@ -263,10 +274,7 @@ class TransformationRGBDepth:
                     copy = cv2.bilateralFilter(copy, 11, 17, 17)
                     copy = cv2.Canny(copy, 40, 40)
 
-                    # Contours
-                    # copy = self.hightlight_objects(copy)
-
-                    #copy = self.add_border(copy)
+                    copy = self.add_border(copy)
                     cv2.imshow('window', copy)
 
                 key = cv2.waitKey(1)
@@ -280,12 +288,13 @@ class TransformationRGBDepth:
             self.pipeline.stop()
 
     # Put a white circle around all objects on the table, like a spotlight
-    def hightlight_objects(self, frame):
+    def hightlight_objects(self, frame, draw_on_black=True):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         frame = cv2.bilateralFilter(frame, 11, 17, 17)
         ret, thresh = cv2.threshold(frame, 100, 255, 0)  # Define treshold here. Still needs tweaking
         contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        frame = np.zeros((frame.shape[0], frame.shape[1], 3), np.uint8)  # draw the contours on a black canvas
+        if draw_on_black:
+            frame = np.zeros((frame.shape[0], frame.shape[1], 3), np.uint8)  # draw the contours on a black canvas
         # cv2.drawContours(copy, contours, -1, (0, 255, 0), 1)
         for contour in contours:
             (x, y), radius = cv2.minEnclosingCircle(contour)
@@ -296,11 +305,48 @@ class TransformationRGBDepth:
 
         return frame
 
-    # Code for tracking Aruco markers taken from https://github.com/njanirudh/Aruco_Tracker
+    # https://scipython.com/book/chapter-6-numpy/examples/creating-a-rotation-matrix-in-numpy/
+    def get_rotation_matrix(self, angle):
+        theta = np.radians(angle)
+        c, s = np.cos(theta), np.sin(theta)
+        rotation_matrix = np.array(((c, -s), (s, c)))
+        return rotation_matrix
+
+    def rotate_points(self, points, angle):
+        rotation_matrix = self.get_rotation_matrix(angle)
+        # Get centroid
+        centroid = self.centroid(points)
+
+        # Move to origing
+        points = points - centroid
+
+        # Rotate
+        # https://scipython.com/book/chapter-6-numpy/examples/creating-a-rotation-matrix-in-numpy/
+        points = np.dot(points, rotation_matrix.T)
+
+        # Move back to original position
+        points = points + centroid
+
+        # Convert all floats to int
+        points = points.astype(int)
+        return points
+
+    # https://progr.interplanety.org/en/python-how-to-find-the-polygon-center-coordinates/
+    def centroid(self, vertexes):
+        _x_list = [vertex[0] for vertex in vertexes]
+        _y_list = [vertex[1] for vertex in vertexes]
+        _len = len(vertexes)
+        _x = sum(_x_list) / _len
+        _y = sum(_y_list) / _len
+        return (_x, _y)
+
+        # Code for tracking Aruco markers taken from https://github.com/njanirudh/Aruco_Tracker
     def track_aruco_markers(self, frame, frame_color):
         gray = cv2.cvtColor(frame_color, cv2.COLOR_BGR2GRAY)
         corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, self.aruco_dictionary,
                                                               parameters=self.aruco_detector_parameters)
+
+        angle = 0
 
         # check if the ids list is not empty
         if np.all(ids is not None):
@@ -313,14 +359,16 @@ class TransformationRGBDepth:
                     v1 = np.array([frame.shape[0], 0])
                     v2 = np.array([marker_point_two[0] - marker_point_one[0], marker_point_two[1] - marker_point_one[1]])
 
-                    cv2.putText(img=frame, text=str(int(self.calculate_angle(v1, v2))) + ' Grad',
+                    angle = self.calculate_angle(v1, v2)
+
+                    cv2.putText(img=frame, text=str(int(angle)) + ' Grad',
                                 org=(int(frame.shape[1] / 6), int(frame.shape[0] / 4)),
                                 fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
 
             # draw a square around the markers
             aruco.drawDetectedMarkers(frame, corners, ids)
 
-        return frame
+        return frame, angle
 
     def calculate_angle(self, v1, v2):
         # https://stackoverflow.com/questions/2827393/angles-between-two-n-dimensional-vectors-in-python
@@ -358,9 +406,9 @@ class TransformationRGBDepth:
                     self.show_hand_model = False
                     self.hand_tracking_enabled = False
                     self.hand_points = None
-                    self.last_distance = -1
+                    self.last_distance = None
         elif key == 111:  # O as in Outline:
-            self.outline_enabled = True
+            self.outline_enabled = not self.outline_enabled
 
     def add_border(self, frame):
         frame = cv2.copyMakeBorder(frame, top=BORDER_TOP, bottom=BORDER_BOTTOM,
