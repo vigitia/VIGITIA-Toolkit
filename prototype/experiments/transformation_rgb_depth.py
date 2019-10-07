@@ -88,12 +88,16 @@ class TransformationRGBDepth:
     display_mode = "off"
     hand_tracking_enabled = False
     aruco_markers_enabled = False
+    outline_enabled = False
     show_hand_model = False
 
     frame = 0
     depth_scale = 0
     hand_points = None
     last_distance = None
+
+    #fgbg = cv2.cv2.createBackgroundSubtractorMOG2()
+    fgbg = cv2.cv2.createBackgroundSubtractorKNN()
 
     def __init__(self):
         # Create a pipeline
@@ -211,6 +215,15 @@ class TransformationRGBDepth:
                         if self.aruco_markers_enabled:
                             color_image = self.track_aruco_markers(color_image, color_image)
 
+                        # Canny Edge Detection
+                        # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
+                        # color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
+                        # color_image = cv2.bilateralFilter(color_image, 11, 17, 17)
+                        # color_image = cv2.Canny(color_image, 100, 200)
+
+                        #mask_img = self.fgbg.apply(color_image)
+                        #color_image = cv2.bitwise_and(color_image, color_image, mask=mask_img)
+
                         # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
                         color_image = self.add_border(color_image)
                     cv2.imshow('window', color_image)
@@ -226,14 +239,15 @@ class TransformationRGBDepth:
                 elif self.display_mode == "off":
                     black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
                     black_image = self.add_hand_tracking_points(black_image, self.hand_points)
-                    #black_image = cv2.flip(black_image, -1)
-                    #black_image = self.perspective_transformation(black_image)
-                    #black_image = self.hightlight_objects(self.perspective_transformation(color_image))
+                    black_image = self.perspective_transformation(black_image)
+
+                    if self.outline_enabled:
+                        black_image = self.hightlight_objects(self.perspective_transformation(color_image))
                     if self.aruco_markers_enabled:
                         black_image = self.track_aruco_markers(black_image, self.perspective_transformation(color_image))
                     black_image = self.add_border(black_image)
-                    if not self.last_distance == -1:
-                        cv2.putText(img=black_image, text=str(int(self.last_distance * 100)) + " cm",
+                    if self.last_distance is not None:
+                        cv2.putText(img=black_image, text=str(self.last_distance) + " cm",
                                     org=(int(color_image.shape[1]/6), int(color_image.shape[0]/4)),
                                     fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
                     cv2.imshow('window', black_image)
@@ -245,14 +259,14 @@ class TransformationRGBDepth:
 
                     # Canny Edge Detection
                     # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
-                    # copy = cv2.cvtColor(copy, cv2.COLOR_BGR2GRAY)
-                    # copy = cv2.bilateralFilter(copy, 11, 17, 17)
-                    # copy = cv2.Canny(copy, 100, 200)
+                    copy = cv2.cvtColor(copy, cv2.COLOR_BGR2GRAY)
+                    copy = cv2.bilateralFilter(copy, 11, 17, 17)
+                    copy = cv2.Canny(copy, 40, 40)
 
                     # Contours
-                    copy = self.hightlight_objects(copy)
+                    # copy = self.hightlight_objects(copy)
 
-                    copy = self.add_border(copy)
+                    #copy = self.add_border(copy)
                     cv2.imshow('window', copy)
 
                 key = cv2.waitKey(1)
@@ -291,13 +305,7 @@ class TransformationRGBDepth:
         # check if the ids list is not empty
         if np.all(ids is not None):
             # draw a square around the markers
-            aruco.drawDetectedMarkers(frame, corners)
-
-            marker_ids = ''
-            for i in range(ids.size):
-                marker_ids += str(ids[i][0]) + ', '
-
-            cv2.putText(frame, marker_ids, (20, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
+            aruco.drawDetectedMarkers(frame, corners, ids)
 
         return frame
 
@@ -330,6 +338,8 @@ class TransformationRGBDepth:
                     self.hand_tracking_enabled = False
                     self.hand_points = None
                     self.last_distance = -1
+        elif key == 111:  # O as in Outline:
+            self.outline_enabled = True
 
     def add_border(self, frame):
         frame = cv2.copyMakeBorder(frame, top=BORDER_TOP, bottom=BORDER_BOTTOM,
