@@ -620,6 +620,20 @@ class TransformationRGBDepth:
 
         return [x, y]
 
+    def scale_fabric(self, points, scale_factor):
+        # Get centroid
+        centroid = self.centroid(points)
+
+        # Move to origin
+        points = points - centroid
+
+        for point in points:
+            point[0] *= scale_factor
+            point[1] *= scale_factor
+
+        return points
+
+
 
 def main():
     transformation = TransformationRGBDepth()
