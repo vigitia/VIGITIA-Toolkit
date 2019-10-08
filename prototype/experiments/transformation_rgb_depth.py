@@ -3,6 +3,8 @@ import pyrealsense2 as rs
 import cv2
 import cv2.aruco as aruco
 import numpy as np
+import time
+import datetime
 
 from hand_tracker import HandTracker
 
@@ -27,10 +29,10 @@ OUTPUT_IMAGE_WIDTH = 1920
 OUTPUT_IMAGE_HEIGHT = 1080
 
 # Coordinates of table corners for perspective transformation
-CORNER_TOP_LEFT = (85, 45)
-CORNER_TOP_RIGHT = (1269, 94)
-CORNER_BOTTOM_LEFT = (67, 641)
-CORNER_BOTTOM_RIGHT = (1248, 675)
+CORNER_TOP_LEFT = (86, 43)
+CORNER_TOP_RIGHT = (1271, 92)
+CORNER_BOTTOM_LEFT = (70, 639)
+CORNER_BOTTOM_RIGHT = (1249, 675)
 
 # Since the projection field of the projector is larger than the table,
 # we need to add black borders on at least two sides
@@ -79,6 +81,11 @@ ARUCO_MARKER_SHIRT_S = 0
 ARUCO_MARKER_SHIRT_M = 4
 ARUCO_MARKER_SHIRT_L = 8
 
+ARUCO_MARKER_TIMELINE_CONTROLLER = 42
+
+TIMELINE_NUM_FRAMES = 50
+TIMELINE_FRAME_SAVING_INTERVAL = 1  # seconds
+
 
 class TransformationRGBDepth:
 
@@ -86,6 +93,7 @@ class TransformationRGBDepth:
     align = None
     colorizer = None
     last_color_frame = None
+    last_color_frames = []
     stored_image = None
     hand_detector = None
 
@@ -104,6 +112,8 @@ class TransformationRGBDepth:
     depth_scale = 0
     hand_points = None
     last_distance = None
+
+    last_timestamp = time.time()
 
     last_fabric_pattern_angle = 0
 
@@ -218,7 +228,7 @@ class TransformationRGBDepth:
                 elif self.display_mode == "off":
                     self.display_mode_black_background(color_image)
                 elif self.display_mode == 'memory':
-                    self.display_mode_memory()
+                    self.display_mode_memory(color_image)
                 elif self.display_mode == "pattern":
                     self.display_mode_pattern(color_image)
 
@@ -252,12 +262,16 @@ class TransformationRGBDepth:
     def display_mode_rgb(self, color_image):
         if not self.calibration_mode:
             color_image = self.add_hand_tracking_points(color_image, self.hand_points)
-            # Perspective Transformation on images
-            color_image = self.perspective_transformation(color_image)
+        # Perspective Transformation on images
+        color_image = self.perspective_transformation(color_image)
+        if not self.calibration_mode:
             if self.outline_enabled:
                 color_image = self.highlight_objects(color_image, False)
             if self.aruco_markers_enabled:
                 color_image, angle, tracker_centroid = self.track_aruco_markers(color_image, color_image)
+
+            # Invert image
+            # copy = cv2.bitwise_not(copy)
 
             # Canny Edge Detection
             # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
@@ -301,20 +315,60 @@ class TransformationRGBDepth:
 
         cv2.imshow('window', black_image)
 
-    def display_mode_memory(self):
-        copy = self.stored_image.copy()
+    def display_mode_memory(self, frame_color):
+        aruco_markers = self.track_aruco_markers(frame_color, frame_color)
 
-        # Invert image
-        # copy = cv2.bitwise_not(copy)
+        if len(aruco_markers) > 0:
+            ids = aruco_markers.keys()
+            if ARUCO_MARKER_TIMELINE_CONTROLLER in ids:
+                tracker = aruco_markers[ARUCO_MARKER_TIMELINE_CONTROLLER]
 
-        # Canny Edge Detection
-        # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
-        copy = cv2.cvtColor(copy, cv2.COLOR_BGR2GRAY)
-        copy = cv2.bilateralFilter(copy, 11, 17, 17)
-        copy = cv2.Canny(copy, 40, 40)
+                # print(len(self.last_color_frames))
 
-        copy = self.add_border(copy)
-        cv2.imshow('window', copy)
+                # TODO: Check if len(self.last_color_frames) > 0 !
+                interval_size = frame_color.shape[1] / len(self.last_color_frames)
+                current_interval_pos = int(tracker['centroid'][0] / interval_size)
+
+                print('Current interval pos: ', current_interval_pos)
+
+                # cv2.putText(img=frame_color, text='Interval_pos: ' + str(current_interval_pos) + 'Saved frames: ' +
+                #                                   str(self.frame),
+                #             org=(int(frame_color.shape[1] / 6), int(frame_color.shape[0] / 4)),
+                #             fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
+
+                if len(self.last_color_frames) == 0:
+                    cv2.imshow('window', frame_color)
+                else:
+                    if current_interval_pos >= len(self.last_color_frames):
+                        current_interval_pos = len(self.last_color_frames) - 1
+
+                    print('Current index: ' + str(current_interval_pos))
+                    cv2.imshow('window', self.last_color_frames[current_interval_pos])
+            else:
+                #if self.frame % (TIMELINE_FRAME_SAVING_INTERVAL * RGB_FPS) == 0:  # once every X seconds
+
+                current_time = time.time()
+                time_since_last_save = current_time - self.last_timestamp
+
+                if time_since_last_save > 1:
+                    self.last_timestamp = current_time
+                    frame_color = self.perspective_transformation(frame_color)
+
+                    cv2.putText(img=frame_color, text=str(datetime.datetime.now().strftime("%H:%M:%S")),
+                                org=(int(frame_color.shape[1] / 6), int(frame_color.shape[0] / 4)),
+                                fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=1, color=(0, 0, 0))
+
+                    self.last_color_frames.append(frame_color)
+                    if len(self.last_color_frames) == TIMELINE_NUM_FRAMES:
+                        self.last_color_frames.pop(0)  # Remove oldest frame
+
+                black_image = np.zeros((frame_color.shape[0], frame_color.shape[1], 3), np.uint8)
+                # cv2.putText(img=black_image, text='Saved frames: ' + str(len(self.last_color_frames)),
+                #             org=(int(frame_color.shape[1] / 6), int(frame_color.shape[0] / 4)),
+                #             fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
+
+                cv2.imshow('window', black_image)
+
 
     def display_mode_pattern(self, color_image):
         color_image = self.perspective_transformation(color_image)
@@ -387,7 +441,7 @@ class TransformationRGBDepth:
 
                 aruco_marker = {'angle': self.calculate_aruco_marker_rotation(corners[i][0], frame),
                                 'corners': corners[i][0],
-                                'centroid': self.centroid(corners[i][0])}
+                                'centroid': self.centroid(corners[i][0]),}
 
                 aruco_markers[ids[i][0]] = aruco_marker
 
@@ -407,8 +461,6 @@ class TransformationRGBDepth:
             if draw_detected_markers:
                 # draw a square around the markers
                 aruco.drawDetectedMarkers(frame, corners, ids)
-
-        print(map(lambda aruco_marker: aruco_marker['id'], aruco_markers))
 
         return aruco_markers
 
