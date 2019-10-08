@@ -73,6 +73,11 @@ CONNECTIONS = [
 FABRIC_PATTERN_ONE = np.array([[-77, -56], [-41, -56], [116, -63], [191, -17], [156, 23], [85, -19], [96, 94],
                                 [-83, 102], [-77, -11], [-174, 28], [-188, -24]])
 
+# IDs of the used Aruco Marker IDs of the Demo application
+ARUCO_MARKER_SHIRT_S = 0
+ARUCO_MARKER_SHIRT_M = 4
+ARUCO_MARKER_SHIRT_L = 8
+
 
 class TransformationRGBDepth:
 
@@ -434,7 +439,7 @@ class TransformationRGBDepth:
         elif key == 52:  # Key 4
             cv2.imwrite('depth.png', depth_colormap)
             cv2.imwrite('color.png', color_image)
-        elif key == 97: # A as in Aruco Markers
+        elif key == 97:  # A as in Aruco Markers
             self.aruco_markers_enabled = not self.aruco_markers_enabled
         elif key == 99:  # C as in Calibrate
             self.calibration_mode = not self.calibration_mode
@@ -460,19 +465,20 @@ class TransformationRGBDepth:
 
         return frame
 
+    # Draw circles on the frame for all detected coordinates of the hand
     def add_hand_tracking_points(self, frame, points):
         if points is not None:
             point_id = 0
             for point in points:
                 x, y = point
-                if point_id == 8:
+                if point_id == 8:  # Id of index finger -> draw in different color
                     cv2.circle(frame, (int(x), int(y)), THICKNESS * 5, (255, 0, 0), -1)
                 else:
                     if self.show_hand_model:
                         cv2.circle(frame, (int(x), int(y)), THICKNESS * 2, POINT_COLOR, -1)
                 point_id += 1
             if self.show_hand_model:
-                for connection in CONNECTIONS:
+                for connection in CONNECTIONS:  # Draw connections of the points
                     x0, y0 = points[connection[0]]
                     x1, y1 = points[connection[1]]
                     cv2.line(frame, (int(x0), int(y0)), (int(x1), int(y1)), CONNECTION_COLOR, THICKNESS)
@@ -530,42 +536,32 @@ class TransformationRGBDepth:
         # Move the pattern to the desired spot on the table. Take the marker pos on the frame to calculate a good
         # position for the Polygon
 
-        ARUCO_MARKER_SHIRT_S = 0
-        ARUCO_MARKER_SHIRT_M = 4
-        ARUCO_MARKER_SHIRT_L = 8
-
         ids = aruco_markers.keys()
-        print(ids)
 
-        size = 'M'
-        tracker_centroid = None
-        angle = None
         if ARUCO_MARKER_SHIRT_S in ids and ARUCO_MARKER_SHIRT_M in ids and ARUCO_MARKER_SHIRT_L in ids:
-            size = 'M'
             tracker_centroid = aruco_markers[ARUCO_MARKER_SHIRT_M]['centroid']
             angle = aruco_markers[ARUCO_MARKER_SHIRT_M]['angle']
+            pattern_points = self.scale_fabric(pattern_points, 1.5)
         elif ARUCO_MARKER_SHIRT_S in ids and ARUCO_MARKER_SHIRT_L in ids:
-            size = 'M'
             tracker_centroid = self.calculate_obscured_marker_centroid(aruco_markers[ARUCO_MARKER_SHIRT_S]['centroid'],
                                                                        None,
                                                                        aruco_markers[ARUCO_MARKER_SHIRT_L]['centroid'])
             angle = aruco_markers[ARUCO_MARKER_SHIRT_S]['angle']
+            pattern_points = self.scale_fabric(pattern_points, 1.5)
         elif ARUCO_MARKER_SHIRT_S in ids and ARUCO_MARKER_SHIRT_M in ids:
-            size = 'L'
             tracker_centroid = self.calculate_obscured_marker_centroid(aruco_markers[ARUCO_MARKER_SHIRT_S]['centroid'],
                                                                        aruco_markers[ARUCO_MARKER_SHIRT_M]['centroid'],
                                                                        None)
             angle = aruco_markers[ARUCO_MARKER_SHIRT_M]['angle']
+            pattern_points = self.scale_fabric(pattern_points, 2)
         elif ARUCO_MARKER_SHIRT_M in ids and ARUCO_MARKER_SHIRT_L in ids:
-            size = 'S'
             tracker_centroid = self.calculate_obscured_marker_centroid(None,
                                                                        aruco_markers[ARUCO_MARKER_SHIRT_M]['centroid'],
                                                                        aruco_markers[ARUCO_MARKER_SHIRT_L]['centroid'])
             angle = aruco_markers[ARUCO_MARKER_SHIRT_M]['angle']
+            pattern_points = self.scale_fabric(pattern_points, 1.2)
         else:
             return
-
-        print('Size: ' + size)
 
         pattern_points = self.rotate_points(pattern_points, angle)
         pattern_points = self.calculate_fabric_pos_offset(tracker_centroid, pattern_points, frame)
@@ -573,15 +569,17 @@ class TransformationRGBDepth:
         cv2.line(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), (int(centroid_of_pattern[0]),
                  int(centroid_of_pattern[1])), (255, 0, 0), 1)
 
+        # Draw a circle to mark the selected pattern size
         cv2.circle(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), 30, (0, 0, 255), 3)
 
+        # Draw the selected pattern
         cv2.polylines(frame, [pattern_points], 1, (255, 255, 255), thickness=3)
 
     def calculate_fabric_pos_offset(self, tracker_centroid, pattern_points, frame):
         tracker_relative_x, tracker_relative_y = self.calculate_aruco_marker_relative_pos(tracker_centroid, frame)
-        if tracker_relative_x <= 0.5:
+        if tracker_relative_x <= 0.5:   # If the tracker is on the left half of the table
             x = int(tracker_centroid[0] + frame.shape[1] / 2)
-        else:
+        else:  # If the tracker is on the right side of the table
             x = int(tracker_centroid[0] - frame.shape[1] / 2)
         y = abs(int(tracker_centroid[1] - frame.shape[0]))
         offset = [x, y]
@@ -607,6 +605,7 @@ class TransformationRGBDepth:
 
         return pattern_points
 
+    # Calculated the center of the obscured aruco marker
     def calculate_obscured_marker_centroid(self, marker_left, marker_middle, marker_right):
         if marker_left is None:
             x = marker_middle[0] - (marker_right[0] - marker_middle[0])
