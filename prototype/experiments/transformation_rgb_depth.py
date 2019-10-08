@@ -116,6 +116,8 @@ class TransformationRGBDepth:
         # Start streaming
         profile = self.pipeline.start(config)
 
+        # TODO: Wait for a few frames to make sure the camera is ready
+
         # TODO: Make this code work to set ROI for Auto exposure on the table surface
         # Set ROI (https://github.com/IntelRealSense/librealsense/issues/3427)
         dev = profile.get_device()
@@ -519,19 +521,59 @@ class TransformationRGBDepth:
         return frame
 
     def pattern_example(self, frame, frame_color):
-        frame, angle, tracker_centroid = self.track_aruco_markers(frame, frame_color)
+        aruco_markers = self.track_aruco_markers(frame, frame_color)
 
-        if tracker_centroid is not None:
-            self.display_fabric_pattern(frame, FABRIC_PATTERN_ONE, tracker_centroid, angle)
+        if len(aruco_markers) > 0:
+            self.display_fabric_pattern(frame, FABRIC_PATTERN_ONE, aruco_markers)
 
-    def display_fabric_pattern(self, frame, pattern_points, tracker_centroid, angle):
+    def display_fabric_pattern(self, frame, pattern_points, aruco_markers):
         # Move the pattern to the desired spot on the table. Take the marker pos on the frame to calculate a good
         # position for the Polygon
+
+        ARUCO_MARKER_SHIRT_S = 0
+        ARUCO_MARKER_SHIRT_M = 4
+        ARUCO_MARKER_SHIRT_L = 8
+
+        ids = aruco_markers.keys()
+        print(ids)
+
+        size = 'M'
+        tracker_centroid = None
+        angle = None
+        if ARUCO_MARKER_SHIRT_S in ids and ARUCO_MARKER_SHIRT_M in ids and ARUCO_MARKER_SHIRT_L in ids:
+            size = 'M'
+            tracker_centroid = aruco_markers[ARUCO_MARKER_SHIRT_M]['centroid']
+            angle = aruco_markers[ARUCO_MARKER_SHIRT_M]['angle']
+        elif ARUCO_MARKER_SHIRT_S in ids and ARUCO_MARKER_SHIRT_L in ids:
+            size = 'M'
+            tracker_centroid = self.calculate_obscured_marker_centroid(aruco_markers[ARUCO_MARKER_SHIRT_S]['centroid'],
+                                                                       None,
+                                                                       aruco_markers[ARUCO_MARKER_SHIRT_L]['centroid'])
+            angle = aruco_markers[ARUCO_MARKER_SHIRT_S]['angle']
+        elif ARUCO_MARKER_SHIRT_S in ids and ARUCO_MARKER_SHIRT_M in ids:
+            size = 'L'
+            tracker_centroid = self.calculate_obscured_marker_centroid(aruco_markers[ARUCO_MARKER_SHIRT_S]['centroid'],
+                                                                       aruco_markers[ARUCO_MARKER_SHIRT_M]['centroid'],
+                                                                       None)
+            angle = aruco_markers[ARUCO_MARKER_SHIRT_M]['angle']
+        elif ARUCO_MARKER_SHIRT_M in ids and ARUCO_MARKER_SHIRT_L in ids:
+            size = 'S'
+            tracker_centroid = self.calculate_obscured_marker_centroid(None,
+                                                                       aruco_markers[ARUCO_MARKER_SHIRT_M]['centroid'],
+                                                                       aruco_markers[ARUCO_MARKER_SHIRT_L]['centroid'])
+            angle = aruco_markers[ARUCO_MARKER_SHIRT_M]['angle']
+        else:
+            return
+
+        print('Size: ' + size)
+
         pattern_points = self.rotate_points(pattern_points, angle)
         pattern_points = self.calculate_fabric_pos_offset(tracker_centroid, pattern_points, frame)
         centroid_of_pattern = self.centroid(pattern_points)
         cv2.line(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), (int(centroid_of_pattern[0]),
                  int(centroid_of_pattern[1])), (255, 0, 0), 1)
+
+        cv2.circle(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), 30, (0, 0, 255), 3)
 
         cv2.polylines(frame, [pattern_points], 1, (255, 255, 255), thickness=3)
 
@@ -564,6 +606,19 @@ class TransformationRGBDepth:
         pattern_points = pattern_points + offset
 
         return pattern_points
+
+    def calculate_obscured_marker_centroid(self, marker_left, marker_middle, marker_right):
+        if marker_left is None:
+            x = marker_middle[0] - (marker_right[0] - marker_middle[0])
+            y = marker_middle[1] - (marker_right[1] - marker_middle[1])
+        elif marker_middle is None:
+            x = (marker_left[0] + marker_right[0]) / 2
+            y = (marker_left[1] + marker_right[1]) / 2
+        elif marker_right is None:
+            x = marker_middle[0] + (marker_middle[0] - marker_left[0])
+            y = marker_middle[1] + (marker_middle[1] - marker_left[1])
+
+        return [x, y]
 
 
 def main():
