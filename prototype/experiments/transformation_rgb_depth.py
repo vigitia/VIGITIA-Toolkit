@@ -346,24 +346,35 @@ class TransformationRGBDepth:
         _y = sum(_y_list) / _len
         return (_x, _y)
 
-        # Code for tracking Aruco markers taken from https://github.com/njanirudh/Aruco_Tracker
+    # Code for tracking Aruco markers taken from https://github.com/njanirudh/Aruco_Tracker
     def track_aruco_markers(self, frame, frame_color):
         gray = cv2.cvtColor(frame_color, cv2.COLOR_BGR2GRAY)
         corners, ids, rejected_points = aruco.detectMarkers(gray, self.aruco_dictionary,
                                                             parameters=self.aruco_detector_parameters)
-        angle = 0
-        tracker_centroid = None
+
+        aruco_markers = {}
+
+        # angle = 0
+        # tracker_centroid = None
 
         # check if the ids list is not empty
         if np.all(ids is not None):
+            print(ids)
             for i in range(len(ids)):
-                if ids[i] == 4:
 
-                    angle = self.calculate_aruco_marker_rotation(corners[i][0], frame)
-                    tracker_centroid = self.centroid(corners[i][0])
-                    tracker_relative_x, tracker_relative_y = self.calculate_aruco_marker_relative_pos(tracker_centroid, frame)
+                aruco_marker = {'angle': self.calculate_aruco_marker_rotation(corners[i][0], frame),
+                                'corners': corners[i][0],
+                                'centroid': self.centroid(corners[i][0])}
 
-                    cv2.circle(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), 5, (0, 0, 255), -1)
+                aruco_markers[ids[i][0]] = aruco_marker
+
+
+                #if ids[i] == 4:
+                    # angle = self.calculate_aruco_marker_rotation(corners[i][0], frame)
+                    # tracker_centroid = self.centroid(corners[i][0])
+                    # tracker_relative_x, tracker_relative_y = self.calculate_aruco_marker_relative_pos(tracker_centroid, frame)
+
+                    # cv2.circle(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), 5, (0, 0, 255), -1)
 
                     # Display info. ONLY FOR TESTING PURPOSES
                     # cv2.putText(img=frame, text=str(int(angle)) + ' Grad' +
@@ -373,9 +384,11 @@ class TransformationRGBDepth:
                     #             fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
 
             # draw a square around the markers
-            aruco.drawDetectedMarkers(frame, corners, ids)
+            #aruco.drawDetectedMarkers(frame, corners, ids)
 
-        return frame, angle, tracker_centroid
+        print(map(lambda aruco_marker: aruco_marker['id'], aruco_markers))
+
+        return aruco_markers
 
     # Calculate the rotation of an aruco marker relative to the frame
     # Returns the angle in the range from 0° to 360°
