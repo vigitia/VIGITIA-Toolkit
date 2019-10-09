@@ -25,8 +25,8 @@ DEPTH_FPS = 30
 RGB_FPS = 30
 
 # Output image (currently needs to be 16x9 because the projector can project this)
-OUTPUT_IMAGE_WIDTH = 1920
-OUTPUT_IMAGE_HEIGHT = 1080
+OUTPUT_IMAGE_WIDTH = 3840
+OUTPUT_IMAGE_HEIGHT = 2160
 
 # Coordinates of table corners for perspective transformation
 CORNER_TOP_LEFT = (85, 45)
@@ -73,8 +73,13 @@ CONNECTIONS = [
     (5, 9), (9, 13), (13, 17), (0, 17)
 ]
 
-FABRIC_PATTERN_T_SHIRT = np.array([[-77, -56], [-41, -56], [116, -63], [191, -17], [156, 23], [85, -19], [96, 94],
-                                   [-83, 102], [-77, -11], [-174, 28], [-188, -24]])
+#FABRIC_PATTERN_T_SHIRT = np.array([[-77, -56], [-41, -56], [116, -63], [191, -17], [156, 23], [85, -19], [96, 94],
+#                                   [-83, 102], [-77, -11], [-174, 28], [-188, -24]])
+FABRIC_PATTERN_T_SHIRT = np.array([[597, 95], [961, 95], [959, 107], [961, 116], [963, 127], [967, 138], [957, 167],
+                                   [924, 163], [907, 163], [897, 164], [887, 171], [878, 180], [870, 188], [861, 196],
+                                   [815, 184], [785, 181], [767, 179], [750, 178], [733, 178], [710, 181], [679, 185],
+                                   [661, 187], [635, 190], [616, 195], [598, 196]])
+
 
 # IDs of the used Aruco Marker IDs of the Demo application
 ARUCO_MARKER_SHIRT_S = 0
@@ -119,7 +124,8 @@ class VigitiaDemo:
     marker_origin = None
     last_aruco_timeline_controller_data = None
 
-    last_fabric_pattern_angle = 0
+    last_fabric_pattern_angle = None
+    last_tracker_centroid_pos = None
 
     #fgbg = cv2.cv2.createBackgroundSubtractorMOG2()
     fgbg = cv2.cv2.createBackgroundSubtractorKNN()
@@ -634,7 +640,6 @@ class VigitiaDemo:
                     frame = self.last_color_frames[0].copy()
                 else:
                     # Invert array position (take elements from the back by adding a minus)
-                    print(current_interval_pos)
                     frame = self.last_color_frames[-current_interval_pos].copy()
 
                 if self.marker_origin is not None:
@@ -683,27 +688,47 @@ class VigitiaDemo:
                                                                        aruco_markers[ARUCO_MARKER_SHIRT_M]['centroid'],
                                                                        None)
             angle = aruco_markers[ARUCO_MARKER_SHIRT_M]['angle']
-            pattern_points = self.scale_fabric(pattern_points, 2)
+            pattern_points = self.scale_fabric(pattern_points, 1.7)
         elif ARUCO_MARKER_SHIRT_M in ids and ARUCO_MARKER_SHIRT_L in ids:
             tracker_centroid = self.calculate_obscured_marker_centroid(None,
                                                                        aruco_markers[ARUCO_MARKER_SHIRT_M]['centroid'],
                                                                        aruco_markers[ARUCO_MARKER_SHIRT_L]['centroid'])
             angle = aruco_markers[ARUCO_MARKER_SHIRT_M]['angle']
-            pattern_points = self.scale_fabric(pattern_points, 1.2)
+            pattern_points = self.scale_fabric(pattern_points, 1.3)
         else:
             return
 
-        pattern_points = self.rotate_points(pattern_points, angle)
-        pattern_points = self.calculate_fabric_pos_offset(tracker_centroid, pattern_points, frame)
-        centroid_of_pattern = self.centroid(pattern_points)
-        cv2.line(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), (int(centroid_of_pattern[0]),
-                 int(centroid_of_pattern[1])), (255, 0, 0), 1)
+        # Threshold for rotation
+        if self.last_fabric_pattern_angle is None:
+            self.last_fabric_pattern_angle = angle
+        if abs(self.last_fabric_pattern_angle - angle) > 3:
+            pattern_points = self.rotate_points(pattern_points, angle)
+            self.last_fabric_pattern_angle = angle
+        else:
+            pattern_points = self.rotate_points(pattern_points, self.last_fabric_pattern_angle)
 
-        # Draw a circle to mark the selected pattern size
-        cv2.circle(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), 30, (0, 0, 255), 3)
+        # Threshold for position
+        if self.last_tracker_centroid_pos is None:
+            self.last_tracker_centroid_pos = tracker_centroid
+        if abs(self.last_tracker_centroid_pos[0] - tracker_centroid[0]) > 3 \
+                or abs(self.last_tracker_centroid_pos[1] - tracker_centroid[1]) > 3:  # Threshold for rotation
+            pattern_points = self.calculate_fabric_pos_offset(tracker_centroid, pattern_points, frame)
+            # Draw a circle to mark the selected pattern size
+            cv2.circle(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), 30, (0, 0, 255), 3)
+            self.last_tracker_centroid_pos = tracker_centroid
+        else:
+            pattern_points = self.calculate_fabric_pos_offset(self.last_tracker_centroid_pos, pattern_points, frame)
+            # Draw a circle to mark the selected pattern size
+            cv2.circle(frame, (int(self.last_tracker_centroid_pos[0]), int(self.last_tracker_centroid_pos[1])), 30,
+                       (0, 0, 255), 3)
+
+        centroid_of_pattern = self.centroid(pattern_points)
+        # Draw line to connect tracker and pattern
+        cv2.line(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), (int(centroid_of_pattern[0]),
+                 int(centroid_of_pattern[1])), (0, 0, 255), 1)
 
         # Draw the selected pattern
-        cv2.polylines(frame, [pattern_points], 1, (255, 255, 255), thickness=3)
+        cv2.polylines(frame, [pattern_points], 1, (255, 255, 255), thickness=2)
 
     def calculate_fabric_pos_offset(self, tracker_centroid, pattern_points, frame):
         tracker_relative_x, tracker_relative_y = self.calculate_aruco_marker_relative_pos(tracker_centroid, frame)
@@ -711,15 +736,18 @@ class VigitiaDemo:
             x = int(tracker_centroid[0] + frame.shape[1] / 2)
         else:  # If the tracker is on the right side of the table
             x = int(tracker_centroid[0] - frame.shape[1] / 2)
-        y = abs(int(tracker_centroid[1] - frame.shape[0]))
+
+        #y = abs(int(tracker_centroid[1] - frame.shape[0]))
+        y = abs(int(tracker_centroid[1]))
         offset = [x, y]
         pattern_points = pattern_points + offset
+        pattern_points = pattern_points.astype(int)  # Convert all floats to int because coordinates are expected to be Integers
 
+        # Make sure the pattern is not displayed outside the table
         x = 0
         y = 0
         fabric_bounding_rect = cv2.boundingRect(pattern_points)
         #cv2.rectangle(frame, fabric_bounding_rect, (255, 0, 0), 3)
-        print(fabric_bounding_rect, frame.shape[0], frame.shape[1])
         if fabric_bounding_rect[0] < 0:
             x = abs(fabric_bounding_rect[0])
         if fabric_bounding_rect[0] + fabric_bounding_rect[2] > frame.shape[1]:
