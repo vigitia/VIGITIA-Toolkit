@@ -73,13 +73,14 @@ CONNECTIONS = [
     (5, 9), (9, 13), (13, 17), (0, 17)
 ]
 
-FABRIC_PATTERN_ONE = np.array([[-77, -56], [-41, -56], [116, -63], [191, -17], [156, 23], [85, -19], [96, 94],
-                               [-83, 102], [-77, -11], [-174, 28], [-188, -24]])
+FABRIC_PATTERN_T_SHIRT = np.array([[-77, -56], [-41, -56], [116, -63], [191, -17], [156, 23], [85, -19], [96, 94],
+                                   [-83, 102], [-77, -11], [-174, 28], [-188, -24]])
 
 # IDs of the used Aruco Marker IDs of the Demo application
 ARUCO_MARKER_SHIRT_S = 0
 ARUCO_MARKER_SHIRT_M = 4
 ARUCO_MARKER_SHIRT_L = 8
+ARUCO_MARKER_MISSING_TIMEOUT = 2  # seconds
 
 ARUCO_MARKER_TIMELINE_CONTROLLER = 42
 
@@ -205,6 +206,9 @@ class VigitiaDemo:
                 frames = self.pipeline.wait_for_frames()  # Get frameset of color and depth
                 color_image, depth_colormap, aligned_depth_frame = self.align_frames(frames)
 
+                if self.frame < 30:
+                    continue
+
                 # depth_data = aligned_depth_frame.get_data()
                 # np_image = np.asanyarray(depth_data)
                 #distance = np_image[int(len(np_image) / 2)][int(len(np_image[0]) / 2)] * self.depth_scale * 100
@@ -224,8 +228,12 @@ class VigitiaDemo:
 
                 self.detect_hands(color_image, aligned_depth_frame)
 
+
+
                 # Available modes of demo application
-                if self.display_mode == "RGB":
+                if self.display_mode == "default":
+                    self.display_mode_rgb(color_image)
+                elif self.display_mode == "RGB":
                     self.display_mode_rgb(color_image)
                 elif self.display_mode == "depth":
                     self.display_mode_depth(depth_colormap)
@@ -248,6 +256,12 @@ class VigitiaDemo:
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Available display modes
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+    def display_mode_default(self, color_image):
+        color_image = self.perspective_transformation(color_image)
+        black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
+        aruco_markers = self.track_aruco_markers(black_image, color_image)
+        current_time = time.time()
 
     def display_mode_rgb(self, color_image):
         if not self.calibration_mode:
@@ -303,32 +317,34 @@ class VigitiaDemo:
 
         cv2.imshow('window', black_image)
 
-    def display_mode_memory(self, frame_color):
-        black_image = np.zeros((frame_color.shape[0], frame_color.shape[1], 3), np.uint8)
-        aruco_markers = self.track_aruco_markers(black_image, frame_color, True)
+    def display_mode_memory(self, color_image):
+        color_image = self.perspective_transformation(color_image)
+        black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
+        aruco_markers = self.track_aruco_markers(black_image, color_image)
         current_time = time.time()
 
-        # If marker is present, show timeline, otherwise, just show a black screen
+        # If marker is present, show timeline. Otherwise, just show a black screen
         if len(aruco_markers) > 0 and ARUCO_MARKER_TIMELINE_CONTROLLER in aruco_markers.keys():
 
             # Check if it it the starting position of the marker
-            if self.last_time_marker_present is None or (current_time - self.last_time_marker_present) > 2:
+            if self.last_time_marker_present is None \
+                    or (current_time - self.last_time_marker_present) > ARUCO_MARKER_MISSING_TIMEOUT:
                 self.marker_origin = aruco_markers[ARUCO_MARKER_TIMELINE_CONTROLLER]['centroid']
 
             self.last_time_marker_present = current_time
             self.last_aruco_timeline_controller_data = aruco_markers[ARUCO_MARKER_TIMELINE_CONTROLLER]
-            self.show_scrollable_timeline(frame_color, self.last_aruco_timeline_controller_data)
+            self.show_scrollable_timeline(color_image, self.last_aruco_timeline_controller_data)
         # If marker was present within the last second
-        elif self.last_time_marker_present is not None and current_time - self.last_time_marker_present < 2:
-            self.show_scrollable_timeline(frame_color, self.last_aruco_timeline_controller_data)
+        elif self.last_time_marker_present is not None \
+                and current_time - self.last_time_marker_present < ARUCO_MARKER_MISSING_TIMEOUT:
+            self.show_scrollable_timeline(color_image, self.last_aruco_timeline_controller_data)
         else:
             time_since_last_saved_frame = current_time - self.last_saved_frame_timestamp
             if time_since_last_saved_frame > TIMELINE_FRAME_SAVING_INTERVAL:
                 self.last_saved_frame_timestamp = current_time
-                frame_color = self.perspective_transformation(frame_color)
-                frame_color = self.add_border(frame_color)
+                color_image = self.add_border(color_image)
 
-                self.last_color_frames.append(frame_color)
+                self.last_color_frames.append(color_image)
                 if len(self.last_color_frames) == TIMELINE_NUM_FRAMES:
                     self.last_color_frames.pop(0)  # Remove oldest frame
 
@@ -340,7 +356,7 @@ class VigitiaDemo:
         aruco_markers = self.track_aruco_markers(black_image, color_image)
 
         if len(aruco_markers) > 0:
-            self.display_fabric_pattern(black_image, FABRIC_PATTERN_ONE, aruco_markers)
+            self.display_fabric_pattern(black_image, FABRIC_PATTERN_T_SHIRT, aruco_markers)
 
         black_image = self.add_border(black_image)
         cv2.imshow('window', black_image)
@@ -488,7 +504,7 @@ class VigitiaDemo:
         return frame
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-    # Functions hand tracking
+    # Functions for hand tracking
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
     # Detect hand position using the google mediapipe framework
@@ -600,23 +616,25 @@ class VigitiaDemo:
     # Functions for the MEMORY FUNCTION example
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-    def show_scrollable_timeline(self, frame_color, tracker):
+    def show_scrollable_timeline(self, color_image, tracker):
         if len(self.last_color_frames) > 0:  # Check if there is at least one stored image to show
-            timeline_length = frame_color.shape[1] / 4  # TODO: Save as constant
-            interval_size = timeline_length / len(self.last_color_frames)
-            # Check if
+            timeline_length = color_image.shape[1] / 4  # TODO: Save as constant
+            interval_size = timeline_length / TIMELINE_NUM_FRAMES
+
+            # Check if tracker is close to the displayed timeline
             if self.marker_origin[0] <= tracker['centroid'][0] <= self.marker_origin[0] + timeline_length and \
                     self.marker_origin[1] - 100 < tracker['centroid'][1] < self.marker_origin[1] + 100:
                 current_interval_pos = int((tracker['centroid'][0] - self.marker_origin[0]) / interval_size)
 
                 # if the array is not full yet with saved frames, always show the last frame present
-                if current_interval_pos >= len(self.last_color_frames):
+                if current_interval_pos > len(self.last_color_frames):
                     current_interval_pos = len(self.last_color_frames) - 1
 
                 if current_interval_pos == 0:
-                    frame = self.last_color_frames[current_interval_pos].copy()
+                    frame = self.last_color_frames[0].copy()
                 else:
                     # Invert array position (take elements from the back by adding a minus)
+                    print(current_interval_pos)
                     frame = self.last_color_frames[-current_interval_pos].copy()
 
                 if self.marker_origin is not None:
@@ -626,16 +644,16 @@ class VigitiaDemo:
 
     def draw_timeline(self, frame, timeline_length):
         # TODO: Correct offset (magic numbers here are just a placeholder)
-        cv2.line(frame, (int(self.marker_origin[0] + timeline_length), int(self.marker_origin[1]) - 20),
-                 (int(self.marker_origin[0] - 40), int(self.marker_origin[1]) - 20), (0, 0, 0), 20)
+        cv2.line(frame, (int(self.marker_origin[0] - 20), int(self.marker_origin[1]) + 50),
+                 (int(self.marker_origin[0] + timeline_length + 20), int(self.marker_origin[1]) + 50), (0, 0, 0), 10)
         cv2.putText(img=frame, text='-0min',
-                    org=(int(self.marker_origin[0] - 20), int(self.marker_origin[1]) - 50),
+                    org=(int(self.marker_origin[0] - 30), int(self.marker_origin[1]) + 80),
                     fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(0, 0, 0))
         cv2.putText(img=frame, text='-1min',
-                    org=(int(self.marker_origin[0] + timeline_length / 2 - 20), int(self.marker_origin[1]) - 50),
+                    org=(int(self.marker_origin[0] + timeline_length / 2 - 30), int(self.marker_origin[1]) + 80),
                     fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(0, 0, 0))
         cv2.putText(img=frame, text='-2min',
-                    org=(int(self.marker_origin[0] + timeline_length - 20), int(self.marker_origin[1]) - 50),
+                    org=(int(self.marker_origin[0] + timeline_length - 30), int(self.marker_origin[1]) + 80),
                     fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(0, 0, 0))
 
         return frame
