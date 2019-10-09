@@ -11,6 +11,8 @@ from hand_tracker import HandTracker
 # Built upon: https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/align-depth2color.py
 # Code for Hand Tracking and Models from https://github.com/metalwhale/hand_tracking
 
+# TODO: M = cv2.getRotationMatrix2D(center, angle, scale)
+
 # Current distance between camera and table in cm
 # TODO: Should be calculated automatically later and saved to config file
 DISTANCE_CAMERA_TABLE = 110  # cm
@@ -251,7 +253,7 @@ class VigitiaDemo:
                     self.display_mode_pattern(color_image)
 
                 key = cv2.waitKey(1)
-                if key & 0xFF == ord('q') or key == 27: # Press esc or 'q' to close the image window
+                if key & 0xFF == ord('q') or key == 27:  # Press esc or 'q' to close the image window
                     cv2.destroyAllWindows()
                     break
                 else:
@@ -648,18 +650,49 @@ class VigitiaDemo:
                 cv2.imshow('window', frame)
 
     def draw_timeline(self, frame, timeline_length):
+
+        black_image = np.ones((frame.shape[0], frame.shape[1], 3), np.uint8)
+
+
         # TODO: Correct offset (magic numbers here are just a placeholder)
-        cv2.line(frame, (int(self.marker_origin[0] - 20), int(self.marker_origin[1]) + 50),
-                 (int(self.marker_origin[0] + timeline_length + 20), int(self.marker_origin[1]) + 50), (0, 0, 0), 10)
-        cv2.putText(img=frame, text='-0min',
-                    org=(int(self.marker_origin[0] - 30), int(self.marker_origin[1]) + 80),
-                    fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(0, 0, 0))
-        cv2.putText(img=frame, text='-1min',
-                    org=(int(self.marker_origin[0] + timeline_length / 2 - 30), int(self.marker_origin[1]) + 80),
-                    fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(0, 0, 0))
-        cv2.putText(img=frame, text='-2min',
-                    org=(int(self.marker_origin[0] + timeline_length - 30), int(self.marker_origin[1]) + 80),
-                    fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(0, 0, 0))
+        cv2.line(frame,
+                 (int(self.marker_origin[0] - 20),
+                  int(self.marker_origin[1]) + 50),
+                 (int(self.marker_origin[0] + timeline_length + 20),
+                  int(self.marker_origin[1]) + 50), (30, 30, 30), 10)
+        cv2.putText(img=black_image, text='-0s',
+                    org=(int(abs((self.marker_origin[0]) - black_image.shape[1])),
+                         int(abs(self.marker_origin[1] - black_image.shape[0] + 80))),
+                    fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(30, 30, 30))
+        cv2.putText(img=black_image, text='-60s',
+                    org=(int(abs((self.marker_origin[0] + timeline_length / 2) - black_image.shape[1])),
+                         int(abs((self.marker_origin[1]) - black_image.shape[0] + 80))),
+                    fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(30, 30, 30))
+        cv2.putText(img=black_image, text='-120s',
+                    org=(int(abs((self.marker_origin[0] + timeline_length) - black_image.shape[1])),
+                         int(abs((self.marker_origin[1]) - black_image.shape[0] + 80))),
+                    fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(30, 30, 30))
+
+        print(str(int(abs((self.marker_origin[1] + 80) - black_image.shape[0]))))
+
+        black_image = cv2.flip(black_image, -1)
+
+        # https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_core/py_image_arithmetics/py_image_arithmetics.html
+        # I want to put logo on top-left corner, So I create a ROI
+        rows, cols, channels = black_image.shape
+        roi = frame[0:rows, 0:cols]
+        # Now create a mask of logo and create its inverse mask also
+        img2gray = cv2.cvtColor(black_image, cv2.COLOR_BGR2GRAY)
+        ret, mask = cv2.threshold(img2gray, 10, 255, cv2.THRESH_BINARY)
+        mask_inv = cv2.bitwise_not(mask)
+        # Now black-out the area of logo in ROI
+        img1_bg = cv2.bitwise_and(roi, roi, mask=mask_inv)
+        # Take only region of logo from logo image.
+        img2_fg = cv2.bitwise_and(black_image, black_image, mask=mask)
+        # Put logo in ROI and modify the main image
+        dst = cv2.add(img1_bg, img2_fg)
+        frame[0:rows, 0:cols] = dst
+
 
         return frame
 
