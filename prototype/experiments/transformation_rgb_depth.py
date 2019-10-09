@@ -306,9 +306,7 @@ class TransformationRGBDepth:
         if self.outline_enabled:
             black_image = self.highlight_objects(self.perspective_transformation(color_image), True)
         if self.aruco_markers_enabled:
-            black_image, angle, tracker_centroid = self.track_aruco_markers(black_image,
-                                                                            self.perspective_transformation(
-                                                                                color_image))
+            aruco_markers = self.track_aruco_markers(black_image, self.perspective_transformation(color_image), True)
 
         black_image = self.add_border(black_image)
         if self.last_distance is not None:
@@ -343,10 +341,6 @@ class TransformationRGBDepth:
                 frame_color = self.perspective_transformation(frame_color)
                 frame_color = self.add_border(frame_color)
 
-                cv2.putText(img=frame_color, text=str(datetime.datetime.now().strftime("%H:%M:%S")),
-                            org=(int(frame_color.shape[1] / 6), int(frame_color.shape[0] / 4)),
-                            fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=1, color=(0, 0, 0))
-
                 self.last_color_frames.append(frame_color)
                 if len(self.last_color_frames) == TIMELINE_NUM_FRAMES:
                     self.last_color_frames.pop(0)  # Remove oldest frame
@@ -355,24 +349,42 @@ class TransformationRGBDepth:
 
     def show_scrollable_timeline(self, frame_color, tracker):
         if len(self.last_color_frames) > 0:
-            interval_size = frame_color.shape[1] / len(self.last_color_frames)
-            current_interval_pos = int(tracker['centroid'][0] / interval_size)
+            timeline_length = frame_color.shape[1] / 4  # TODO: Save as constant
+            interval_size = timeline_length / len(self.last_color_frames)
+            if self.marker_origin[0] <= tracker['centroid'][0] <= self.marker_origin[0] + timeline_length and \
+                    self.marker_origin[1] - 100 < tracker['centroid'][1] < self.marker_origin[1] + 100:
+                current_interval_pos = int((tracker['centroid'][0] - self.marker_origin[0]) / interval_size)
 
-            print('Current interval pos: ', current_interval_pos)
+                # if the array is not full yet with saved frames, always show the last frame present
+                if current_interval_pos >= len(self.last_color_frames):
+                    current_interval_pos = len(self.last_color_frames) - 1
 
-            if current_interval_pos >= len(self.last_color_frames):
-                current_interval_pos = len(self.last_color_frames) - 1
+                if current_interval_pos == 0:
+                    frame = self.last_color_frames[current_interval_pos].copy()
+                else:
+                    # Invert array position (take elements from the back by adding a minus)
+                    frame = self.last_color_frames[-current_interval_pos].copy()
 
-            print('Current index: ' + str(current_interval_pos))
-            # Invert array position (take elements from the back by adding a minus)
-            frame = self.last_color_frames[-current_interval_pos].copy()
-            if self.marker_origin is not None:
-                cv2.circle(frame, (int(self.marker_origin[0]), int(self.marker_origin[1])), 60, (0, 0, 0), cv2.FILLED)
-                TIMELINE_LENGTH = frame.shape[1]/4
-                cv2.line(frame, (int(self.marker_origin[0]), int(self.marker_origin[1])),
-                         (int(self.marker_origin[0] + TIMELINE_LENGTH), int(self.marker_origin[1])), (0, 0, 0), 10)
+                if self.marker_origin is not None:
+                    frame = self.draw_timeline(frame, timeline_length)
 
-            cv2.imshow('window', frame)
+                cv2.imshow('window', frame)
+
+    def draw_timeline(self, frame, timeline_length):
+        # TODO: Correct offset (magic numbers here are just a placeholder)
+        cv2.line(frame, (int(self.marker_origin[0] + timeline_length), int(self.marker_origin[1]) - 20),
+                 (int(self.marker_origin[0] - 40), int(self.marker_origin[1]) - 20), (0, 0, 0), 20)
+        cv2.putText(img=frame, text='-0min',
+                    org=(int(self.marker_origin[0] - 20), int(self.marker_origin[1]) - 50),
+                    fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(0, 0, 0))
+        cv2.putText(img=frame, text='-1min',
+                    org=(int(self.marker_origin[0] + timeline_length / 2 - 20), int(self.marker_origin[1]) - 50),
+                    fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(0, 0, 0))
+        cv2.putText(img=frame, text='-2min',
+                    org=(int(self.marker_origin[0] + timeline_length - 20), int(self.marker_origin[1]) - 50),
+                    fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(0, 0, 0))
+
+        return frame
 
     def display_mode_pattern(self, color_image):
         color_image = self.perspective_transformation(color_image)
@@ -397,7 +409,10 @@ class TransformationRGBDepth:
             (x, y), radius = cv2.minEnclosingCircle(contour)
             center = (int(x), int(y))
             radius = int(radius * 1.5)
-            if radius < frame.shape[0] / 2:
+
+            MIN_CIRCLE_SIZE = 30
+
+            if frame.shape[0] / 2 > radius > MIN_CIRCLE_SIZE:
                 frame = cv2.circle(frame, center, radius, (255, 255, 255), cv2.FILLED)
 
         return frame
