@@ -29,10 +29,10 @@ OUTPUT_IMAGE_WIDTH = 1920
 OUTPUT_IMAGE_HEIGHT = 1080
 
 # Coordinates of table corners for perspective transformation
-CORNER_TOP_LEFT = (86, 43)
-CORNER_TOP_RIGHT = (1271, 92)
-CORNER_BOTTOM_LEFT = (70, 639)
-CORNER_BOTTOM_RIGHT = (1249, 675)
+CORNER_TOP_LEFT = (85, 45)
+CORNER_TOP_RIGHT = (1269, 94)
+CORNER_BOTTOM_LEFT = (68, 638)
+CORNER_BOTTOM_RIGHT = (1245, 674)
 
 # Since the projection field of the projector is larger than the table,
 # we need to add black borders on at least two sides
@@ -83,7 +83,7 @@ ARUCO_MARKER_SHIRT_L = 8
 
 ARUCO_MARKER_TIMELINE_CONTROLLER = 42
 
-TIMELINE_NUM_FRAMES = 50
+TIMELINE_NUM_FRAMES = 120
 TIMELINE_FRAME_SAVING_INTERVAL = 1  # seconds
 
 
@@ -113,7 +113,10 @@ class TransformationRGBDepth:
     hand_points = None
     last_distance = None
 
-    last_timestamp = time.time()
+    last_saved_frame_timestamp = time.time()
+    last_time_marker_present = None
+    marker_origin = None
+    last_aruco_timeline_controller_data = None
 
     last_fabric_pattern_angle = 0
 
@@ -316,59 +319,60 @@ class TransformationRGBDepth:
         cv2.imshow('window', black_image)
 
     def display_mode_memory(self, frame_color):
-        aruco_markers = self.track_aruco_markers(frame_color, frame_color)
+        black_image = np.zeros((frame_color.shape[0], frame_color.shape[1], 3), np.uint8)
+        aruco_markers = self.track_aruco_markers(black_image, frame_color, True)
+        current_time = time.time()
 
-        if len(aruco_markers) > 0:
-            ids = aruco_markers.keys()
-            if ARUCO_MARKER_TIMELINE_CONTROLLER in ids:
-                tracker = aruco_markers[ARUCO_MARKER_TIMELINE_CONTROLLER]
+        # If marker is present, show timeline, otherwise, just show a black screen
+        if len(aruco_markers) > 0 and ARUCO_MARKER_TIMELINE_CONTROLLER in aruco_markers.keys():
 
-                # print(len(self.last_color_frames))
+            # Check if it it the starting position of the marker
+            if self.last_time_marker_present is None or (current_time - self.last_time_marker_present) > 2:
+                self.marker_origin = aruco_markers[ARUCO_MARKER_TIMELINE_CONTROLLER]['centroid']
 
-                # TODO: Check if len(self.last_color_frames) > 0 !
-                interval_size = frame_color.shape[1] / len(self.last_color_frames)
-                current_interval_pos = int(tracker['centroid'][0] / interval_size)
+            self.last_time_marker_present = current_time
+            self.last_aruco_timeline_controller_data = aruco_markers[ARUCO_MARKER_TIMELINE_CONTROLLER]
+            self.show_scrollable_timeline(frame_color, self.last_aruco_timeline_controller_data)
+        # If marker was present within the last second
+        elif self.last_time_marker_present is not None and current_time - self.last_time_marker_present < 2:
+            self.show_scrollable_timeline(frame_color, self.last_aruco_timeline_controller_data)
+        else:
+            time_since_last_saved_frame = current_time - self.last_saved_frame_timestamp
+            if time_since_last_saved_frame > TIMELINE_FRAME_SAVING_INTERVAL:
+                self.last_saved_frame_timestamp = current_time
+                frame_color = self.perspective_transformation(frame_color)
+                frame_color = self.add_border(frame_color)
 
-                print('Current interval pos: ', current_interval_pos)
+                cv2.putText(img=frame_color, text=str(datetime.datetime.now().strftime("%H:%M:%S")),
+                            org=(int(frame_color.shape[1] / 6), int(frame_color.shape[0] / 4)),
+                            fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=1, color=(0, 0, 0))
 
-                # cv2.putText(img=frame_color, text='Interval_pos: ' + str(current_interval_pos) + 'Saved frames: ' +
-                #                                   str(self.frame),
-                #             org=(int(frame_color.shape[1] / 6), int(frame_color.shape[0] / 4)),
-                #             fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
+                self.last_color_frames.append(frame_color)
+                if len(self.last_color_frames) == TIMELINE_NUM_FRAMES:
+                    self.last_color_frames.pop(0)  # Remove oldest frame
 
-                if len(self.last_color_frames) == 0:
-                    cv2.imshow('window', frame_color)
-                else:
-                    if current_interval_pos >= len(self.last_color_frames):
-                        current_interval_pos = len(self.last_color_frames) - 1
+            cv2.imshow('window', black_image)
 
-                    print('Current index: ' + str(current_interval_pos))
-                    cv2.imshow('window', self.last_color_frames[current_interval_pos])
-            else:
-                #if self.frame % (TIMELINE_FRAME_SAVING_INTERVAL * RGB_FPS) == 0:  # once every X seconds
+    def show_scrollable_timeline(self, frame_color, tracker):
+        if len(self.last_color_frames) > 0:
+            interval_size = frame_color.shape[1] / len(self.last_color_frames)
+            current_interval_pos = int(tracker['centroid'][0] / interval_size)
 
-                current_time = time.time()
-                time_since_last_save = current_time - self.last_timestamp
+            print('Current interval pos: ', current_interval_pos)
 
-                if time_since_last_save > 1:
-                    self.last_timestamp = current_time
-                    frame_color = self.perspective_transformation(frame_color)
+            if current_interval_pos >= len(self.last_color_frames):
+                current_interval_pos = len(self.last_color_frames) - 1
 
-                    cv2.putText(img=frame_color, text=str(datetime.datetime.now().strftime("%H:%M:%S")),
-                                org=(int(frame_color.shape[1] / 6), int(frame_color.shape[0] / 4)),
-                                fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=1, color=(0, 0, 0))
+            print('Current index: ' + str(current_interval_pos))
+            # Invert array position (take elements from the back by adding a minus)
+            frame = self.last_color_frames[-current_interval_pos].copy()
+            if self.marker_origin is not None:
+                cv2.circle(frame, (int(self.marker_origin[0]), int(self.marker_origin[1])), 60, (0, 0, 0), cv2.FILLED)
+                TIMELINE_LENGTH = frame.shape[1]/4
+                cv2.line(frame, (int(self.marker_origin[0]), int(self.marker_origin[1])),
+                         (int(self.marker_origin[0] + TIMELINE_LENGTH), int(self.marker_origin[1])), (0, 0, 0), 10)
 
-                    self.last_color_frames.append(frame_color)
-                    if len(self.last_color_frames) == TIMELINE_NUM_FRAMES:
-                        self.last_color_frames.pop(0)  # Remove oldest frame
-
-                black_image = np.zeros((frame_color.shape[0], frame_color.shape[1], 3), np.uint8)
-                # cv2.putText(img=black_image, text='Saved frames: ' + str(len(self.last_color_frames)),
-                #             org=(int(frame_color.shape[1] / 6), int(frame_color.shape[0] / 4)),
-                #             fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
-
-                cv2.imshow('window', black_image)
-
+            cv2.imshow('window', frame)
 
     def display_mode_pattern(self, color_image):
         color_image = self.perspective_transformation(color_image)
@@ -441,7 +445,7 @@ class TransformationRGBDepth:
 
                 aruco_marker = {'angle': self.calculate_aruco_marker_rotation(corners[i][0], frame),
                                 'corners': corners[i][0],
-                                'centroid': self.centroid(corners[i][0]),}
+                                'centroid': self.centroid(corners[i][0])}
 
                 aruco_markers[ids[i][0]] = aruco_marker
 
