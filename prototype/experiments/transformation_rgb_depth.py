@@ -4,7 +4,9 @@ import cv2
 import cv2.aruco as aruco
 import numpy as np
 import time
-import datetime
+import configparser
+# https://stackoverflow.com/questions/9763116/parse-a-tuple-from-a-string
+from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
 
 from hand_tracker import HandTracker
 
@@ -29,12 +31,6 @@ RGB_FPS = 30
 # Output image (currently needs to be 16x9 because the projector can project this)
 OUTPUT_IMAGE_WIDTH = 3840
 OUTPUT_IMAGE_HEIGHT = 2160
-
-# Coordinates of table corners for perspective transformation
-CORNER_TOP_LEFT = (85, 45)
-CORNER_TOP_RIGHT = (1269, 94)
-CORNER_BOTTOM_LEFT = (68, 638)
-CORNER_BOTTOM_RIGHT = (1245, 674)
 
 # Since the projection field of the projector is larger than the table,
 # we need to add black borders on at least two sides
@@ -75,32 +71,39 @@ CONNECTIONS = [
     (5, 9), (9, 13), (13, 17), (0, 17)
 ]
 
-#FABRIC_PATTERN_T_SHIRT = np.array([[-77, -56], [-41, -56], [116, -63], [191, -17], [156, 23], [85, -19], [96, 94],
-#                                   [-83, 102], [-77, -11], [-174, 28], [-188, -24]])
+# Coordinates of marker points for the fabric pattern "T-shirt"
 FABRIC_PATTERN_T_SHIRT = np.array([[597, 95], [961, 95], [959, 107], [961, 116], [963, 127], [967, 138], [957, 167],
                                    [924, 163], [907, 163], [897, 164], [887, 171], [878, 180], [870, 188], [861, 196],
                                    [815, 184], [785, 181], [767, 179], [750, 178], [733, 178], [710, 181], [679, 185],
                                    [661, 187], [635, 190], [616, 195], [598, 196]])
 
 
-# IDs of the used Aruco Marker IDs of the Demo application
+# IDs of the used Aruco Marker IDs of the demo applications
 ARUCO_MARKER_SHIRT_S = 0
 ARUCO_MARKER_SHIRT_M = 4
 ARUCO_MARKER_SHIRT_L = 8
-ARUCO_MARKER_MISSING_TIMEOUT = 2  # seconds
-
 ARUCO_MARKER_TIMELINE_CONTROLLER = 42
 
+# Time until a marker is declared absent by the system (we wait a little to make sure it is not just obstructed by
+# something
+ARUCO_MARKER_MISSING_TIMEOUT = 2  # seconds
+
+# Number of stored frames for the rewind function
 TIMELINE_NUM_FRAMES = 120
+
+# interval for storing frames for the rewind function
 TIMELINE_FRAME_SAVING_INTERVAL = 1  # seconds
 
 
 class VigitiaDemo:
+    table_corner_top_left = (0, 0)
+    table_corner_top_right = (0, 0)
+    table_corner_bottom_left = (0, 0)
+    table_corner_bottom_right = (0, 0)
 
     pipeline = None
     align = None
     colorizer = None
-    last_color_frame = None
     last_color_frames = []
     stored_image = None
     hand_detector = None
@@ -180,10 +183,24 @@ class VigitiaDemo:
         # Set mouse callbacks to extract the coordinates of clicked spots in the image
         cv2.setMouseCallback('window', self.on_mouse_click)
 
+        self.read_config_file()
         self.init_colorizer()
         self.init_hand_detector()
         self.init_aruco_tracking()
         self.loop()
+
+    def read_config_file(self):
+        config = configparser.ConfigParser()
+        config.read('config.ini')
+        print(config.sections())
+
+        # Coordinates of table corners for perspective transformation
+        self.table_corner_top_left = make_tuple(config['CORNERS']['CornerTopLeft'])
+        self.table_corner_top_right = make_tuple(config['CORNERS']['CornerTopRight'])
+        self.table_corner_bottom_left = make_tuple(config['CORNERS']['CornerBottomLeft'])
+        self.table_corner_bottom_right = make_tuple(config['CORNERS']['CornerBottomRight'])
+
+        print(self.table_corner_top_left)
 
     # Log mouse clickt positions to the console
     def on_mouse_click(self, event, x, y, flags, param):
@@ -194,6 +211,7 @@ class VigitiaDemo:
     def init_colorizer(self):
         self.colorizer = rs.colorizer()
         self.colorizer.set_option(rs.option.color_scheme, 0)   # Define the color scheme
+        # Auto histogram color selection (0 = off, 1 = on)
         self.colorizer.set_option(rs.option.histogram_equalization_enabled, 0)
         self.colorizer.set_option(rs.option.min_distance, 1.0)  # meter
         self.colorizer.set_option(rs.option.max_distance, 1.3)  # meter
@@ -214,6 +232,7 @@ class VigitiaDemo:
                 frames = self.pipeline.wait_for_frames()  # Get frameset of color and depth
                 color_image, depth_colormap, aligned_depth_frame = self.align_frames(frames)
 
+                # skip the first few frames to make sure the camera is ready
                 if self.frame < 30:
                     continue
 
@@ -231,12 +250,9 @@ class VigitiaDemo:
                 #         if distance > 1.08:
                 #             color_image[i, j] = (0, 0, 0)
 
-                # Save last color frame to display it later
-                self.last_color_frame = color_image
+                #color_image = self.remove_background(color_image, depth_colormap, 100)
 
                 self.detect_hands(color_image, aligned_depth_frame)
-
-
 
                 # Available modes of demo application
                 if self.display_mode == "default":
@@ -249,8 +265,6 @@ class VigitiaDemo:
                     self.display_mode_black_background(color_image)
                 elif self.display_mode == 'memory':
                     self.display_mode_memory(color_image)
-                elif self.display_mode == "pattern":
-                    self.display_mode_pattern(color_image)
 
                 key = cv2.waitKey(1)
                 if key & 0xFF == ord('q') or key == 27:  # Press esc or 'q' to close the image window
@@ -261,6 +275,23 @@ class VigitiaDemo:
         finally:
             self.pipeline.stop()
 
+    # https://dev.intelrealsense.com/docs/rs-align-advanced
+    def remove_background(self, color_frame, depth_frame, clipping_distance):
+        height = color_frame.shape[1]
+        width = color_frame.shape[0]
+        for y in range(height):
+            depth_pixel_index = y * width
+            for x in range(width):
+                depth_pixel_index += 1
+                # Get the depth value of the current pixel
+                pixels_distance = depth_frame[x][y] * self.depth_scale
+                # Check if the depth value is invalid (<=0) or greater than the threshold
+                if pixels_distance <= 0 or pixels_distance > clipping_distance:
+                    # Set pixel to "background" color
+                    color_frame[x, y] = (0, 0, 0)
+
+        return color_frame
+
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Available display modes
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -270,6 +301,10 @@ class VigitiaDemo:
         black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
         aruco_markers = self.track_aruco_markers(black_image, color_image)
         current_time = time.time()
+
+        if len(aruco_markers) > 0:
+            if ARUCO_MARKER_TIMELINE_CONTROLLER in aruco_markers.keys():
+                pass
 
     def display_mode_rgb(self, color_image):
         if not self.calibration_mode:
@@ -331,6 +366,9 @@ class VigitiaDemo:
         aruco_markers = self.track_aruco_markers(black_image, color_image)
         current_time = time.time()
 
+        if len(aruco_markers) > 0:
+            self.display_fabric_pattern(black_image, FABRIC_PATTERN_T_SHIRT, aruco_markers)
+
         # If marker is present, show timeline. Otherwise, just show a black screen
         if len(aruco_markers) > 0 and ARUCO_MARKER_TIMELINE_CONTROLLER in aruco_markers.keys():
 
@@ -342,7 +380,7 @@ class VigitiaDemo:
             self.last_time_marker_present = current_time
             self.last_aruco_timeline_controller_data = aruco_markers[ARUCO_MARKER_TIMELINE_CONTROLLER]
             self.show_scrollable_timeline(color_image, self.last_aruco_timeline_controller_data)
-        # If marker was present within the last second
+        # If marker was present within the last X seconds
         elif self.last_time_marker_present is not None \
                 and current_time - self.last_time_marker_present < ARUCO_MARKER_MISSING_TIMEOUT:
             self.show_scrollable_timeline(color_image, self.last_aruco_timeline_controller_data)
@@ -356,18 +394,8 @@ class VigitiaDemo:
                 if len(self.last_color_frames) == TIMELINE_NUM_FRAMES:
                     self.last_color_frames.pop(0)  # Remove oldest frame
 
+            black_image = self.add_border(black_image)
             cv2.imshow('window', black_image)
-
-    def display_mode_pattern(self, color_image):
-        color_image = self.perspective_transformation(color_image)
-        black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
-        aruco_markers = self.track_aruco_markers(black_image, color_image)
-
-        if len(aruco_markers) > 0:
-            self.display_fabric_pattern(black_image, FABRIC_PATTERN_T_SHIRT, aruco_markers)
-
-        black_image = self.add_border(black_image)
-        cv2.imshow('window', black_image)
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Helper functions
@@ -429,9 +457,7 @@ class VigitiaDemo:
 
     # Change display modes and options depending on pressed keys
     def check_key_inputs(self, key, color_image, depth_colormap):
-        if key == 48:  # Key 0
-            self.display_mode = 'pattern'
-        elif key == 49:  # Key 1
+        if key == 49:  # Key 1
             if self.display_mode == "RGB":
                 self.display_mode = "depth"
             else:
@@ -439,11 +465,11 @@ class VigitiaDemo:
         elif key == 50:  # Key 2
             self.display_mode = "off"
         elif key == 51:  # Key 3
-            self.stored_image = self.perspective_transformation(self.last_color_frame.copy())
+            #self.stored_image = self.perspective_transformation(self.last_color_frame.copy())
             self.display_mode = 'memory'
         elif key == 52:  # Key 4
-            cv2.imwrite('depth.png', depth_colormap)
-            cv2.imwrite('color.png', color_image)
+            cv2.imwrite('depth.png', self.perspective_transformation(depth_colormap))
+            cv2.imwrite('color.png', self.perspective_transformation(color_image))
         elif key == 97:  # A as in Aruco Markers
             self.aruco_markers_enabled = not self.aruco_markers_enabled
         elif key == 99:  # C as in Calibrate
@@ -497,12 +523,13 @@ class VigitiaDemo:
 
         # Draw circles to mark the screen corners. Only show them if calibration mode is on
         if self.calibration_mode:
-            cv2.circle(frame, CORNER_TOP_LEFT, 2, (0, 0, 255), -1)
-            cv2.circle(frame, CORNER_TOP_RIGHT, 2, (0, 0, 255), -1)
-            cv2.circle(frame, CORNER_BOTTOM_LEFT, 2, (0, 0, 255), -1)
-            cv2.circle(frame, CORNER_BOTTOM_RIGHT, 2, (0, 0, 255), -1)
+            cv2.circle(frame, self.table_corner_top_left, 2, (0, 0, 255), -1)
+            cv2.circle(frame, self.table_corner_top_right, 2, (0, 0, 255), -1)
+            cv2.circle(frame, self.table_corner_bottom_left, 2, (0, 0, 255), -1)
+            cv2.circle(frame, self.table_corner_bottom_right, 2, (0, 0, 255), -1)
 
-        pts1 = np.float32([list(CORNER_TOP_LEFT), list(CORNER_TOP_RIGHT), list(CORNER_BOTTOM_LEFT), list(CORNER_BOTTOM_RIGHT)])
+        pts1 = np.float32([list(self.table_corner_top_left), list(self.table_corner_top_right),
+                           list(self.table_corner_bottom_left), list(self.table_corner_bottom_right)])
         pts2 = np.float32([[0, 0], [x, 0], [0, x / 2], [x, x / 2]])
         matrix = cv2.getPerspectiveTransform(pts1, pts2)
         # Only do the perspective transformation if calibration mode is off.
@@ -531,7 +558,7 @@ class VigitiaDemo:
                 else:
                     self.last_distance = distance_fingertip_table
             else:
-                self.last_distance = None#
+                self.last_distance = None  #
 
     # Draw circles on the frame for all detected coordinates of the hand
     def add_hand_tracking_points(self, frame, points):
@@ -653,27 +680,24 @@ class VigitiaDemo:
 
         black_image = np.ones((frame.shape[0], frame.shape[1], 3), np.uint8)
 
-
         # TODO: Correct offset (magic numbers here are just a placeholder)
         cv2.line(frame,
                  (int(self.marker_origin[0] - 20),
                   int(self.marker_origin[1]) + 50),
-                 (int(self.marker_origin[0] + timeline_length + 20),
+                 (int(self.marker_origin[0] + timeline_length),
                   int(self.marker_origin[1]) + 50), (30, 30, 30), 10)
-        cv2.putText(img=black_image, text='-0s',
+        cv2.putText(img=black_image, text='- 0s',
                     org=(int(abs((self.marker_origin[0]) - black_image.shape[1])),
                          int(abs(self.marker_origin[1] - black_image.shape[0] + 80))),
                     fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(30, 30, 30))
-        cv2.putText(img=black_image, text='-60s',
+        cv2.putText(img=black_image, text='- 60s',
                     org=(int(abs((self.marker_origin[0] + timeline_length / 2) - black_image.shape[1])),
                          int(abs((self.marker_origin[1]) - black_image.shape[0] + 80))),
                     fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(30, 30, 30))
-        cv2.putText(img=black_image, text='-120s',
+        cv2.putText(img=black_image, text='- 120s',
                     org=(int(abs((self.marker_origin[0] + timeline_length) - black_image.shape[1])),
                          int(abs((self.marker_origin[1]) - black_image.shape[0] + 80))),
                     fontFace=cv2.FONT_HERSHEY_COMPLEX, fontScale=0.5, color=(30, 30, 30))
-
-        print(str(int(abs((self.marker_origin[1] + 80) - black_image.shape[0]))))
 
         black_image = cv2.flip(black_image, -1)
 
@@ -692,7 +716,6 @@ class VigitiaDemo:
         # Put logo in ROI and modify the main image
         dst = cv2.add(img1_bg, img2_fg)
         frame[0:rows, 0:cols] = dst
-
 
         return frame
 
@@ -727,7 +750,7 @@ class VigitiaDemo:
                                                                        aruco_markers[ARUCO_MARKER_SHIRT_M]['centroid'],
                                                                        aruco_markers[ARUCO_MARKER_SHIRT_L]['centroid'])
             angle = aruco_markers[ARUCO_MARKER_SHIRT_M]['angle']
-            pattern_points = self.scale_fabric(pattern_points, 1.3)
+            pattern_points = self.scale_fabric(pattern_points, 1.2)
         else:
             return
 
@@ -758,7 +781,7 @@ class VigitiaDemo:
         centroid_of_pattern = self.centroid(pattern_points)
         # Draw line to connect tracker and pattern
         cv2.line(frame, (int(tracker_centroid[0]), int(tracker_centroid[1])), (int(centroid_of_pattern[0]),
-                 int(centroid_of_pattern[1])), (0, 0, 255), 1)
+                 int(centroid_of_pattern[1])), (0, 0, 255), 2)
 
         # Draw the selected pattern
         cv2.polylines(frame, [pattern_points], 1, (255, 255, 255), thickness=2)
