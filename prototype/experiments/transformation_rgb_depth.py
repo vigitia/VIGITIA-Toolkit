@@ -19,6 +19,8 @@ from hand_tracker import HandTracker
 # TODO: Should be calculated automatically later and saved to config file
 DISTANCE_CAMERA_TABLE = 110  # cm
 
+DEFAULT_DISPLAY_MODE = 'memory'
+
 # Camera Settings
 DEPTH_RES_X = 1280
 DEPTH_RES_Y = 720
@@ -101,6 +103,8 @@ class VigitiaDemo:
     table_corner_bottom_left = (0, 0)
     table_corner_bottom_right = (0, 0)
 
+    last_mouse_click_coordinates = []
+
     pipeline = None
     align = None
     colorizer = None
@@ -111,9 +115,7 @@ class VigitiaDemo:
     aruco_dictionary = None
     aruco_detector_parameters = None
 
-    # If calibration mode is on, the user can select the table corners
-    calibration_mode = False
-    display_mode = "memory"
+    display_mode = DEFAULT_DISPLAY_MODE
     hand_tracking_enabled = False
     aruco_markers_enabled = False
     outline_enabled = False
@@ -202,11 +204,13 @@ class VigitiaDemo:
 
         print(self.table_corner_top_left)
 
-    # Log mouse clickt positions to the console
+    # Log mouse click positions to the console
     def on_mouse_click(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
             print((x, y))
-            # TODO: Implement calibration mode to save clicked corners to txt document
+            self.last_mouse_click_coordinates.append((x, y))
+            if len(self.last_mouse_click_coordinates) > 4:
+                self.last_mouse_click_coordinates = []
 
     def init_colorizer(self):
         self.colorizer = rs.colorizer()
@@ -265,6 +269,8 @@ class VigitiaDemo:
                     self.display_mode_black_background(color_image)
                 elif self.display_mode == 'memory':
                     self.display_mode_memory(color_image)
+                elif self.display_mode == 'calibration':
+                    self.display_mode_calibration(color_image)
 
                 key = cv2.waitKey(1)
                 if key & 0xFF == ord('q') or key == 27:  # Press esc or 'q' to close the image window
@@ -307,38 +313,91 @@ class VigitiaDemo:
                 pass
 
     def display_mode_rgb(self, color_image):
-        if not self.calibration_mode:
-            color_image = self.add_hand_tracking_points(color_image, self.hand_points)
+        color_image = self.add_hand_tracking_points(color_image, self.hand_points)
         # Perspective Transformation on images
         color_image = self.perspective_transformation(color_image)
-        if not self.calibration_mode:
-            if self.outline_enabled:
-                color_image = self.highlight_objects(color_image, False)
-            if self.aruco_markers_enabled:
-                color_image, angle, tracker_centroid = self.track_aruco_markers(color_image, color_image)
 
-            # Invert image
-            # copy = cv2.bitwise_not(copy)
+        if self.outline_enabled:
+            color_image = self.highlight_objects(color_image, False)
+        if self.aruco_markers_enabled:
+            color_image, angle, tracker_centroid = self.track_aruco_markers(color_image, color_image)
 
-            # Canny Edge Detection
-            # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
-            # color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
-            # color_image = cv2.bilateralFilter(color_image, 11, 17, 17)
-            # color_image = cv2.Canny(color_image, 100, 200)
+        # Invert image
+        # copy = cv2.bitwise_not(copy)
 
-            # mask_img = self.fgbg.apply(color_image)
-            # color_image = cv2.bitwise_and(color_image, color_image, mask=mask_img)
+        # Canny Edge Detection
+        # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
+        # color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
+        # color_image = cv2.bilateralFilter(color_image, 11, 17, 17)
+        # color_image = cv2.Canny(color_image, 100, 200)
 
-            # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
-            color_image = self.add_border(color_image)
+        # mask_img = self.fgbg.apply(color_image)
+        # color_image = cv2.bitwise_and(color_image, color_image, mask=mask_img)
+
+        # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
+        color_image = self.add_border(color_image)
         cv2.imshow('window', color_image)
 
+    def display_mode_calibration(self, color_image):
+        # Show circles of previous coordinates
+        cv2.circle(color_image, self.table_corner_top_left, 2, (0, 0, 255), -1)
+        cv2.circle(color_image, self.table_corner_top_right, 2, (0, 0, 255), -1)
+        cv2.circle(color_image, self.table_corner_bottom_left, 2, (0, 0, 255), -1)
+        cv2.circle(color_image, self.table_corner_bottom_right, 2, (0, 0, 255), -1)
+
+        # Draw circles for clicks in a different color to mark the new points
+        for coordinate in self.last_mouse_click_coordinates:
+            cv2.circle(color_image, coordinate, 2, (0, 255, 0), -1)
+
+        cv2.putText(img=color_image, text='Calibration Mode - Press on each of the four corners of the table (' +
+                                          str(len(self.last_mouse_click_coordinates)) + '/4)',
+                    org=(int(color_image.shape[1] / 30), int(color_image.shape[0] / 20)),
+                    fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(0, 0, 255))
+
+        if len(self.last_mouse_click_coordinates) == 4:
+            print('Calibrated')
+            self.update_table_corner_calibration()
+
+        cv2.imshow('window', color_image)
+
+    def update_table_corner_calibration(self):
+        # Order coordinates by x value
+        coordinates = sorted(self.last_mouse_click_coordinates)
+
+        if coordinates[0][1] > coordinates[1][1]:
+            self.table_corner_top_left = coordinates[1]
+            self.table_corner_bottom_left = coordinates[0]
+        else:
+            self.table_corner_top_left = coordinates[0]
+            self.table_corner_bottom_left = coordinates[1]
+
+        if coordinates[2][1] > coordinates[3][1]:
+            self.table_corner_top_right = coordinates[3]
+            self.table_corner_bottom_right = coordinates[2]
+        else:
+            self.table_corner_top_left = coordinates[2]
+            self.table_corner_bottom_right = coordinates[3]
+
+        # Update config
+        config = configparser.ConfigParser()
+        config['CORNERS'] = {'CornerTopLeft': str(self.table_corner_top_left),
+                             'CornerTopRight': str(self.table_corner_top_right),
+                             'CornerBottomLeft': str(self.table_corner_bottom_left),
+                             'CornerBottomRight': str(self.table_corner_bottom_right)}
+
+        with open('config.ini', 'w') as configfile:
+            config.write(configfile)
+
+        # Go back to default display mode
+        self.display_mode = DEFAULT_DISPLAY_MODE
+
+
+
     def display_mode_depth(self, depth_colormap):
-        if not self.calibration_mode:
-            depth_colormap = self.add_hand_tracking_points(depth_colormap, self.hand_points)
-            # Perspective Transformation on images
-            depth_colormap = self.perspective_transformation(depth_colormap)
-            depth_colormap = self.add_border(depth_colormap)
+        depth_colormap = self.add_hand_tracking_points(depth_colormap, self.hand_points)
+        # Perspective Transformation on images
+        depth_colormap = self.perspective_transformation(depth_colormap)
+        depth_colormap = self.add_border(depth_colormap)
 
         cv2.imshow('window', depth_colormap)
 
@@ -458,12 +517,12 @@ class VigitiaDemo:
     # Change display modes and options depending on pressed keys
     def check_key_inputs(self, key, color_image, depth_colormap):
         if key == 49:  # Key 1
-            if self.display_mode == "RGB":
-                self.display_mode = "depth"
+            if self.display_mode == 'RGB':
+                self.display_mode = 'depth'
             else:
-                self.display_mode = "RGB"
+                self.display_mode = 'RGB'
         elif key == 50:  # Key 2
-            self.display_mode = "off"
+            self.display_mode = 'off'
         elif key == 51:  # Key 3
             #self.stored_image = self.perspective_transformation(self.last_color_frame.copy())
             self.display_mode = 'memory'
@@ -473,7 +532,8 @@ class VigitiaDemo:
         elif key == 97:  # A as in Aruco Markers
             self.aruco_markers_enabled = not self.aruco_markers_enabled
         elif key == 99:  # C as in Calibrate
-            self.calibration_mode = not self.calibration_mode
+            self.last_mouse_click_coordinates = []  # Reset list
+            self.display_mode = 'calibration'
         elif key == 104:  # H as in Hand
             if not self.hand_tracking_enabled:
                 self.hand_tracking_enabled = True
@@ -521,20 +581,12 @@ class VigitiaDemo:
     def perspective_transformation(self, frame):
         x = frame.shape[1]
 
-        # Draw circles to mark the screen corners. Only show them if calibration mode is on
-        if self.calibration_mode:
-            cv2.circle(frame, self.table_corner_top_left, 2, (0, 0, 255), -1)
-            cv2.circle(frame, self.table_corner_top_right, 2, (0, 0, 255), -1)
-            cv2.circle(frame, self.table_corner_bottom_left, 2, (0, 0, 255), -1)
-            cv2.circle(frame, self.table_corner_bottom_right, 2, (0, 0, 255), -1)
-
         pts1 = np.float32([list(self.table_corner_top_left), list(self.table_corner_top_right),
                            list(self.table_corner_bottom_left), list(self.table_corner_bottom_right)])
         pts2 = np.float32([[0, 0], [x, 0], [0, x / 2], [x, x / 2]])
         matrix = cv2.getPerspectiveTransform(pts1, pts2)
-        # Only do the perspective transformation if calibration mode is off.
-        if not self.calibration_mode:
-            frame = cv2.warpPerspective(frame, matrix, (x, int(x / 2)))
+
+        frame = cv2.warpPerspective(frame, matrix, (x, int(x / 2)))
 
         return frame
 
