@@ -375,7 +375,7 @@ class VigitiaDemo:
             self.table_corner_top_right = coordinates[3]
             self.table_corner_bottom_right = coordinates[2]
         else:
-            self.table_corner_top_left = coordinates[2]
+            self.table_corner_top_right = coordinates[2]
             self.table_corner_bottom_right = coordinates[3]
 
         # Update config
