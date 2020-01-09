@@ -4,3 +4,5 @@ prototype/experiments/depth.png
 prototype/experiments/color.png
 
 prototype/experiments/.idea/
+
+prototype/experiments/__pycache__/
