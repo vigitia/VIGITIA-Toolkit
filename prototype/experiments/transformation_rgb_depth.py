@@ -42,7 +42,7 @@ BORDER_LEFT = 0  # px
 BORDER_RIGHT = 50  # px
 
 # Paths to the Models needed for hand tracking
-PALM_MODEL_PATH = "./palm_detection_without_custom_op.tflite"
+PALM_MODEL_PATH = "./palm_detection.tflite"
 LANDMARK_MODEL_PATH = "./hand_landmark.tflite"
 ANCHORS_PATH = "./anchors.csv"
 
@@ -123,7 +123,7 @@ class VigitiaDemo:
 
     frame = 0
     depth_scale = 0
-    hand_points = None
+    detected_hands = None
     last_distance = None
 
     last_saved_frame_timestamp = time.time()
@@ -313,7 +313,7 @@ class VigitiaDemo:
                 pass
 
     def display_mode_rgb(self, color_image):
-        color_image = self.add_hand_tracking_points(color_image, self.hand_points)
+        color_image = self.add_hand_tracking_points(color_image, self.detected_hands)
         # Perspective Transformation on images
         color_image = self.perspective_transformation(color_image)
 
@@ -394,7 +394,7 @@ class VigitiaDemo:
 
 
     def display_mode_depth(self, depth_colormap):
-        depth_colormap = self.add_hand_tracking_points(depth_colormap, self.hand_points)
+        depth_colormap = self.add_hand_tracking_points(depth_colormap, self.detected_hands)
         # Perspective Transformation on images
         depth_colormap = self.perspective_transformation(depth_colormap)
         depth_colormap = self.add_border(depth_colormap)
@@ -403,7 +403,7 @@ class VigitiaDemo:
 
     def display_mode_black_background(self, color_image):
         black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
-        black_image = self.add_hand_tracking_points(black_image, self.hand_points)
+        black_image = self.add_hand_tracking_points(black_image, self.detected_hands)
         black_image = self.perspective_transformation(black_image)
 
         if self.outline_enabled:
@@ -543,7 +543,7 @@ class VigitiaDemo:
                 else:
                     self.show_hand_model = False
                     self.hand_tracking_enabled = False
-                    self.hand_points = None
+                    self.detected_hands = None
                     self.last_distance = None
         elif key == 111:  # O as in Outline:
             self.outline_enabled = not self.outline_enabled
@@ -596,39 +596,44 @@ class VigitiaDemo:
 
     # Detect hand position using the google mediapipe framework
     def detect_hands(self, color_image, aligned_depth_frame):
-        # Hand detection (current implementation is far from real time). To reduce lag, the detection only
-        # takes place only once in 8 frames
-        if self.hand_tracking_enabled and self.frame % 8 == 0:
-            self.hand_points, _ = self.detector(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
-            if self.hand_points is not None:
+        # Hand detection (current implementation is far from real time).
+        if self.hand_tracking_enabled:
+            self.detected_hands = self.detector(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
+            if self.detected_hands is not None:
+
                 # The fingertip in the google mediapipe handtracking model has the ID 8.
-                distance_camera_fingertip = int(aligned_depth_frame.get_distance(int(self.hand_points[8][0]),
-                                                                                 int(self.hand_points[8][1])) * 100)
-                distance_fingertip_table = DISTANCE_CAMERA_TABLE - distance_camera_fingertip
-                if distance_fingertip_table < 0:
-                    self.last_distance = 0
-                else:
-                    self.last_distance = distance_fingertip_table
+                if len(self.detected_hands[0]['joints']) >= 7:
+                    distance_camera_fingertip = int(aligned_depth_frame.get_distance(int(self.detected_hands[0]['joints'][8][0]),
+                                                                                     int(self.detected_hands[0]['joints'][8][1])) * 100)
+                    distance_fingertip_table = DISTANCE_CAMERA_TABLE - distance_camera_fingertip
+                    if distance_fingertip_table < 0:
+                        self.last_distance = 0
+                    else:
+                        self.last_distance = distance_fingertip_table
             else:
                 self.last_distance = None  #
 
     # Draw circles on the frame for all detected coordinates of the hand
-    def add_hand_tracking_points(self, frame, points):
-        if points is not None:
-            point_id = 0
-            for point in points:
-                x, y = point
-                if point_id == 8:  # Id of index finger -> draw in different color
-                    cv2.circle(frame, (int(x), int(y)), THICKNESS * 5, (255, 0, 0), -1)
-                else:
-                    if self.show_hand_model:
-                        cv2.circle(frame, (int(x), int(y)), THICKNESS * 2, POINT_COLOR, -1)
-                point_id += 1
-            if self.show_hand_model:
-                for connection in CONNECTIONS:  # Draw connections of the points
-                    x0, y0 = points[connection[0]]
-                    x1, y1 = points[connection[1]]
-                    cv2.line(frame, (int(x0), int(y0)), (int(x1), int(y1)), CONNECTION_COLOR, THICKNESS)
+    def add_hand_tracking_points(self, frame, hands):
+        if hands is not None:
+            for hand in hands:
+                # Only look at the joints right now
+                # TODO: Check bounding boxes, etc later
+                points = hand['joints']
+                point_id = 0
+                for point in points:
+                    x, y = point
+                    if point_id == 8:  # Id of index finger -> draw in different color
+                        cv2.circle(frame, (int(x), int(y)), THICKNESS * 5, (255, 0, 0), -1)
+                    else:
+                        if self.show_hand_model:
+                            cv2.circle(frame, (int(x), int(y)), THICKNESS * 2, POINT_COLOR, -1)
+                    point_id += 1
+                if self.show_hand_model:
+                    for connection in CONNECTIONS:  # Draw connections of the points
+                        x0, y0 = points[connection[0]]
+                        x1, y1 = points[connection[1]]
+                        cv2.line(frame, (int(x0), int(y0)), (int(x1), int(y1)), CONNECTION_COLOR, THICKNESS)
 
         return frame
 
