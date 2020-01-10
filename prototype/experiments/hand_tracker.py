@@ -305,7 +305,6 @@ class HandTracker():
         if hands is None:
             try:
                 hands = self.detect_hand(img_norm, scale=scale)
-                print("NUM Hands:", len(hands))
             except:
                 hands = []
             for rec in hands:
@@ -318,5 +317,5 @@ class HandTracker():
 
         hands = [self.add_bbox(h) for h in hands]
         hands = [self.get_landmarks(img, h) for h in hands]
-        #print(hands)
+
         return hands

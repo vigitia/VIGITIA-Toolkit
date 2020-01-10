@@ -124,7 +124,6 @@ class VigitiaDemo:
     frame = 0
     depth_scale = 0
     detected_hands = None
-    last_distance = None
 
     last_saved_frame_timestamp = time.time()
     last_time_marker_present = None
@@ -256,21 +255,21 @@ class VigitiaDemo:
 
                 #color_image = self.remove_background(color_image, depth_colormap, 100)
 
-                self.detect_hands(color_image, aligned_depth_frame)
+                self.detect_hands(color_image)
 
                 # Available modes of demo application
                 if self.display_mode == "default":
-                    self.display_mode_rgb(color_image)
+                    self.display_mode_rgb(color_image, depth_colormap, aligned_depth_frame)
                 elif self.display_mode == "RGB":
-                    self.display_mode_rgb(color_image)
+                    self.display_mode_rgb(color_image, depth_colormap, aligned_depth_frame)
                 elif self.display_mode == "depth":
-                    self.display_mode_depth(depth_colormap)
+                    self.display_mode_depth(color_image, depth_colormap, aligned_depth_frame)
                 elif self.display_mode == "off":
-                    self.display_mode_black_background(color_image)
+                    self.display_mode_black_background(color_image, depth_colormap, aligned_depth_frame)
                 elif self.display_mode == 'memory':
-                    self.display_mode_memory(color_image)
+                    self.display_mode_memory(color_image, depth_colormap, aligned_depth_frame)
                 elif self.display_mode == 'calibration':
-                    self.display_mode_calibration(color_image)
+                    self.display_mode_calibration(color_image, depth_colormap, aligned_depth_frame)
 
                 key = cv2.waitKey(1)
                 if key & 0xFF == ord('q') or key == 27:  # Press esc or 'q' to close the image window
@@ -302,7 +301,7 @@ class VigitiaDemo:
     # Available display modes
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-    def display_mode_default(self, color_image):
+    def display_mode_default(self, color_image, depth_colormap, aligned_depth_frame):
         color_image = self.perspective_transformation(color_image)
         black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
         aruco_markers = self.track_aruco_markers(black_image, color_image)
@@ -312,8 +311,8 @@ class VigitiaDemo:
             if ARUCO_MARKER_TIMELINE_CONTROLLER in aruco_markers.keys():
                 pass
 
-    def display_mode_rgb(self, color_image):
-        color_image = self.add_hand_tracking_points(color_image, self.detected_hands)
+    def display_mode_rgb(self, color_image, depth_colormap, aligned_depth_frame):
+        color_image = self.add_hand_tracking_points(color_image, aligned_depth_frame)
         # Perspective Transformation on images
         color_image = self.perspective_transformation(color_image)
 
@@ -338,7 +337,7 @@ class VigitiaDemo:
         color_image = self.add_border(color_image)
         cv2.imshow('window', color_image)
 
-    def display_mode_calibration(self, color_image):
+    def display_mode_calibration(self, color_image, depth_colormap, aligned_depth_frame):
         # Show circles of previous coordinates
         cv2.circle(color_image, self.table_corner_top_left, 2, (0, 0, 255), -1)
         cv2.circle(color_image, self.table_corner_top_right, 2, (0, 0, 255), -1)
@@ -391,19 +390,17 @@ class VigitiaDemo:
         # Go back to default display mode
         self.display_mode = DEFAULT_DISPLAY_MODE
 
-
-
-    def display_mode_depth(self, depth_colormap):
-        depth_colormap = self.add_hand_tracking_points(depth_colormap, self.detected_hands)
+    def display_mode_depth(self, color_image, depth_colormap, aligned_depth_frame):
+        depth_colormap = self.add_hand_tracking_points(depth_colormap, aligned_depth_frame)
         # Perspective Transformation on images
         depth_colormap = self.perspective_transformation(depth_colormap)
         depth_colormap = self.add_border(depth_colormap)
 
         cv2.imshow('window', depth_colormap)
 
-    def display_mode_black_background(self, color_image):
+    def display_mode_black_background(self, color_image, depth_colormap, aligned_depth_frame):
         black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
-        black_image = self.add_hand_tracking_points(black_image, self.detected_hands)
+        black_image = self.add_hand_tracking_points(black_image, aligned_depth_frame)
         black_image = self.perspective_transformation(black_image)
 
         if self.outline_enabled:
@@ -412,14 +409,10 @@ class VigitiaDemo:
             aruco_markers = self.track_aruco_markers(black_image, self.perspective_transformation(color_image), True)
 
         black_image = self.add_border(black_image)
-        if self.last_distance is not None:
-            cv2.putText(img=black_image, text=str(self.last_distance) + " cm",
-                        org=(int(color_image.shape[1] / 6), int(color_image.shape[0] / 4)),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
 
         cv2.imshow('window', black_image)
 
-    def display_mode_memory(self, color_image):
+    def display_mode_memory(self, color_image, depth_colormap, aligned_depth_frame):
         color_image = self.perspective_transformation(color_image)
         black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
         aruco_markers = self.track_aruco_markers(black_image, color_image)
@@ -544,7 +537,6 @@ class VigitiaDemo:
                     self.show_hand_model = False
                     self.hand_tracking_enabled = False
                     self.detected_hands = None
-                    self.last_distance = None
         elif key == 111:  # O as in Outline:
             self.outline_enabled = not self.outline_enabled
 
@@ -594,29 +586,24 @@ class VigitiaDemo:
     # Functions for hand tracking
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-    # Detect hand position using the google mediapipe framework
-    def detect_hands(self, color_image, aligned_depth_frame):
-        # Hand detection (current implementation is far from real time).
+    # Detect hand position using the unofficial python wrapper for the google mediapipe framework by
+    # https://github.com/wolterlw/hand_tracking
+    def detect_hands(self, color_image):
         if self.hand_tracking_enabled:
-            self.detected_hands = self.detector(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
-            if self.detected_hands is not None:
 
-                # The fingertip in the google mediapipe handtracking model has the ID 8.
-                if len(self.detected_hands[0]['joints']) >= 7:
-                    distance_camera_fingertip = int(aligned_depth_frame.get_distance(int(self.detected_hands[0]['joints'][8][0]),
-                                                                                     int(self.detected_hands[0]['joints'][8][1])) * 100)
-                    distance_fingertip_table = DISTANCE_CAMERA_TABLE - distance_camera_fingertip
-                    if distance_fingertip_table < 0:
-                        self.last_distance = 0
-                    else:
-                        self.last_distance = distance_fingertip_table
-            else:
-                self.last_distance = None  #
+            # TODO: Find solution for this temporary fix of ghost hands
+            self.detector.reset()
+
+
+            self.detected_hands = self.detector(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
+        else:
+            self.detected_hands = None
 
     # Draw circles on the frame for all detected coordinates of the hand
-    def add_hand_tracking_points(self, frame, hands):
-        if hands is not None:
-            for hand in hands:
+    def add_hand_tracking_points(self, frame, aligned_depth_frame):
+        if self.detected_hands is not None:
+            print("Num here:", len(self.detected_hands))
+            for hand in self.detected_hands:
                 # Only look at the joints right now
                 # TODO: Check bounding boxes, etc later
                 points = hand['joints']
@@ -629,6 +616,9 @@ class VigitiaDemo:
                         if self.show_hand_model:
                             cv2.circle(frame, (int(x), int(y)), THICKNESS * 2, POINT_COLOR, -1)
                     point_id += 1
+
+                frame, distance_fingertip_table = self.calculate_distance_fingertip_table(hand, frame, aligned_depth_frame)
+
                 if self.show_hand_model:
                     for connection in CONNECTIONS:  # Draw connections of the points
                         x0, y0 = points[connection[0]]
@@ -636,6 +626,23 @@ class VigitiaDemo:
                         cv2.line(frame, (int(x0), int(y0)), (int(x1), int(y1)), CONNECTION_COLOR, THICKNESS)
 
         return frame
+
+    # This function gets the coordinates of the index fingertip of a given hand and calculates the distance between the
+    # fingertip and the table surface
+    def calculate_distance_fingertip_table(self, hand, frame, aligned_depth_frame):
+        if hand is not None:
+            # The fingertip in the google mediapipe handtracking model has the ID 8.
+            fingertip_x = int(hand['joints'][8][0])
+            fingertip_y = int(hand['joints'][8][1])
+            distance_camera_fingertip = int(aligned_depth_frame.get_distance(fingertip_x, fingertip_y) * 100)
+            distance_fingertip_table = DISTANCE_CAMERA_TABLE - distance_camera_fingertip
+            if distance_fingertip_table < 0:
+                distance_fingertip_table = 0
+
+            cv2.putText(img=frame, text=str(distance_fingertip_table) + " cm", org=(fingertip_x, fingertip_y),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255))
+
+            return frame, distance_fingertip_table
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Functions for tracking of aruco markers
