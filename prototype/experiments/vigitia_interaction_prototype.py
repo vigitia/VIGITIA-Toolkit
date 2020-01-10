@@ -42,9 +42,9 @@ BORDER_LEFT = 0  # px
 BORDER_RIGHT = 50  # px
 
 # Paths to the Models needed for hand tracking
-PALM_MODEL_PATH = "./palm_detection.tflite"
-LANDMARK_MODEL_PATH = "./hand_landmark.tflite"
-ANCHORS_PATH = "./anchors.csv"
+PALM_MODEL_PATH = "./models/palm_detection.tflite"
+LANDMARK_MODEL_PATH = "./models/hand_landmark.tflite"
+ANCHORS_PATH = "./models/anchors.csv"
 
 # Constants for drawing of the hand
 POINT_COLOR = (0, 255, 0)
