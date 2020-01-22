@@ -17,7 +17,7 @@ from hand_tracker import HandTracker
 
 # Current distance between camera and table in cm
 # TODO: Should be calculated automatically later and saved to config file
-DISTANCE_CAMERA_TABLE = 110  # cm
+DISTANCE_CAMERA_TABLE = 111  # cm
 
 DEFAULT_DISPLAY_MODE = 'memory'
 
@@ -169,7 +169,7 @@ class VigitiaDemo:
         depth_sensor.set_option(rs.option.laser_power, 360)
 
         # TODO: Tweak camera settings
-        depth_sensor.set_option(rs.option.depth_units, 0.0001)
+        depth_sensor.set_option(rs.option.depth_units, 0.001)
 
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
@@ -215,12 +215,12 @@ class VigitiaDemo:
         self.colorizer = rs.colorizer()
         self.colorizer.set_option(rs.option.color_scheme, 0)   # Define the color scheme
         # Auto histogram color selection (0 = off, 1 = on)
-        self.colorizer.set_option(rs.option.histogram_equalization_enabled, 0)
-        self.colorizer.set_option(rs.option.min_distance, 1.0)  # meter
-        self.colorizer.set_option(rs.option.max_distance, 1.3)  # meter
+        self.colorizer.set_option(rs.option.histogram_equalization_enabled, 1)
+        self.colorizer.set_option(rs.option.min_distance, 0.4)  # meter
+        self.colorizer.set_option(rs.option.max_distance, 1.2)  # meter
 
     def init_hand_detector(self):
-        self.detector = HandTracker(PALM_MODEL_PATH, LANDMARK_MODEL_PATH, ANCHORS_PATH, box_shift=0.2, box_enlarge=1.3)
+        self.detector = HandTracker(PALM_MODEL_PATH, LANDMARK_MODEL_PATH, ANCHORS_PATH)
 
     def init_aruco_tracking(self):
         self.aruco_dictionary = aruco.Dictionary_get(aruco.DICT_4X4_100)
@@ -300,16 +300,6 @@ class VigitiaDemo:
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Available display modes
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-    def display_mode_default(self, color_image, depth_colormap, aligned_depth_frame):
-        color_image = self.perspective_transformation(color_image)
-        black_image = np.zeros((color_image.shape[0], color_image.shape[1], 3), np.uint8)
-        aruco_markers = self.track_aruco_markers(black_image, color_image)
-        current_time = time.time()
-
-        if len(aruco_markers) > 0:
-            if ARUCO_MARKER_TIMELINE_CONTROLLER in aruco_markers.keys():
-                pass
 
     def display_mode_rgb(self, color_image, depth_colormap, aligned_depth_frame):
         color_image = self.add_hand_tracking_points(color_image, aligned_depth_frame)
@@ -594,7 +584,6 @@ class VigitiaDemo:
             # TODO: Find solution for this temporary fix of ghost hands
             self.detector.reset()
 
-
             self.detected_hands = self.detector(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
         else:
             self.detected_hands = None
@@ -611,7 +600,7 @@ class VigitiaDemo:
                 for point in points:
                     x, y = point
                     if point_id == 8:  # Id of index finger -> draw in different color
-                        cv2.circle(frame, (int(x), int(y)), THICKNESS * 5, (255, 0, 0), -1)
+                        cv2.circle(frame, (int(x), int(y)), THICKNESS * 2, (255, 0, 0), -1)
                     else:
                         if self.show_hand_model:
                             cv2.circle(frame, (int(x), int(y)), THICKNESS * 2, POINT_COLOR, -1)
