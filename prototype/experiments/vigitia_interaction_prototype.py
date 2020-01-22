@@ -86,7 +86,7 @@ ARUCO_MARKER_SHIRT_M = 4
 ARUCO_MARKER_SHIRT_L = 8
 ARUCO_MARKER_TIMELINE_CONTROLLER = 42
 
-ARUCO_MARKER_STORAGE_01 = 9
+ARUCO_MARKER_STORAGE_IDS = [9, 10]
 
 # Time until a marker is declared absent by the system (we wait a little to make sure it is not just obstructed by
 # something
@@ -111,7 +111,7 @@ class VigitiaDemo:
     align = None
     colorizer = None
     last_color_frames = []
-    stored_image_01 = None
+    stored_images = {}
     hand_detector = None
 
     aruco_dictionary = None
@@ -410,9 +410,10 @@ class VigitiaDemo:
         aruco_markers = self.track_aruco_markers(black_image, color_image)
         current_time = time.time()
 
-        if ARUCO_MARKER_STORAGE_01 in aruco_markers:
-            self.image_storage_mode(color_image, black_image, aruco_markers)
-            return
+        for storage_marker in ARUCO_MARKER_STORAGE_IDS:
+            if storage_marker in aruco_markers:
+                self.image_storage_mode(color_image, black_image, aruco_markers[storage_marker], storage_marker)
+                return
 
         if len(aruco_markers) > 0:
             self.display_fabric_pattern(black_image, FABRIC_PATTERN_T_SHIRT, aruco_markers)
@@ -445,12 +446,12 @@ class VigitiaDemo:
             black_image = self.add_border(black_image)
             cv2.imshow('window', black_image)
 
-    def image_storage_mode(self, color_image, black_image, aruco_markers):
-        region_save_top_left_corner = (50, 75)
-        region_save_bottom_right_corner = (125, 150)
+    def image_storage_mode(self, color_image, black_image, aruco_marker, marker_id):
+        region_save_top_left_corner = (50, black_image.shape[0] - 50)
+        region_save_bottom_right_corner = (125, black_image.shape[0] - 125)
 
-        region_load_top_left_corner = (50, 225)
-        region_load_bottom_right_corner = (125, 300)
+        region_load_top_left_corner = (50, black_image.shape[0] - 200)
+        region_load_bottom_right_corner = (125, black_image.shape[0] - 275)
 
         # Square for saving screen content
         cv2.rectangle(black_image, region_save_top_left_corner, region_save_bottom_right_corner, (255, 0, 0), -1)
@@ -462,11 +463,11 @@ class VigitiaDemo:
         cv2.putText(img=black_image, text="Load", org=region_load_top_left_corner,
                     fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255))
 
-        if self.is_marker_in_region(region_save_top_left_corner, region_save_bottom_right_corner, aruco_markers[9]['centroid']):
-            self.stored_image_01 = color_image
-        elif self.is_marker_in_region(region_load_top_left_corner, region_load_bottom_right_corner, aruco_markers[9]['centroid']):
-            if self.stored_image_01 is not None:
-                stored_image = self.stored_image_01.copy()
+        if self.is_marker_in_region(region_save_top_left_corner, region_save_bottom_right_corner, aruco_marker['centroid']):
+            self.stored_images[str(marker_id)] = color_image
+        elif self.is_marker_in_region(region_load_top_left_corner, region_load_bottom_right_corner, aruco_marker['centroid']):
+            if str(marker_id) in self.stored_images.keys():
+                stored_image = self.stored_images[str(marker_id)].copy()
                 stored_image = self.add_border(stored_image)
                 cv2.imshow('window', stored_image)
                 return
