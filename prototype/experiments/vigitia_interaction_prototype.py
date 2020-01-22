@@ -10,6 +10,11 @@ from ast import literal_eval as make_tuple  # Needed to convert strings stored i
 
 from hand_tracker import HandTracker
 
+
+# Libraries for the  thermal camera
+from libs.uvctypes import *
+from queue import Queue
+
 # Built upon: https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/align-depth2color.py
 # Code for Hand Tracking and Models from https://github.com/metalwhale/hand_tracking
 
@@ -136,6 +141,21 @@ class VigitiaDemo:
     #fgbg = cv2.cv2.createBackgroundSubtractorMOG2()
     fgbg = cv2.cv2.createBackgroundSubtractorKNN()
 
+
+### Code experiments with code for the thermal camera
+### Code taken from: https://github.com/groupgets/purethermal1-uvc-capture/blob/master/python/uvc-radiometry.py
+
+    BUF_SIZE = 1
+    q = Queue(BUF_SIZE)
+
+    # return type, then types of arguments
+    c_function = CFUNCTYPE(None, POINTER(uvc_frame), c_void_p)
+    ptr_py_frame_callback = None
+
+    thermal_camera_capture = None
+
+
+
     def __init__(self):
         # Create a pipeline
         self.pipeline = rs.pipeline()
@@ -188,7 +208,90 @@ class VigitiaDemo:
         self.init_colorizer()
         self.init_hand_detector()
         self.init_aruco_tracking()
+
+        #self.ptr_py_frame_callback = self.c_function(self.py_frame_callback)
+        #self.init_thermal_camera()
+        self.thermal_camera_capture = cv2.VideoCapture(8)
+
         self.loop()
+
+
+    ### Code experiments with code for the thermal camera
+    ### Code taken from: https://github.com/groupgets/purethermal1-uvc-capture/blob/master/python/uvc-radiometry.py
+
+    def py_frame_callback(self, frame, userptr):
+        print("In py frame callback")
+        array_pointer = cast(frame.contents.data, POINTER(c_uint16 * (frame.contents.width * frame.contents.height)))
+        data = np.frombuffer(array_pointer.contents, dtype=np.dtype(np.uint16)).reshape(frame.contents.height,
+                                                                                        frame.contents.width)
+        if frame.contents.data_bytes != (2 * frame.contents.width * frame.contents.height):
+            return
+
+        if not self.q.full():
+            self.q.put(data)
+
+    def init_thermal_camera(self):
+        ucv_context = POINTER(uvc_context)()
+        device = POINTER(uvc_device)()
+        device_handle = POINTER(uvc_device_handle)()
+        uvc_stream_control = uvc_stream_ctrl()
+
+        res = libuvc.uvc_init(byref(ucv_context), 0)
+        if res < 0:
+            print("uvc_init error")
+
+        try:
+            res = libuvc.uvc_find_device(ucv_context, byref(device), PT_USB_VID, PT_USB_PID, 0)
+            if res < 0:
+                print("Can't find thermal camera")
+
+            try:
+                res = libuvc.uvc_open(device, byref(device_handle))
+                if res < 0:
+                    print("uvc_open error")
+
+                print("device opened!")
+
+                frame_formats = uvc_get_frame_formats_by_guid(device_handle, VS_FMT_GUID_Y16)
+
+                libuvc.uvc_get_stream_ctrl_format_size(device_handle, byref(uvc_stream_control), UVC_FRAME_FORMAT_Y16,
+                                                       frame_formats[0].wWidth, frame_formats[0].wHeight,
+                                                       int(1e7 / frame_formats[0].dwDefaultFrameInterval))
+
+                res = libuvc.uvc_start_streaming(device_handle, byref(uvc_stream_control), self.ptr_py_frame_callback, None, 0)
+                print("res", res)
+                if res < 0:
+                    print("uvc_start_streaming failed: {0}".format(res))
+            finally:
+                libuvc.uvc_unref_device(device)
+        finally:
+            libuvc.uvc_exit(ucv_context)
+
+    def get_thermal_color_frame(self):
+        try:
+            data = self.q.get(False)
+        except:
+            sys.exit("No frame present")
+
+        if data is not None:
+            data = cv2.resize(data[:, :], (640, 480))
+            minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(data)
+            img = self.raw_to_8bit(data)
+            # display_temperature(img, minVal, minLoc, (255, 0, 0))
+            # display_temperature(img, maxVal, maxLoc, (0, 0, 255))
+            # cv2.imshow('Lepton Radiometry', img)
+            # cv2.waitKey(1)
+
+            #finally:
+            #    libuvc.uvc_stop_streaming(devh)
+        return img
+
+    def raw_to_8bit(data):
+        cv2.normalize(data, data, 0, 65535, cv2.NORM_MINMAX)
+        np.right_shift(data, 8, data)
+        return cv2.cvtColor(np.uint8(data), cv2.COLOR_GRAY2RGB)
+
+
 
     def read_config_file(self):
         config = configparser.ConfigParser()
@@ -279,6 +382,7 @@ class VigitiaDemo:
                     self.check_key_inputs(key, color_image, depth_colormap)
         finally:
             self.pipeline.stop()
+            #libuvc.uvc_stop_streaming(devh)
 
     # https://dev.intelrealsense.com/docs/rs-align-advanced
     def remove_background(self, color_frame, depth_frame, clipping_distance):
@@ -325,7 +429,11 @@ class VigitiaDemo:
 
         # Add black border on top to fill the missing pixels from 2:1 (16:8) to 16:9 aspect ratio
         color_image = self.add_border(color_image)
-        cv2.imshow('window', color_image)
+
+        ret, img = self.thermal_camera_capture.read()
+        cv2.imshow("window", cv2.resize(img, (640, 480)))
+
+        #cv2.imshow('window', color_image)
 
     def display_mode_calibration(self, color_image, depth_colormap, aligned_depth_frame):
         # Show circles of previous coordinates
