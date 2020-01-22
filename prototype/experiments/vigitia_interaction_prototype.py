@@ -17,7 +17,7 @@ from hand_tracker import HandTracker
 
 # Current distance between camera and table in cm
 # TODO: Should be calculated automatically later and saved to config file
-DISTANCE_CAMERA_TABLE = 111  # cm
+DISTANCE_CAMERA_TABLE = 113  # cm
 
 DEFAULT_DISPLAY_MODE = 'memory'
 
@@ -112,6 +112,7 @@ class VigitiaDemo:
     colorizer = None
     last_color_frames = []
     stored_images = {}
+    last_stored_image_timestamp = time.time()
     hand_detector = None
 
     aruco_dictionary = None
@@ -454,7 +455,10 @@ class VigitiaDemo:
         region_load_bottom_right_corner = (125, black_image.shape[0] - 275)
 
         # Square for saving screen content
-        cv2.rectangle(black_image, region_save_top_left_corner, region_save_bottom_right_corner, (255, 0, 0), -1)
+        if time.time() - self.last_stored_image_timestamp > ARUCO_MARKER_MISSING_TIMEOUT:
+            cv2.rectangle(black_image, region_save_top_left_corner, region_save_bottom_right_corner, (255, 0, 0), -1)
+        else:
+            cv2.rectangle(black_image, region_save_top_left_corner, region_save_bottom_right_corner, (0, 255, 0), -1)
         cv2.putText(img=black_image, text="Save", org=region_save_top_left_corner,
                     fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255))
 
@@ -464,7 +468,11 @@ class VigitiaDemo:
                     fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255))
 
         if self.is_marker_in_region(region_save_top_left_corner, region_save_bottom_right_corner, aruco_marker['centroid']):
-            self.stored_images[str(marker_id)] = color_image
+            if time.time() - self.last_stored_image_timestamp > ARUCO_MARKER_MISSING_TIMEOUT:
+                self.stored_images[str(marker_id)] = color_image
+                self.last_stored_image_timestamp = time.time()
+            cv2.putText(img=black_image, text="Saved", org=region_save_top_left_corner,
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255))
         elif self.is_marker_in_region(region_load_top_left_corner, region_load_bottom_right_corner, aruco_marker['centroid']):
             if str(marker_id) in self.stored_images.keys():
                 stored_image = self.stored_images[str(marker_id)].copy()
@@ -476,12 +484,14 @@ class VigitiaDemo:
         black_image = self.add_border(black_image)
         cv2.imshow('window', black_image)
 
+    # check if the centroid of the given aruco marker is within the boundaries of the corners defining a square
     def is_marker_in_region(self, region_top_left, region_bottom_right, marker_centroid):
-        print(region_top_left)
-        print(region_bottom_right)
-        print(marker_centroid)
+        print(region_top_left[0], marker_centroid[0], region_bottom_right[0])
+        print(region_top_left[1], marker_centroid[1], region_bottom_right[1])
+        print("------")
         if region_top_left[0] < marker_centroid[0] < region_bottom_right[0]:
-            if region_top_left[1] < marker_centroid[1] < region_bottom_right[1]:
+            if region_top_left[1] > marker_centroid[1] > region_bottom_right[1]:
+                print("Marker in region")
                 return True
         return False
 
