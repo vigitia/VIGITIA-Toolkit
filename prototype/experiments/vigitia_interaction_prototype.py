@@ -86,6 +86,8 @@ ARUCO_MARKER_SHIRT_M = 4
 ARUCO_MARKER_SHIRT_L = 8
 ARUCO_MARKER_TIMELINE_CONTROLLER = 42
 
+ARUCO_MARKER_STORAGE_01 = 9
+
 # Time until a marker is declared absent by the system (we wait a little to make sure it is not just obstructed by
 # something
 ARUCO_MARKER_MISSING_TIMEOUT = 2  # seconds
@@ -109,7 +111,7 @@ class VigitiaDemo:
     align = None
     colorizer = None
     last_color_frames = []
-    stored_image = None
+    stored_image_01 = None
     hand_detector = None
 
     aruco_dictionary = None
@@ -169,7 +171,7 @@ class VigitiaDemo:
         depth_sensor.set_option(rs.option.laser_power, 360)
 
         # TODO: Tweak camera settings
-        depth_sensor.set_option(rs.option.depth_units, 0.001)
+        depth_sensor.set_option(rs.option.depth_units, 0.0001)
 
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
@@ -408,6 +410,10 @@ class VigitiaDemo:
         aruco_markers = self.track_aruco_markers(black_image, color_image)
         current_time = time.time()
 
+        if ARUCO_MARKER_STORAGE_01 in aruco_markers:
+            self.image_storage_mode(color_image, black_image, aruco_markers)
+            return
+
         if len(aruco_markers) > 0:
             self.display_fabric_pattern(black_image, FABRIC_PATTERN_T_SHIRT, aruco_markers)
 
@@ -438,6 +444,46 @@ class VigitiaDemo:
 
             black_image = self.add_border(black_image)
             cv2.imshow('window', black_image)
+
+    def image_storage_mode(self, color_image, black_image, aruco_markers):
+        region_save_top_left_corner = (50, 75)
+        region_save_bottom_right_corner = (125, 150)
+
+        region_load_top_left_corner = (50, 225)
+        region_load_bottom_right_corner = (125, 300)
+
+        # Square for saving screen content
+        cv2.rectangle(black_image, region_save_top_left_corner, region_save_bottom_right_corner, (255, 0, 0), -1)
+        cv2.putText(img=black_image, text="Save", org=region_save_top_left_corner,
+                    fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255))
+
+        # Square for loading image stored in marker
+        cv2.rectangle(black_image, region_load_top_left_corner, region_load_bottom_right_corner, (255, 0, 0), -1)
+        cv2.putText(img=black_image, text="Load", org=region_load_top_left_corner,
+                    fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255))
+
+        if self.is_marker_in_region(region_save_top_left_corner, region_save_bottom_right_corner, aruco_markers[9]['centroid']):
+            self.stored_image_01 = color_image
+        elif self.is_marker_in_region(region_load_top_left_corner, region_load_bottom_right_corner, aruco_markers[9]['centroid']):
+            if self.stored_image_01 is not None:
+                stored_image = self.stored_image_01.copy()
+                stored_image = self.add_border(stored_image)
+                cv2.imshow('window', stored_image)
+                return
+
+        #black_image = cv2.flip(black_image, -1)
+        black_image = self.add_border(black_image)
+        cv2.imshow('window', black_image)
+
+    def is_marker_in_region(self, region_top_left, region_bottom_right, marker_centroid):
+        print(region_top_left)
+        print(region_bottom_right)
+        print(marker_centroid)
+        if region_top_left[0] < marker_centroid[0] < region_bottom_right[0]:
+            if region_top_left[1] < marker_centroid[1] < region_bottom_right[1]:
+                return True
+        return False
+
 
     # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
     # Helper functions
@@ -507,7 +553,6 @@ class VigitiaDemo:
         elif key == 50:  # Key 2
             self.display_mode = 'off'
         elif key == 51:  # Key 3
-            #self.stored_image = self.perspective_transformation(self.last_color_frame.copy())
             self.display_mode = 'memory'
         elif key == 52:  # Key 4
             cv2.imwrite('depth.png', self.perspective_transformation(depth_colormap))
