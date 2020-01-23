@@ -1,4 +1,5 @@
 import sys
+import os
 import pyrealsense2 as rs
 import cv2
 import cv2.aruco as aruco
@@ -86,7 +87,7 @@ ARUCO_MARKER_SHIRT_M = 4
 ARUCO_MARKER_SHIRT_L = 8
 ARUCO_MARKER_TIMELINE_CONTROLLER = 42
 
-ARUCO_MARKER_STORAGE_IDS = [9, 10]
+ARUCO_MARKER_STORAGE_IDS = [5, 6, 16, 20]
 
 # Time until a marker is declared absent by the system (we wait a little to make sure it is not just obstructed by
 # something
@@ -111,7 +112,6 @@ class VigitiaDemo:
     align = None
     colorizer = None
     last_color_frames = []
-    stored_images = {}
     last_stored_image_timestamp = time.time()
     hand_detector = None
 
@@ -449,33 +449,33 @@ class VigitiaDemo:
 
     def image_storage_mode(self, color_image, black_image, aruco_marker, marker_id):
         region_save_top_left_corner = (50, black_image.shape[0] - 50)
-        region_save_bottom_right_corner = (125, black_image.shape[0] - 125)
+        region_save_bottom_right_corner = (150, black_image.shape[0] - 150)
 
         region_load_top_left_corner = (50, black_image.shape[0] - 200)
-        region_load_bottom_right_corner = (125, black_image.shape[0] - 275)
+        region_load_bottom_right_corner = (150, black_image.shape[0] - 300)
 
         # Square for saving screen content
         if time.time() - self.last_stored_image_timestamp > ARUCO_MARKER_MISSING_TIMEOUT:
-            cv2.rectangle(black_image, region_save_top_left_corner, region_save_bottom_right_corner, (255, 0, 0), -1)
+            cv2.rectangle(black_image, region_save_top_left_corner, region_save_bottom_right_corner, (255, 0, 0), 2)
         else:
-            cv2.rectangle(black_image, region_save_top_left_corner, region_save_bottom_right_corner, (0, 255, 0), -1)
+            cv2.rectangle(black_image, region_save_top_left_corner, region_save_bottom_right_corner, (0, 255, 0), 2)
         cv2.putText(img=black_image, text="Save", org=region_save_top_left_corner,
                     fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255))
 
         # Square for loading image stored in marker
-        cv2.rectangle(black_image, region_load_top_left_corner, region_load_bottom_right_corner, (255, 0, 0), -1)
+        cv2.rectangle(black_image, region_load_top_left_corner, region_load_bottom_right_corner, (255, 0, 0), 2)
         cv2.putText(img=black_image, text="Load", org=region_load_top_left_corner,
                     fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255))
 
         if self.is_marker_in_region(region_save_top_left_corner, region_save_bottom_right_corner, aruco_marker['centroid']):
             if time.time() - self.last_stored_image_timestamp > ARUCO_MARKER_MISSING_TIMEOUT:
-                self.stored_images[str(marker_id)] = color_image
+                cv2.imwrite(str(marker_id) + '.png', color_image)
                 self.last_stored_image_timestamp = time.time()
             cv2.putText(img=black_image, text="Saved", org=region_save_top_left_corner,
                         fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255))
         elif self.is_marker_in_region(region_load_top_left_corner, region_load_bottom_right_corner, aruco_marker['centroid']):
-            if str(marker_id) in self.stored_images.keys():
-                stored_image = self.stored_images[str(marker_id)].copy()
+            if os.path.isfile(str(marker_id) + '.png'):
+                stored_image = cv2.imread(str(marker_id) + '.png')
                 stored_image = self.add_border(stored_image)
                 cv2.imshow('window', stored_image)
                 return
@@ -486,12 +486,8 @@ class VigitiaDemo:
 
     # check if the centroid of the given aruco marker is within the boundaries of the corners defining a square
     def is_marker_in_region(self, region_top_left, region_bottom_right, marker_centroid):
-        print(region_top_left[0], marker_centroid[0], region_bottom_right[0])
-        print(region_top_left[1], marker_centroid[1], region_bottom_right[1])
-        print("------")
         if region_top_left[0] < marker_centroid[0] < region_bottom_right[0]:
             if region_top_left[1] > marker_centroid[1] > region_bottom_right[1]:
-                print("Marker in region")
                 return True
         return False
 
