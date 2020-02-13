@@ -37,7 +37,7 @@ OUTPUT_IMAGE_HEIGHT = 2160
 
 # Since the projection field of the projector is larger than the table,
 # we need to add black borders on at least two sides
-BORDER_TOP = 38  # px
+BORDER_TOP = 40  # px
 BORDER_BOTTOM = 0  # px
 BORDER_LEFT = 0  # px
 BORDER_RIGHT = 50  # px
@@ -87,7 +87,7 @@ ARUCO_MARKER_SHIRT_M = 4
 ARUCO_MARKER_SHIRT_L = 8
 ARUCO_MARKER_TIMELINE_CONTROLLER = 42
 
-ARUCO_MARKER_STORAGE_IDS = [5, 6, 16, 20]
+ARUCO_MARKER_STORAGE_IDS = [1, 2, 3, 5]
 
 # Time until a marker is declared absent by the system (we wait a little to make sure it is not just obstructed by
 # something
@@ -218,8 +218,8 @@ class VigitiaDemo:
         self.colorizer = rs.colorizer()
         self.colorizer.set_option(rs.option.color_scheme, 0)   # Define the color scheme
         # Auto histogram color selection (0 = off, 1 = on)
-        self.colorizer.set_option(rs.option.histogram_equalization_enabled, 1)
-        self.colorizer.set_option(rs.option.min_distance, 0.4)  # meter
+        self.colorizer.set_option(rs.option.histogram_equalization_enabled, 0)
+        self.colorizer.set_option(rs.option.min_distance, 0.6)  # meter
         self.colorizer.set_option(rs.option.max_distance, 1.2)  # meter
 
     def init_hand_detector(self):
@@ -312,7 +312,7 @@ class VigitiaDemo:
         if self.outline_enabled:
             color_image = self.highlight_objects(color_image, False)
         if self.aruco_markers_enabled:
-            color_image, angle, tracker_centroid = self.track_aruco_markers(color_image, color_image)
+            aruco_markers = self.track_aruco_markers(color_image, color_image, True)
 
         # Invert image
         # copy = cv2.bitwise_not(copy)
@@ -469,7 +469,7 @@ class VigitiaDemo:
 
         if self.is_marker_in_region(region_save_top_left_corner, region_save_bottom_right_corner, aruco_marker['centroid']):
             if time.time() - self.last_stored_image_timestamp > ARUCO_MARKER_MISSING_TIMEOUT:
-                cv2.imwrite(str(marker_id) + '.png', color_image)
+                self.save_image(marker_id, color_image)
                 self.last_stored_image_timestamp = time.time()
             cv2.putText(img=black_image, text="Saved", org=region_save_top_left_corner,
                         fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255))
@@ -483,6 +483,10 @@ class VigitiaDemo:
         #black_image = cv2.flip(black_image, -1)
         black_image = self.add_border(black_image)
         cv2.imshow('window', black_image)
+
+    def save_image(self, marker_id, color_image):
+        cv2.imwrite(str(marker_id) + '.png', color_image)
+
 
     # check if the centroid of the given aruco marker is within the boundaries of the corners defining a square
     def is_marker_in_region(self, region_top_left, region_bottom_right, marker_centroid):
@@ -699,12 +703,22 @@ class VigitiaDemo:
 
         # check if the ids list is not empty
         if np.all(ids is not None):
+            if draw_detected_markers:
+                # draw a square around the markers
+                aruco.drawDetectedMarkers(frame, corners, ids)
+
             for i in range(len(ids)):
                 aruco_marker = {'angle': self.calculate_aruco_marker_rotation(corners[i][0], frame),
                                 'corners': corners[i][0],
                                 'centroid': self.centroid(corners[i][0])}
 
                 aruco_markers[ids[i][0]] = aruco_marker
+
+                top_left_corner = (int(aruco_marker['centroid'][0]-20), int(aruco_marker['centroid'][1]-20))
+                bottom_right_corner = (int(aruco_marker['centroid'][0]+20), int(aruco_marker['centroid'][1]+20))
+                print(top_left_corner)
+                cv2.rectangle(frame_color, top_left_corner, bottom_right_corner, (0, 0, 0), -1)
+                #cv2.circle(frame_color, (int(aruco_marker['centroid'][0]), int(aruco_marker['centroid'][1])), 40, (0, 0, 255), -1)
 
                 # angle = self.calculate_aruco_marker_rotation(corners[i][0], frame)
                 # tracker_centroid = self.centroid(corners[i][0])
@@ -718,11 +732,6 @@ class VigitiaDemo:
                 #             ' Rel Y: ' + str(int(tracker_relative_y * 100)) + '%',
                 #             org=(int(frame.shape[1] / 6), int(frame.shape[0] / 4)),
                 #             fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
-
-            if draw_detected_markers:
-                # draw a square around the markers
-                aruco.drawDetectedMarkers(frame, corners, ids)
-
         return aruco_markers
 
     # Calculate the rotation of an aruco marker relative to the frame
