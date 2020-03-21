@@ -18,7 +18,7 @@ from hand_tracker import HandTracker
 
 # Current distance between camera and table in cm
 # TODO: Should be calculated automatically later and saved to config file
-DISTANCE_CAMERA_TABLE = 113  # cm
+DISTANCE_CAMERA_TABLE = 130  # cm
 
 DEFAULT_DISPLAY_MODE = 'memory'
 
