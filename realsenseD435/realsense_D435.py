@@ -8,7 +8,7 @@ import sys
 from hand_tracking.hand_tracking_controller import HandTrackingController
 
 
-DISTANCE_CAMERA_TABLE = 1.20  # m
+DISTANCE_CAMERA_TABLE = 1.30  # m
 
 MIN_DIST_TOUCH = 0.003  # m
 MAX_DIST_TOUCH = 0.05  # m
@@ -39,6 +39,11 @@ class RealsenseD435Camera():
     colorizer = None
 
     hole_filling_filter = None
+    decimation_filter = None
+    spacial_filter = None
+    temporal_filter = None
+    disparity_to_depth_filter = None
+    depth_to_disparity_filter = None
 
     hand_tracking_contoller = None
 
@@ -71,6 +76,8 @@ class RealsenseD435Camera():
         self.align = rs.align(align_to)
 
         self.hole_filling_filter = rs.hole_filling_filter()
+        self.decimation_filter = rs.decimation_filter()
+        self.temporal_filter = rs.temporal_filter()
 
         # We will be removing the background of objects more than
         #  clipping_distance_in_meters meters away
@@ -114,14 +121,13 @@ class RealsenseD435Camera():
 
     def create_background_model(self, depth_image):
         pos = self.num_frame - NUM_FRAMES_WAIT_INITIALIZING - 1
-        print('Pos:', pos)
+        print('Storing frame ' + str(pos+1) + '/' + str(NUM_FRAMES_FOR_BACKGROUND_MODEL))
         self.store_depth_values(depth_image, pos)
 
         if pos == (NUM_FRAMES_FOR_BACKGROUND_MODEL - 1):
             self.calculate_background_model_statistics()
 
     def store_depth_values(self, depth_image, pos):
-        print('Storing new depth value')
         for y in range(DEPTH_RES_Y):
             for x in range(DEPTH_RES_X):
                 current_depth_px = depth_image[y][x]
@@ -132,9 +138,9 @@ class RealsenseD435Camera():
         for y in range(DEPTH_RES_Y):
             for x in range(DEPTH_RES_X):
                 stored_values_at_pixel = self.stored_background_values[y][x]
-                stored_values_at_pixel = stored_values_at_pixel[stored_values_at_pixel != 0]
-                if len(stored_values_at_pixel) == 0:
-                    stored_values_at_pixel = [0]
+                #stored_values_at_pixel = stored_values_at_pixel[stored_values_at_pixel != 0]
+                #if len(stored_values_at_pixel) == 0:
+                #    stored_values_at_pixel = [0]
                 self.background_average[y][x] = np.mean(stored_values_at_pixel)
                 self.background_standard_deviation[y][x] = 3 * np.std(stored_values_at_pixel)
 
@@ -173,6 +179,8 @@ class RealsenseD435Camera():
                 color_frame = aligned_frames.get_color_frame()
 
                 aligned_depth_frame = self.hole_filling_filter.process(aligned_depth_frame)
+                #aligned_depth_frame = self.decimation_filter.process(aligned_depth_frame)
+                #aligned_depth_frame = self.temporal_filter.process(aligned_depth_frame)
 
                 color_image = np.asanyarray(color_frame.get_data())
                 # depth_image = np.asanyarray(aligned_depth_frame.get_data())
@@ -182,59 +190,21 @@ class RealsenseD435Camera():
                 if not aligned_depth_frame or not color_frame:
                     continue
 
+                # Render images
+                # depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+                depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
+
+                # color_image = self.hand_tracking_contoller.detect_hands(color_image, aligned_depth_frame)
+
                 if 50 < self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL + 50:
                     #self.get_max_background_model(depth_image)
                     self.create_background_model(depth_image)
                     continue
                 else:
 
-                    # Remove all pixels at defined cutoff value
-                    #bg_removed = self.remove_background(color_image, depth_image)
+                    output_image = self.extract_arms(depth_image)
 
-
-                    # Compare with max background
-                    # diff = self.max_background - depth_image
-                    # diff = np.where(diff < 0, abs(diff), diff)
-                    # diff = diff.astype(np.uint16)
-                    # #diff = diff * self.depth_scale
-                    # diff = np.where((diff < 100) | (diff > 500), 0, 65534)
-                    # diff = diff.astype(np.uint16)
-
-
-                    diff = self.background_average - depth_image
-                    diff = np.where(diff < 0, abs(diff), diff)
-                    diff = diff.astype(np.uint16)
-
-                    print('Diff:')
-                    print(diff[int(DEPTH_RES_Y/2)])
-
-                    diff = diff - self.background_standard_deviation
-                    diff = np.where(diff < 0, 0, diff)
-
-                    diff = np.where((diff >= MIN_DIST_TOUCH / self.depth_scale) & (diff <= MAX_DIST_TOUCH / self.depth_scale), 65535, diff)
-                    diff = np.where((diff < MIN_DIST_TOUCH / self.depth_scale), 0, diff)
-                    diff = np.where((diff > MAX_DIST_TOUCH / self.depth_scale), 32000, diff)
-
-                    diff = diff.astype(np.uint16)
-
-                    print('Compared:')
-                    print(diff[int(DEPTH_RES_Y/2)])
-
-
-
-
-
-
-
-                    # Render images
-                    #depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
-                    depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
-
-                    # color_image = self.hand_tracking_contoller.detect_hands(color_image, aligned_depth_frame)
-
-                    cv2.imshow('realsense', diff)
-
-
+                    cv2.imshow('realsense', output_image)
                     #cv2.imwrite('average_background.png', self.average_background)
 
                 key = cv2.waitKey(1)
@@ -245,8 +215,46 @@ class RealsenseD435Camera():
         finally:
             self.pipeline.stop()
 
-    def compare_to_background_model(self, depth_image):
+    def extract_arms(self, depth_image):
+        # Remove all pixels at defined cutoff value
+        # bg_removed = self.remove_background(color_image, depth_image)
 
+        difference_to_background = self.background_average - depth_image
+        difference_to_background = np.where(difference_to_background < 0, 0, difference_to_background)
+
+        # https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_filtering/py_filtering.html
+        # kernel = np.ones((5, 5), np.float32) / 25
+        # difference_to_background = cv2.filter2D(difference_to_background, -1, kernel)
+
+        remove_uncertain_pixels = difference_to_background - self.background_standard_deviation
+        remove_uncertain_pixels = np.where(remove_uncertain_pixels < 0, 0, difference_to_background)
+
+        # significant_pixels = np.where((remove_uncertain_pixels >= MIN_DIST_TOUCH / self.depth_scale) &
+        #                              (remove_uncertain_pixels <= MAX_DIST_TOUCH / self.depth_scale),
+        #                              65535, 0)
+        significant_pixels = np.where((remove_uncertain_pixels >= MIN_DIST_TOUCH / self.depth_scale),
+                                      65535, 0)
+        significant_pixels = significant_pixels.astype(np.uint8)
+
+        # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
+        # significant_pixels = cv2.bilateralFilter(significant_pixels, 5, 17, 200)
+        # significant_pixels = cv2.Canny(significant_pixels, 30, 200)
+
+        # https://stackoverflow.com/questions/42798659/how-to-remove-small-connected-objects-using-opencv
+        nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(significant_pixels, connectivity=8)
+        sizes = stats[1:, -1]
+        nb_components = nb_components - 1
+        min_size = 1000
+
+        output_image = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.uint8)
+        # for every component in the image, you keep it only if it's above min_size
+        for i in range(0, nb_components):
+            if sizes[i] >= min_size:
+                output_image[output == i + 1] = 255
+
+        return output_image
+
+    def compare_to_background_model(self, depth_image):
         #depth_image = np.where((abs(self.average_background - depth_image) < 300, 0, depth_image))
 
         for y in range(DEPTH_RES_Y):
@@ -256,7 +264,6 @@ class RealsenseD435Camera():
                 dist = bg_px - depth_px
                 if abs(dist) < 100:
                     depth_image[y][x] = 0
-
 
         return depth_image
 
