@@ -19,8 +19,8 @@ DEPTH_RES_Y = 480
 RGB_RES_X = 848
 RGB_RES_Y = 480
 
-DEPTH_FPS = 30
-RGB_FPS = 30
+DEPTH_FPS = 60
+RGB_FPS = 60
 
 NUM_FRAMES_WAIT_INITIALIZING = 50
 NUM_FRAMES_FOR_BACKGROUND_MODEL = 10
@@ -33,6 +33,8 @@ class RealsenseD435Camera():
     clipping_distance = -1
 
     num_frame = 0
+
+    stored_depth_frame = None
 
     pipeline = None
     align = None
@@ -177,6 +179,8 @@ class RealsenseD435Camera():
                 # depth_image = np.asanyarray(aligned_depth_frame.get_data())
                 depth_image = np.array(aligned_depth_frame.get_data(), dtype=np.int16)
 
+                #depth_image = self.moving_average_filter(depth_image)
+
                 # Validate that both frames are valid
                 if not aligned_depth_frame or not color_frame:
                     continue
@@ -207,44 +211,56 @@ class RealsenseD435Camera():
         finally:
             self.pipeline.stop()
 
+    def moving_average_filter(self, image):
+        if self.stored_depth_frame is None:
+            self.stored_depth_frame = image
+            return image
+        else:
+            combined_images = self.stored_depth_frame + image
+            averaged_image = combined_images/2
+            self.stored_depth_frame = image
+            return averaged_image
+
+
     def extract_arms(self, depth_image, color_image):
+
+        if self.num_frame == 200:
+            print("Writing files")
+            cv2.imwrite('depth_image.png', depth_image)
+            cv2.imwrite('color_image.png', color_image)
+
         difference_to_background = self.background_average - depth_image
         difference_to_background = np.where(difference_to_background < 0, 0, difference_to_background)
 
         remove_uncertain_pixels = difference_to_background - self.background_standard_deviation
         remove_uncertain_pixels = np.where(remove_uncertain_pixels < 0, 0, difference_to_background)
-
-        # significant_pixels = np.where((remove_uncertain_pixels >= MIN_DIST_TOUCH / self.depth_scale) &
-        #                              (remove_uncertain_pixels <= MAX_DIST_TOUCH / self.depth_scale),
-        #                              65535, 0)
-
         remove_uncertain_pixels = np.where((remove_uncertain_pixels < MIN_DIST_TOUCH / self.depth_scale), 0, remove_uncertain_pixels)
+
+        depth_holes = np.where(depth_image == 0, 0, 65535)
+        remove_uncertain_pixels = np.where(depth_holes == 0, 0, remove_uncertain_pixels)
 
         mark_arm_pixels = np.where((remove_uncertain_pixels > MAX_DIST_TOUCH / self.depth_scale), 65535, 0)
         mark_arm_pixels = cv2.convertScaleAbs(mark_arm_pixels, alpha=(255.0 / 65535.0))
-        #mark_arm_pixels = cv2.cvtColor(mark_arm_pixels, cv2.COLOR_GRAY2BGR)
-        #mark_arm_pixels[np.where((mark_arm_pixels == [255, 255, 255]).all(axis=2))] = [0, 255, 0]
 
         mark_touch_pixels = np.where((remove_uncertain_pixels >= MAX_DIST_TOUCH / self.depth_scale), 0, remove_uncertain_pixels)
         mark_touch_pixels = np.where(mark_touch_pixels != 0, 65535, 0)
         mark_touch_pixels = cv2.convertScaleAbs(mark_touch_pixels, alpha=(255.0 / 65535.0))
 
-        #mark_touch_pixels = cv2.cvtColor(mark_touch_pixels, cv2.COLOR_GRAY2BGR)
-        #mark_touch_pixels[np.where((mark_touch_pixels == [255, 255, 255]).all(axis=2))] = [255, 0, 0]
+        if self.num_frame == 200:
+            print("Writing files")
+            cv2.imwrite('mark_arm_pixels.png', mark_arm_pixels)
+            cv2.imwrite('mark_touch_pixels.png', mark_touch_pixels)
 
-        #significant_pixels = mark_touch_pixels + mark_arm_pixels
-
-        #mark_touch_pixels = np.where(np.logical_and((remove_uncertain_pixels >= MIN_DIST_TOUCH / self.depth_scale),(remove_uncertain_pixels <= MAX_DIST_TOUCH / self.depth_scale)),
-        #                              32767, remove_uncertain_pixels)
-
-        #mark_arm_pixels = np.where((mark_touch_pixels > MAX_DIST_TOUCH / self.depth_scale), 65535, mark_touch_pixels)
 
         remove_uncertain_pixels = np.where((remove_uncertain_pixels >= MIN_DIST_TOUCH / self.depth_scale), 65535, 0)
         remove_uncertain_pixels = cv2.convertScaleAbs(remove_uncertain_pixels, alpha=(255.0/65535.0))
 
         small_regions = self.remove_small_connected_regions(remove_uncertain_pixels, 10000, True)
 
-        #significant_pixels = self.remove_small_connected_regions(significant_pixels, 2000)
+        if self.num_frame == 200:
+            print("Writing files")
+            cv2.imwrite('remove_uncertain_pixels.png', remove_uncertain_pixels)
+            cv2.imwrite('small_regions.png', small_regions)
 
         remove_uncertain_pixels -=small_regions
         mark_arm_pixels -= small_regions
