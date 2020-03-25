@@ -178,6 +178,7 @@ class RealsenseD435Camera():
                 aligned_depth_frame = aligned_frames.get_depth_frame()
                 color_frame = aligned_frames.get_color_frame()
 
+                # Apply Filters
                 aligned_depth_frame = self.hole_filling_filter.process(aligned_depth_frame)
                 #aligned_depth_frame = self.decimation_filter.process(aligned_depth_frame)
                 #aligned_depth_frame = self.temporal_filter.process(aligned_depth_frame)
@@ -197,12 +198,13 @@ class RealsenseD435Camera():
                 # color_image = self.hand_tracking_contoller.detect_hands(color_image, aligned_depth_frame)
 
                 if 50 < self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL + 50:
-                    #self.get_max_background_model(depth_image)
                     self.create_background_model(depth_image)
                     continue
                 else:
+                    # Remove all pixels at defined cutoff value
+                    # bg_removed = self.remove_background(color_image, depth_image)
 
-                    output_image = self.extract_arms(depth_image)
+                    output_image = self.extract_arms(depth_image, color_image)
 
                     cv2.imshow('realsense', output_image)
                     #cv2.imwrite('average_background.png', self.average_background)
@@ -215,16 +217,9 @@ class RealsenseD435Camera():
         finally:
             self.pipeline.stop()
 
-    def extract_arms(self, depth_image):
-        # Remove all pixels at defined cutoff value
-        # bg_removed = self.remove_background(color_image, depth_image)
-
+    def extract_arms(self, depth_image, color_image):
         difference_to_background = self.background_average - depth_image
         difference_to_background = np.where(difference_to_background < 0, 0, difference_to_background)
-
-        # https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_filtering/py_filtering.html
-        # kernel = np.ones((5, 5), np.float32) / 25
-        # difference_to_background = cv2.filter2D(difference_to_background, -1, kernel)
 
         remove_uncertain_pixels = difference_to_background - self.background_standard_deviation
         remove_uncertain_pixels = np.where(remove_uncertain_pixels < 0, 0, difference_to_background)
@@ -235,16 +230,17 @@ class RealsenseD435Camera():
         significant_pixels = np.where((remove_uncertain_pixels >= MIN_DIST_TOUCH / self.depth_scale),
                                       65535, 0)
         significant_pixels = significant_pixels.astype(np.uint8)
+        significant_pixels = self.remove_small_connected_regions(significant_pixels, 1000)
+        edge_map = self.get_edge_map(color_image)
+        output_image = significant_pixels + edge_map
 
-        # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
-        # significant_pixels = cv2.bilateralFilter(significant_pixels, 5, 17, 200)
-        # significant_pixels = cv2.Canny(significant_pixels, 30, 200)
+        return output_image
 
+    def remove_small_connected_regions(self, image, min_size):
         # https://stackoverflow.com/questions/42798659/how-to-remove-small-connected-objects-using-opencv
-        nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(significant_pixels, connectivity=8)
+        nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(image, connectivity=8)
         sizes = stats[1:, -1]
         nb_components = nb_components - 1
-        min_size = 1000
 
         output_image = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.uint8)
         # for every component in the image, you keep it only if it's above min_size
@@ -253,6 +249,19 @@ class RealsenseD435Camera():
                 output_image[output == i + 1] = 255
 
         return output_image
+
+    def get_edge_map(self, image):
+        # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
+        image = cv2.bilateralFilter(image, 11, 17, 17)
+        image = cv2.Canny(image, 30, 400, 7)
+
+        image = self.remove_small_connected_regions(image, 1)
+
+        return image
+
+
+
+
 
     def compare_to_background_model(self, depth_image):
         #depth_image = np.where((abs(self.average_background - depth_image) < 300, 0, depth_image))
