@@ -23,7 +23,7 @@ DEPTH_FPS = 30
 RGB_FPS = 30
 
 NUM_FRAMES_WAIT_INITIALIZING = 50
-NUM_FRAMES_FOR_BACKGROUND_MODEL = 50
+NUM_FRAMES_FOR_BACKGROUND_MODEL = 10
 
 COLOR_REMOVED_BACKGROUND = [64, 177, 0]  # Chroma Green
 
@@ -148,16 +148,6 @@ class RealsenseD435Camera():
         print(self.background_average[int(DEPTH_RES_Y/2)])
         print(self.background_standard_deviation[int(DEPTH_RES_Y/2)])
 
-    # Inspired by https://blogs.wcode.org/2017/01/howto-use-foreground-removal-with-the-microsoft-kinect/
-    def get_max_background_model(self, depth_image):
-        print('Processing frame for background model')
-        for y in range(DEPTH_RES_Y):
-            for x in range(DEPTH_RES_X):
-                current_depth_px = depth_image[y][x]
-                if current_depth_px != 0:
-                    if self.max_background[y][x] == 0 or current_depth_px < self.max_background[y][x]:
-                        self.max_background[y][x] = current_depth_px
-
     def loop(self):
         # Streaming loop
         try:
@@ -179,7 +169,7 @@ class RealsenseD435Camera():
                 color_frame = aligned_frames.get_color_frame()
 
                 # Apply Filters
-                aligned_depth_frame = self.hole_filling_filter.process(aligned_depth_frame)
+                #aligned_depth_frame = self.hole_filling_filter.process(aligned_depth_frame)
                 #aligned_depth_frame = self.decimation_filter.process(aligned_depth_frame)
                 #aligned_depth_frame = self.temporal_filter.process(aligned_depth_frame)
 
@@ -227,16 +217,65 @@ class RealsenseD435Camera():
         # significant_pixels = np.where((remove_uncertain_pixels >= MIN_DIST_TOUCH / self.depth_scale) &
         #                              (remove_uncertain_pixels <= MAX_DIST_TOUCH / self.depth_scale),
         #                              65535, 0)
-        significant_pixels = np.where((remove_uncertain_pixels >= MIN_DIST_TOUCH / self.depth_scale),
-                                      65535, 0)
-        significant_pixels = significant_pixels.astype(np.uint8)
-        significant_pixels = self.remove_small_connected_regions(significant_pixels, 1000)
+
+        remove_uncertain_pixels = np.where((remove_uncertain_pixels < MIN_DIST_TOUCH / self.depth_scale), 0, remove_uncertain_pixels)
+
+        mark_arm_pixels = np.where((remove_uncertain_pixels > MAX_DIST_TOUCH / self.depth_scale), 65535, 0)
+        mark_arm_pixels = cv2.convertScaleAbs(mark_arm_pixels, alpha=(255.0 / 65535.0))
+        #mark_arm_pixels = cv2.cvtColor(mark_arm_pixels, cv2.COLOR_GRAY2BGR)
+        #mark_arm_pixels[np.where((mark_arm_pixels == [255, 255, 255]).all(axis=2))] = [0, 255, 0]
+
+        mark_touch_pixels = np.where((remove_uncertain_pixels >= MAX_DIST_TOUCH / self.depth_scale), 0, remove_uncertain_pixels)
+        mark_touch_pixels = np.where(mark_touch_pixels != 0, 65535, 0)
+        mark_touch_pixels = cv2.convertScaleAbs(mark_touch_pixels, alpha=(255.0 / 65535.0))
+
+        #mark_touch_pixels = cv2.cvtColor(mark_touch_pixels, cv2.COLOR_GRAY2BGR)
+        #mark_touch_pixels[np.where((mark_touch_pixels == [255, 255, 255]).all(axis=2))] = [255, 0, 0]
+
+        #significant_pixels = mark_touch_pixels + mark_arm_pixels
+
+        #mark_touch_pixels = np.where(np.logical_and((remove_uncertain_pixels >= MIN_DIST_TOUCH / self.depth_scale),(remove_uncertain_pixels <= MAX_DIST_TOUCH / self.depth_scale)),
+        #                              32767, remove_uncertain_pixels)
+
+        #mark_arm_pixels = np.where((mark_touch_pixels > MAX_DIST_TOUCH / self.depth_scale), 65535, mark_touch_pixels)
+
+        remove_uncertain_pixels = np.where((remove_uncertain_pixels >= MIN_DIST_TOUCH / self.depth_scale), 65535, 0)
+        remove_uncertain_pixels = cv2.convertScaleAbs(remove_uncertain_pixels, alpha=(255.0/65535.0))
+
+        small_regions = self.remove_small_connected_regions(remove_uncertain_pixels, 10000, True)
+
+        #significant_pixels = self.remove_small_connected_regions(significant_pixels, 2000)
+
+        remove_uncertain_pixels -=small_regions
+        mark_arm_pixels -= small_regions
+        mark_touch_pixels -= small_regions
+
+        significant_pixels = cv2.cvtColor(remove_uncertain_pixels, cv2.COLOR_GRAY2BGR)
+        mark_arm_pixels = cv2.cvtColor(mark_arm_pixels, cv2.COLOR_GRAY2BGR)
+        mark_touch_pixels = cv2.cvtColor(mark_touch_pixels, cv2.COLOR_GRAY2BGR)
+
+        significant_pixels[np.where((mark_touch_pixels == [255, 255, 255]).all(axis=2))] = [0, 0, 255]
+        significant_pixels[np.where((mark_arm_pixels == [255, 255, 255]).all(axis=2))] = [0, 255, 0]
+
+        unique, counts = np.unique(significant_pixels, return_counts=True)
+        print(dict(zip(unique, counts)))
+
+        #significant_pixels_color = cv2.cvtColor(significant_pixels, cv2.COLOR_GRAY2BGR)
+
+
         edge_map = self.get_edge_map(color_image)
+        edge_map = cv2.cvtColor(edge_map, cv2.COLOR_GRAY2BGR)
+
+
         output_image = significant_pixels + edge_map
+        #output_image = edge_map
+
+        unique, counts = np.unique(output_image, return_counts=True)
+        #print(dict(zip(unique, counts)))
 
         return output_image
 
-    def remove_small_connected_regions(self, image, min_size):
+    def remove_small_connected_regions(self, image, min_size, get_only_regions_to_remove):
         # https://stackoverflow.com/questions/42798659/how-to-remove-small-connected-objects-using-opencv
         nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(image, connectivity=8)
         sizes = stats[1:, -1]
@@ -245,17 +284,22 @@ class RealsenseD435Camera():
         output_image = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.uint8)
         # for every component in the image, you keep it only if it's above min_size
         for i in range(0, nb_components):
-            if sizes[i] >= min_size:
-                output_image[output == i + 1] = 255
+            if get_only_regions_to_remove:
+                if sizes[i] < min_size:
+                    output_image[output == i + 1] = 255
+            else:
+                if sizes[i] >= min_size:
+                    output_image[output == i + 1] = 255
 
         return output_image
 
     def get_edge_map(self, image):
         # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
-        image = cv2.bilateralFilter(image, 11, 17, 17)
+        #image = cv2.bilateralFilter(image, 11, 17, 17)
+        image = cv2.bilateralFilter(image, 7, 50, 50)
         image = cv2.Canny(image, 30, 400, 7)
 
-        image = self.remove_small_connected_regions(image, 1)
+        #image = self.remove_small_connected_regions(image, 10, False)
 
         return image
 
