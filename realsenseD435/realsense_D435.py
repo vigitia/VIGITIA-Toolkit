@@ -3,12 +3,13 @@
 import pyrealsense2 as rs
 import numpy as np
 import cv2
+import imutils
 import sys
 
 from hand_tracking.hand_tracking_controller import HandTrackingController
 
 
-DISTANCE_CAMERA_TABLE = 1.30  # m
+DISTANCE_CAMERA_TABLE = 1.23  # m
 
 MIN_DIST_TOUCH = 0.003  # m
 MAX_DIST_TOUCH = 0.05  # m
@@ -23,7 +24,7 @@ DEPTH_FPS = 60
 RGB_FPS = 60
 
 NUM_FRAMES_WAIT_INITIALIZING = 50
-NUM_FRAMES_FOR_BACKGROUND_MODEL = 10
+NUM_FRAMES_FOR_BACKGROUND_MODEL = 50
 
 COLOR_REMOVED_BACKGROUND = [64, 177, 0]  # Chroma Green
 
@@ -33,6 +34,10 @@ class RealsenseD435Camera():
     clipping_distance = -1
 
     num_frame = 0
+
+    stored_background_values = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X, NUM_FRAMES_FOR_BACKGROUND_MODEL), dtype=np.int16)
+    background_average = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
+    background_standard_deviation = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
 
     stored_depth_frame = None
 
@@ -113,14 +118,6 @@ class RealsenseD435Camera():
         self.colorizer.set_option(rs.option.min_distance, 0.5)  # meter
         self.colorizer.set_option(rs.option.max_distance, 1.4)  # meter
 
-    frames_for_background = []
-    max_background = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
-    frame_num = 0
-
-    stored_background_values = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X, NUM_FRAMES_FOR_BACKGROUND_MODEL), dtype=np.int16)
-    background_average = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
-    background_standard_deviation = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
-
     def create_background_model(self, depth_image):
         pos = self.num_frame - NUM_FRAMES_WAIT_INITIALIZING - 1
         print('Storing frame ' + str(pos+1) + '/' + str(NUM_FRAMES_FOR_BACKGROUND_MODEL))
@@ -191,7 +188,7 @@ class RealsenseD435Camera():
 
                 # color_image = self.hand_tracking_contoller.detect_hands(color_image, aligned_depth_frame)
 
-                if 50 < self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL + 50:
+                if NUM_FRAMES_WAIT_INITIALIZING < self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL + NUM_FRAMES_WAIT_INITIALIZING:
                     self.create_background_model(depth_image)
                     continue
                 else:
@@ -315,7 +312,28 @@ class RealsenseD435Camera():
         image = cv2.bilateralFilter(image, 7, 50, 50)
         image = cv2.Canny(image, 30, 400, 7)
 
+        #https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
+        # find contours in the edged image, keep only the largest
+        # ones, and initialize our screen contour
+        cnts = cv2.findContours(image.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = imutils.grab_contours(cnts)
+        cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:10]
+
+        print("Num Contours: ", len(cnts))
+
+        # loop over our contours
+        for c in cnts:
+            # approximate the contour
+            peri = cv2.arcLength(c, True)
+            approx = cv2.approxPolyDP(c, 0.015 * peri, True)
+            # if our approximated contour has four points, then
+            # we can assume that we have found our screen
+            #print("Length of contour: ", len(approx))
+
         #image = self.remove_small_connected_regions(image, 10, False)
+
+        # See:
+        # https://stackoverflow.com/questions/35847990/detect-holes-ends-and-beginnings-of-a-line-using-opencv
 
         return image
 
