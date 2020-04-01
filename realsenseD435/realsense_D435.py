@@ -23,7 +23,7 @@ RGB_RES_Y = 480
 DEPTH_FPS = 60
 RGB_FPS = 60
 
-NUM_FRAMES_WAIT_INITIALIZING = 50
+NUM_FRAMES_WAIT_INITIALIZING = 10
 NUM_FRAMES_FOR_BACKGROUND_MODEL = 50
 
 COLOR_REMOVED_BACKGROUND = [64, 177, 0]  # Chroma Green
@@ -53,6 +53,8 @@ class RealsenseD435Camera():
     depth_to_disparity_filter = None
 
     hand_tracking_contoller = None
+
+    background_model_available = False
 
     def __init__(self):
         # Create a pipeline
@@ -92,10 +94,21 @@ class RealsenseD435Camera():
 
         self.init_colorizer()
         self.init_opencv()
+        self.init_background_model()
 
         self.hand_tracking_contoller = HandTrackingController()
 
         self.loop()
+
+    def init_background_model(self):
+        background_temp = np.load('background_average.npy')
+        deviation_temp = np.load('background_standard_deviation.npy')
+
+        if background_temp is not None and deviation_temp is not None:
+            self.background_average = background_temp
+            self.background_standard_deviation = deviation_temp
+            self.background_model_available = True
+
 
     def init_opencv(self):
         #cv2.namedWindow("realsense", cv2.WND_PROP_FULLSCREEN)
@@ -143,6 +156,9 @@ class RealsenseD435Camera():
                 self.background_average[y][x] = np.mean(stored_values_at_pixel)
                 self.background_standard_deviation[y][x] = 3 * np.std(stored_values_at_pixel)
 
+        np.save('background_average.npy', self.background_average)
+        np.save('background_standard_deviation.npy', self.background_standard_deviation)
+
         print('Finished calculating background model statistics')
         print(self.background_average[int(DEPTH_RES_Y/2)])
         print(self.background_standard_deviation[int(DEPTH_RES_Y/2)])
@@ -188,7 +204,7 @@ class RealsenseD435Camera():
 
                 # color_image = self.hand_tracking_contoller.detect_hands(color_image, aligned_depth_frame)
 
-                if NUM_FRAMES_WAIT_INITIALIZING < self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL + NUM_FRAMES_WAIT_INITIALIZING:
+                if not self.background_model_available and NUM_FRAMES_WAIT_INITIALIZING < self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL + NUM_FRAMES_WAIT_INITIALIZING:
                     self.create_background_model(depth_image)
                     continue
                 else:
