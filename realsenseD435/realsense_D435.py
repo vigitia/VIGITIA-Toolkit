@@ -5,6 +5,10 @@ import numpy as np
 import cv2
 import imutils
 import sys
+import configparser
+# https://stackoverflow.com/questions/9763116/parse-a-tuple-from-a-string
+from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
+
 
 from hand_tracking.hand_tracking_controller import HandTrackingController
 
@@ -55,6 +59,14 @@ class RealsenseD435Camera():
     hand_tracking_contoller = None
 
     background_model_available = False
+    calibration_mode = True
+
+    table_corner_top_left = (0, 0)
+    table_corner_top_right = (0, 0)
+    table_corner_bottom_left = (0, 0)
+    table_corner_bottom_right = (0, 0)
+
+    last_mouse_click_coordinates = []
 
     def __init__(self):
         # Create a pipeline
@@ -92,6 +104,7 @@ class RealsenseD435Camera():
         #  clipping_distance_in_meters meters away
         self.clipping_distance = DISTANCE_CAMERA_TABLE / self.depth_scale
 
+        self.read_config_file()
         self.init_colorizer()
         self.init_opencv()
         self.init_background_model()
@@ -99,6 +112,28 @@ class RealsenseD435Camera():
         self.hand_tracking_contoller = HandTrackingController()
 
         self.loop()
+
+    # Log mouse click positions to the console
+    def on_mouse_click(self, event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            print((x, y))
+            self.last_mouse_click_coordinates.append((x, y))
+            if len(self.last_mouse_click_coordinates) > 4:
+                self.last_mouse_click_coordinates = []
+
+    def read_config_file(self):
+        config = configparser.ConfigParser()
+        config.read('config.ini')
+        print(config.sections())
+
+        if len(config.sections()) > 0:
+            # Coordinates of table corners for perspective transformation
+            self.table_corner_top_left = make_tuple(config['CORNERS']['CornerTopLeft'])
+            self.table_corner_top_right = make_tuple(config['CORNERS']['CornerTopRight'])
+            self.table_corner_bottom_left = make_tuple(config['CORNERS']['CornerBottomLeft'])
+            self.table_corner_bottom_right = make_tuple(config['CORNERS']['CornerBottomRight'])
+
+            print(self.table_corner_top_left)
 
     def init_background_model(self):
         background_temp = np.load('background_average.npy')
@@ -109,19 +144,21 @@ class RealsenseD435Camera():
             self.background_standard_deviation = deviation_temp
             self.background_model_available = True
 
-
     def init_opencv(self):
         #cv2.namedWindow("realsense", cv2.WND_PROP_FULLSCREEN)
         #cv2.setWindowProperty("window", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
         cv2.namedWindow('realsense', cv2.WINDOW_AUTOSIZE)
 
         # Set mouse callbacks to extract the coordinates of clicked spots in the image
-        cv2.setMouseCallback('window', self.on_mouse_click)
+        cv2.setMouseCallback('realsense', self.on_mouse_click)
 
     # Log mouse click positions to the console
     def on_mouse_click(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
             print((x, y))
+            self.last_mouse_click_coordinates.append((x, y))
+            if len(self.last_mouse_click_coordinates) > 4:
+                self.last_mouse_click_coordinates = []
 
     def init_colorizer(self):
         self.colorizer = rs.colorizer()
@@ -198,31 +235,105 @@ class RealsenseD435Camera():
                 if not aligned_depth_frame or not color_frame:
                     continue
 
-                # Render images
-                # depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
-                depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
-
-                # color_image = self.hand_tracking_contoller.detect_hands(color_image, aligned_depth_frame)
-
-                if not self.background_model_available and NUM_FRAMES_WAIT_INITIALIZING < self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL + NUM_FRAMES_WAIT_INITIALIZING:
-                    self.create_background_model(depth_image)
-                    continue
+                if self.calibration_mode:
+                    self.display_mode_calibration(color_image)
                 else:
-                    # Remove all pixels at defined cutoff value
-                    # bg_removed = self.remove_background(color_image, depth_image)
+                    # Render images
+                    # depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+                    depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
 
-                    output_image = self.extract_arms(depth_image, color_image)
+                    # color_image = self.hand_tracking_contoller.detect_hands(color_image, aligned_depth_frame)
 
-                    cv2.imshow('realsense', output_image)
-                    #cv2.imwrite('average_background.png', self.average_background)
+                    if not self.background_model_available and NUM_FRAMES_WAIT_INITIALIZING < self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL + NUM_FRAMES_WAIT_INITIALIZING:
+                        self.create_background_model(depth_image)
+                        continue
+                    else:
+                        # Remove all pixels at defined cutoff value
+                        # bg_removed = self.remove_background(color_image, depth_image)
+
+                        output_image = self.extract_arms(depth_image, color_image)
+                        output_image = self.perspective_transformation(output_image)
+
+                        cv2.imshow('realsense', output_image)
+                        #cv2.imwrite('average_background.png', self.average_background)
 
                 key = cv2.waitKey(1)
                 # Press esc or 'q' to close the image window
                 if key & 0xFF == ord('q') or key == 27:
                     cv2.destroyAllWindows()
                     break
+                elif key == 99:  # C as in Calibrate
+                    self.last_mouse_click_coordinates = []  # Reset list
+                    self.calibration_mode = not self.calibration_mode
         finally:
             self.pipeline.stop()
+
+    def display_mode_calibration(self, color_image):
+        print("In calibration mode")
+        # Show circles of previous coordinates
+        cv2.circle(color_image, self.table_corner_top_left, 2, (0, 0, 255), -1)
+        cv2.circle(color_image, self.table_corner_top_right, 2, (0, 0, 255), -1)
+        cv2.circle(color_image, self.table_corner_bottom_left, 2, (0, 0, 255), -1)
+        cv2.circle(color_image, self.table_corner_bottom_right, 2, (0, 0, 255), -1)
+
+        # Draw circles for clicks in a different color to mark the new points
+        for coordinate in self.last_mouse_click_coordinates:
+            cv2.circle(color_image, coordinate, 2, (0, 255, 0), -1)
+
+        cv2.putText(img=color_image, text='Calibration Mode - Press on each of the four corners of the table (' +
+                                          str(len(self.last_mouse_click_coordinates)) + '/4)',
+                    org=(int(color_image.shape[1] / 30), int(color_image.shape[0] / 20)),
+                    fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(0, 0, 255))
+
+        if len(self.last_mouse_click_coordinates) == 4:
+            print('Calibrated')
+            self.update_table_corner_calibration()
+
+        cv2.imshow('realsense', color_image)
+
+    def update_table_corner_calibration(self):
+        # Order coordinates by x value
+        coordinates = sorted(self.last_mouse_click_coordinates)
+
+        if coordinates[0][1] > coordinates[1][1]:
+            self.table_corner_top_left = coordinates[1]
+            self.table_corner_bottom_left = coordinates[0]
+        else:
+            self.table_corner_top_left = coordinates[0]
+            self.table_corner_bottom_left = coordinates[1]
+
+        if coordinates[2][1] > coordinates[3][1]:
+            self.table_corner_top_right = coordinates[3]
+            self.table_corner_bottom_right = coordinates[2]
+        else:
+            self.table_corner_top_right = coordinates[2]
+            self.table_corner_bottom_right = coordinates[3]
+
+        # Update config
+        config = configparser.ConfigParser()
+        config['CORNERS'] = {'CornerTopLeft': str(self.table_corner_top_left),
+                             'CornerTopRight': str(self.table_corner_top_right),
+                             'CornerBottomLeft': str(self.table_corner_bottom_left),
+                             'CornerBottomRight': str(self.table_corner_bottom_right)}
+
+        with open('config.ini', 'w') as configfile:
+            config.write(configfile)
+
+        # Go back to default display mode
+        self.calibration_mode = False
+
+    # Based on: https://www.youtube.com/watch?v=PtCQH93GucA
+    def perspective_transformation(self, frame):
+        x = frame.shape[1]
+
+        pts1 = np.float32([list(self.table_corner_top_left), list(self.table_corner_top_right),
+                           list(self.table_corner_bottom_left), list(self.table_corner_bottom_right)])
+        pts2 = np.float32([[0, 0], [x, 0], [0, x / 2], [x, x / 2]])
+        matrix = cv2.getPerspectiveTransform(pts1, pts2)
+
+        frame = cv2.warpPerspective(frame, matrix, (x, int(x / 2)))
+
+        return frame
 
     def moving_average_filter(self, image):
         if self.stored_depth_frame is None:
@@ -263,7 +374,6 @@ class RealsenseD435Camera():
             print("Writing files")
             cv2.imwrite('mark_arm_pixels.png', mark_arm_pixels)
             cv2.imwrite('mark_touch_pixels.png', mark_touch_pixels)
-
 
         remove_uncertain_pixels = np.where((remove_uncertain_pixels >= MIN_DIST_TOUCH / self.depth_scale), 65535, 0)
         remove_uncertain_pixels = cv2.convertScaleAbs(remove_uncertain_pixels, alpha=(255.0/65535.0))
