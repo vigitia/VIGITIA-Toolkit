@@ -257,7 +257,7 @@ class RealsenseD435Camera():
                         # bg_removed = self.remove_background(color_image, depth_image)
 
                         output_image = self.extract_arms(depth_image, color_image)
-                        output_image = self.perspective_transformation(output_image)
+                        #output_image = self.perspective_transformation(output_image)
 
                         cv2.imshow('realsense', output_image)
                         #cv2.imwrite('average_background.png', self.average_background)
@@ -442,6 +442,7 @@ class RealsenseD435Camera():
     def get_edge_map(self, image):
         # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
         #image = cv2.bilateralFilter(image, 11, 17, 17)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         image = cv2.bilateralFilter(image, 7, 50, 50)
         image = cv2.Canny(image, 30, 400, 7)
 
@@ -458,9 +459,25 @@ class RealsenseD435Camera():
 
         print("Num Contours: ", len(contours))
 
-        # loop over our contours
+        # Remove all points outside of the border
+        table_border = np.array([self.table_corner_top_left, self.table_corner_top_right,
+                                 self.table_corner_bottom_right, self.table_corner_bottom_left])
         for contour in contours:
             print('')
+
+            points_inside = []
+
+            for point in contour:
+                modified_point = (point[0][0], point[0][1])
+                if cv2.pointPolygonTest(table_border, modified_point, False) > 0:
+                    points_inside.append(point)
+
+            result = np.asarray(points_inside)
+
+            cv2.drawContours(black_image, result, -1, (255, 255, 255), -1)
+
+
+
             # approximate the contour
             #peri = cv2.arcLength(c, True)
             #approx = cv2.approxPolyDP(c, 0.015 * peri, True)
@@ -470,10 +487,10 @@ class RealsenseD435Camera():
 
         # TODO: See:
         # https://stackoverflow.com/questions/35847990/detect-holes-ends-and-beginnings-of-a-line-using-opencv
-        # cv2.drawContours(black_image, contours, -1, (255, 255, 255), -1)
+
         # Also: Remove points outside the boundries of the table
 
-        return image
+        return black_image
 
 
 
