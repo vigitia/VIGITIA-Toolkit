@@ -59,7 +59,7 @@ class RealsenseD435Camera():
     hand_tracking_contoller = None
 
     background_model_available = False
-    calibration_mode = True
+    calibration_mode = False
 
     table_corner_top_left = (0, 0)
     table_corner_top_right = (0, 0)
@@ -136,8 +136,13 @@ class RealsenseD435Camera():
             print(self.table_corner_top_left)
 
     def init_background_model(self):
-        background_temp = np.load('background_average.npy')
-        deviation_temp = np.load('background_standard_deviation.npy')
+        background_temp = None
+        deviation_temp = None
+        try:
+            background_temp = np.load('background_average.npy')
+            deviation_temp = np.load('background_standard_deviation.npy')
+        except FileNotFoundError:
+            print("No stored background")
 
         if background_temp is not None and deviation_temp is not None:
             self.background_average = background_temp
@@ -412,6 +417,8 @@ class RealsenseD435Camera():
         unique, counts = np.unique(output_image, return_counts=True)
         #print(dict(zip(unique, counts)))
 
+        # TODO: Get extreme Points: https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_contours/py_contour_properties/py_contour_properties.html#contour-properties
+
         return output_image
 
     def remove_small_connected_regions(self, image, min_size, get_only_regions_to_remove):
@@ -438,28 +445,33 @@ class RealsenseD435Camera():
         image = cv2.bilateralFilter(image, 7, 50, 50)
         image = cv2.Canny(image, 30, 400, 7)
 
+        black_image = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.uint8)
+
+
         #https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
         # find contours in the edged image, keep only the largest
         # ones, and initialize our screen contour
-        cnts = cv2.findContours(image.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        cnts = imutils.grab_contours(cnts)
-        cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:10]
+        #cnts = cv2.findContours(image.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours = cv2.findContours(image.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        contours = imutils.grab_contours(contours)
+        contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]
 
-        print("Num Contours: ", len(cnts))
+        print("Num Contours: ", len(contours))
 
         # loop over our contours
-        for c in cnts:
+        for contour in contours:
+            print('')
             # approximate the contour
-            peri = cv2.arcLength(c, True)
-            approx = cv2.approxPolyDP(c, 0.015 * peri, True)
-            # if our approximated contour has four points, then
-            # we can assume that we have found our screen
+            #peri = cv2.arcLength(c, True)
+            #approx = cv2.approxPolyDP(c, 0.015 * peri, True)
             #print("Length of contour: ", len(approx))
 
         #image = self.remove_small_connected_regions(image, 10, False)
 
-        # See:
+        # TODO: See:
         # https://stackoverflow.com/questions/35847990/detect-holes-ends-and-beginnings-of-a-line-using-opencv
+        # cv2.drawContours(black_image, contours, -1, (255, 255, 255), -1)
+        # Also: Remove points outside the boundries of the table
 
         return image
 
