@@ -417,11 +417,11 @@ class RealsenseD435Camera():
         hand_area = cv2.cvtColor(hand_area, cv2.COLOR_GRAY2BGR)
         significant_pixels[np.where((hand_area == [0, 0, 0]).all(axis=2))] = [0, 0, 0]
 
-        edge_map = self.get_edge_map(color_image)
-        edge_map = cv2.cvtColor(edge_map, cv2.COLOR_GRAY2BGR)
+        #edge_map = self.get_edge_map(color_image)
+        #edge_map = cv2.cvtColor(edge_map, cv2.COLOR_GRAY2BGR)
 
-        output_image = significant_pixels + edge_map
-        #output_image = edge_map
+        #output_image = significant_pixels + edge_map
+        output_image = significant_pixels
 
         unique, counts = np.unique(output_image, return_counts=True)
         #print(dict(zip(unique, counts)))
@@ -511,6 +511,8 @@ class RealsenseD435Camera():
         fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, 2)
 
         contours, hierarchy = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Extract the 10 largest contours (more shold never be needed)
         contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]
 
 
@@ -519,6 +521,8 @@ class RealsenseD435Camera():
         if len(contours) > 0:
             for contour in contours:
                 cv2.drawContours(color_image, [contour], 0, (255, 0, 0), 3)
+
+            # Draw largest contour in a different color
             cv2.drawContours(color_image, [contours[0]], 0, (0, 0, 255), 3)
 
             # https://webnautes.tistory.com/m/1378
@@ -527,18 +531,23 @@ class RealsenseD435Camera():
             hull = cv2.convexHull(max_contour)
             cv2.drawContours(color_image, [hull], 0, (0, 255, 0), 2)
 
-            # Find center of contour
-            M = cv2.moments(max_contour)
-            cx = int(M['m10'] / M['m00'])
-            cy = int(M['m01'] / M['m00'])
-            cv2.circle(color_image, (cx, cy), 10, [255, 255, 255], -1)
+            try:
+                # Find center of contour
+                M = cv2.moments(max_contour)
+                cx = int(M['m10'] / M['m00'])
+                cy = int(M['m01'] / M['m00'])
+                cv2.circle(color_image, (cx, cy), 10, [255, 255, 255], -1)
+            except ZeroDivisionError:
+                pass
 
-            closest_point_to_center = [0,0]
-
+            # Remove all points outside of the border
+            table_border = np.array([self.table_corner_top_left, self.table_corner_top_right,
+                                     self.table_corner_bottom_right, self.table_corner_bottom_left])
             for point in hull:
-                cv2.circle(color_image, tuple(point[0]), 10, [255, 0, 255], -1)
-
-
+                distance_to_table_border = abs(cv2.pointPolygonTest(table_border, tuple(point[0]), True))
+                # TODO Remove points close to the table border
+                if distance_to_table_border > 20:
+                    cv2.circle(color_image, tuple(point[0]), 5, [255, 0, 255], -1)
 
         cv2.imshow('mask', color_image)
 
