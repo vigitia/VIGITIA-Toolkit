@@ -27,7 +27,7 @@ RGB_RES_Y = 480
 DEPTH_FPS = 60
 RGB_FPS = 60
 
-NUM_FRAMES_WAIT_INITIALIZING = 10
+NUM_FRAMES_WAIT_INITIALIZING = 100
 NUM_FRAMES_FOR_BACKGROUND_MODEL = 50
 
 COLOR_REMOVED_BACKGROUND = [64, 177, 0]  # Chroma Green
@@ -43,6 +43,7 @@ class RealsenseD435Camera():
     background_average = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
     background_standard_deviation = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
 
+    stored_color_frame = None
     stored_depth_frame = None
 
     pipeline = None
@@ -67,6 +68,8 @@ class RealsenseD435Camera():
     table_corner_bottom_right = (0, 0)
 
     last_mouse_click_coordinates = []
+
+    fgbg = cv2.createBackgroundSubtractorMOG2(varThreshold=200, detectShadows=0)
 
     def __init__(self):
         # Create a pipeline
@@ -240,6 +243,9 @@ class RealsenseD435Camera():
                 if not aligned_depth_frame or not color_frame:
                     continue
 
+                if self.num_frame < NUM_FRAMES_WAIT_INITIALIZING:
+                    continue
+
                 if self.calibration_mode:
                     self.display_mode_calibration(color_image)
                 else:
@@ -368,6 +374,7 @@ class RealsenseD435Camera():
         depth_holes = np.where(depth_image == 0, 0, 65535)
         remove_uncertain_pixels = np.where(depth_holes == 0, 0, remove_uncertain_pixels)
 
+        # Arm pixels are pixels at least MAX_DIST_TOUCH away from the the background mean
         mark_arm_pixels = np.where((remove_uncertain_pixels > MAX_DIST_TOUCH / self.depth_scale), 65535, 0)
         mark_arm_pixels = cv2.convertScaleAbs(mark_arm_pixels, alpha=(255.0 / 65535.0))
 
@@ -406,10 +413,12 @@ class RealsenseD435Camera():
 
         #significant_pixels_color = cv2.cvtColor(significant_pixels, cv2.COLOR_GRAY2BGR)
 
+        hand_area = self.edge_test(color_image)
+        hand_area = cv2.cvtColor(hand_area, cv2.COLOR_GRAY2BGR)
+        significant_pixels[np.where((hand_area == [0, 0, 0]).all(axis=2))] = [0, 0, 0]
 
         edge_map = self.get_edge_map(color_image)
         edge_map = cv2.cvtColor(edge_map, cv2.COLOR_GRAY2BGR)
-
 
         output_image = significant_pixels + edge_map
         #output_image = edge_map
@@ -440,6 +449,7 @@ class RealsenseD435Camera():
         return output_image
 
     def get_edge_map(self, image):
+
         # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
         #image = cv2.bilateralFilter(image, 11, 17, 17)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -469,12 +479,12 @@ class RealsenseD435Camera():
 
             for point in contour:
                 modified_point = (point[0][0], point[0][1])
-                if cv2.pointPolygonTest(table_border, modified_point, False) > 0:
+                if cv2.pointPolygonTest(table_border, modified_point, False) == 1:
                     points_inside.append(point)
 
             result = np.asarray(points_inside)
 
-            cv2.drawContours(black_image, result, -1, (255, 255, 255), -1)
+            cv2.drawContours(black_image, result, -1, (255, 255, 255), 3)
 
 
 
@@ -491,6 +501,49 @@ class RealsenseD435Camera():
         # Also: Remove points outside the boundries of the table
 
         return black_image
+
+    def edge_test(self, color_image):
+        blur = cv2.GaussianBlur(color_image, (7, 7), 0)
+        fgmask = self.fgbg.apply(blur, learningRate=0)
+
+        # get rid of the small black regions in our mask by applying morphological closing (dilation followed by erosion) with a small x by x pixel kernel
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, 2)
+
+        contours, hierarchy = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]
+
+
+        # TODO: Fill holes if needed
+
+        if len(contours) > 0:
+            for contour in contours:
+                cv2.drawContours(color_image, [contour], 0, (255, 0, 0), 3)
+            cv2.drawContours(color_image, [contours[0]], 0, (0, 0, 255), 3)
+
+            # https://webnautes.tistory.com/m/1378
+            max_contour = contours[0]
+            max_contour = cv2.approxPolyDP(max_contour, 0.02 * cv2.arcLength(max_contour, True), True)
+            hull = cv2.convexHull(max_contour)
+            cv2.drawContours(color_image, [hull], 0, (0, 255, 0), 2)
+
+            # Find center of contour
+            M = cv2.moments(max_contour)
+            cx = int(M['m10'] / M['m00'])
+            cy = int(M['m01'] / M['m00'])
+            cv2.circle(color_image, (cx, cy), 10, [255, 255, 255], -1)
+
+            closest_point_to_center = [0,0]
+
+            for point in hull:
+                cv2.circle(color_image, tuple(point[0]), 10, [255, 0, 255], -1)
+
+
+
+        cv2.imshow('mask', color_image)
+
+        return fgmask
+
 
 
 
