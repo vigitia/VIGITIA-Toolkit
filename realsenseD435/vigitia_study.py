@@ -21,7 +21,7 @@ RGB_RES_Y = 480
 DEPTH_FPS = 60
 RGB_FPS = 60
 
-NUM_FRAMES_WAIT_INITIALIZING = 50
+NUM_FRAMES_WAIT_INITIALIZING = 100
 NUM_FRAMES_FOR_BACKGROUND_MODEL = 10
 
 COLOR_REMOVED_BACKGROUND = [64, 177, 0]  # Chroma Green
@@ -51,7 +51,7 @@ class RealsenseD435Camera():
     disparity_to_depth_filter = None
     depth_to_disparity_filter = None
 
-    fgbg = cv2.createBackgroundSubtractorMOG2()
+    fgbg = cv2.createBackgroundSubtractorMOG2(varThreshold=200, detectShadows=0)
 
     def __init__(self):
         # Create a pipeline
@@ -89,7 +89,8 @@ class RealsenseD435Camera():
         #  clipping_distance_in_meters meters away
         self.clipping_distance = DISTANCE_CAMERA_TABLE / self.depth_scale
 
-        self.init_opencv()
+        #self.init_opencv()
+        self.init_colorizer()
 
         self.loop()
 
@@ -97,6 +98,14 @@ class RealsenseD435Camera():
         #cv2.namedWindow("realsense", cv2.WND_PROP_FULLSCREEN)
         #cv2.setWindowProperty("window", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
         cv2.namedWindow('realsense', cv2.WINDOW_AUTOSIZE)
+
+    def init_colorizer(self):
+        self.colorizer = rs.colorizer()
+        self.colorizer.set_option(rs.option.color_scheme, 0)   # Define the color scheme
+        # Auto histogram color selection (0 = off, 1 = on)
+        self.colorizer.set_option(rs.option.histogram_equalization_enabled, 0)
+        self.colorizer.set_option(rs.option.min_distance, 0.4)  # meter
+        self.colorizer.set_option(rs.option.max_distance, 1.4)  # meter
 
     def create_background_model(self, depth_image, color_image):
         pos = self.num_frame - NUM_FRAMES_WAIT_INITIALIZING - 1
@@ -145,10 +154,12 @@ class RealsenseD435Camera():
 
                 # Align the depth frame to color frame
                 aligned_frames = self.align.process(frames)
-
-                # Get aligned frames
                 aligned_depth_frame = aligned_frames.get_depth_frame()
                 color_frame = aligned_frames.get_color_frame()
+
+                # Validate that both frames are valid
+                if not aligned_depth_frame or not color_frame:
+                    continue
 
                 # Apply Filters
                 #aligned_depth_frame = self.hole_filling_filter.process(aligned_depth_frame)
@@ -156,29 +167,19 @@ class RealsenseD435Camera():
                 #aligned_depth_frame = self.temporal_filter.process(aligned_depth_frame)
 
                 color_image = np.asanyarray(color_frame.get_data())
-                # depth_image = np.asanyarray(aligned_depth_frame.get_data())
                 depth_image = np.array(aligned_depth_frame.get_data(), dtype=np.int16)
+                depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
 
-                #depth_image = self.moving_average_filter(depth_image)
-
-                # Validate that both frames are valid
-                if not aligned_depth_frame or not color_frame:
-                    continue
-
-                # Render images
-                # depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
-                #depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
-
-                if NUM_FRAMES_WAIT_INITIALIZING < self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL + NUM_FRAMES_WAIT_INITIALIZING:
-                    self.create_background_model(depth_image, color_image)
-                    continue
-                else:
-
+                #if NUM_FRAMES_WAIT_INITIALIZING < self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL + NUM_FRAMES_WAIT_INITIALIZING:
+                #    self.create_background_model(depth_image, color_image)
+                #    continue
+                #else:
                     #output_image = self.remove_background_advanced(color_image, depth_image)
-                    output_image = self.detect_movement(color_image)
+                #output_image = self.detect_movement(color_image)
 
-                    cv2.imshow('realsense', output_image)
-                    #cv2.imwrite('average_background.png', self.average_background)
+                output_image = self.differences_to_empty_state(color_image)
+
+                #cv2.imshow('realsense', output_image)
 
                 key = cv2.waitKey(1)
                 # Press esc or 'q' to close the image window
@@ -192,12 +193,14 @@ class RealsenseD435Camera():
     def detect_movement(self, color_image):
 
         if self.stored_color_frame is None:
+            self.stored_color_frame = color_image
+            print('Color frame stored at frame number ', self.num_frame)
             return color_image
 
-        fgmask = self.fgbg.apply(color_image)
-        fgmask = np.where(fgmask == 255, 0, fgmask)
-        shadow_mask = np.where(fgmask > 0, 255, fgmask)
-        shadow_mask = np.dstack((shadow_mask, shadow_mask, shadow_mask))
+        #fgmask = self.fgbg.apply(color_image)
+        #fgmask = np.where(fgmask == 255, 0, fgmask)
+        #shadow_mask = np.where(fgmask > 0, 255, fgmask)
+        #shadow_mask = np.dstack((shadow_mask, shadow_mask, shadow_mask))
 
 
         MIN_AREA = 100
@@ -234,6 +237,107 @@ class RealsenseD435Camera():
         # color_image[np.where((shadow_mask == [255, 255, 255]).all(axis=2))] = [0, 0, 0]
 
         return color_image
+
+    # Parts taken from https://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
+    def differences_to_empty_state(self, color_image):
+
+        if self.stored_color_frame is None:
+            self.stored_color_frame = color_image
+            print('Color frame stored at frame number ', self.num_frame)
+
+        grey_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
+        hsv_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2HSV)
+        lab_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2LAB)
+        grey_image_stored = cv2.cvtColor(self.stored_color_frame, cv2.COLOR_BGR2GRAY)
+        hsv_image_stored = cv2.cvtColor(self.stored_color_frame, cv2.COLOR_BGR2HSV)
+        lab_image_stored = cv2.cvtColor(self.stored_color_frame, cv2.COLOR_BGR2LAB)
+
+        hue, saturation, value = cv2.split(hsv_image)
+        l, a, b = cv2.split(lab_image)
+        hue_stored, saturation_stored, value_stored = cv2.split(hsv_image_stored)
+        l_stored, a_stored, b_stored = cv2.split(lab_image_stored)
+
+        areas_of_interest_grey = self.get_areas_of_interest(grey_image, grey_image_stored, color_image)
+        areas_of_interest_hue = self.get_areas_of_interest(hue, hue_stored, color_image)
+        areas_of_interest_saturation = self.get_areas_of_interest(saturation, saturation_stored, color_image)
+        areas_of_interest_value = self.get_areas_of_interest(value, value_stored, color_image)
+        areas_of_interest_l = self.get_areas_of_interest(l, l_stored, color_image)
+        areas_of_interest_a = self.get_areas_of_interest(a, a_stored, color_image)
+        areas_of_interest_b = self.get_areas_of_interest(b, b_stored, color_image)
+
+        if self.num_frame == 600:
+            cv2.imwrite('00_color_stored.png', self.stored_color_frame)
+            cv2.imwrite('01_color.png', color_image)
+            cv2.imwrite('02_grey.png', areas_of_interest_grey)
+            cv2.imwrite('03_hue.png', areas_of_interest_hue)
+            cv2.imwrite('04_saturation.png', areas_of_interest_saturation)
+            cv2.imwrite('05_value.png', areas_of_interest_value)
+            cv2.imwrite('06_l.png', areas_of_interest_l)
+            cv2.imwrite('07_a.png', areas_of_interest_a)
+            cv2.imwrite('08_b.png', areas_of_interest_b)
+            print("Stored frames")
+            #sys.exit()
+
+        self.background_substractor(color_image)
+
+        cv2.imshow('rgb -> grey', areas_of_interest_grey)
+        cv2.imshow('value', areas_of_interest_value)
+        cv2.imshow('l', areas_of_interest_l)
+
+        return areas_of_interest_grey
+
+    def background_substractor(self, color_image):
+        blur = cv2.GaussianBlur(color_image, (5, 5), 0)
+        fgmask = self.fgbg.apply(blur, learningRate=0)
+
+        # get rid of the small black regions in our mask by applying morphological closing (dilation followed by erosion) with a small x by x pixel kernel
+        #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        #fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, 2)
+        fgmask = np.dstack((fgmask, fgmask, fgmask))
+
+        color_image[np.where((fgmask == [0, 0, 0]).all(axis=2))] = [0, 0, 0]
+
+        cv2.imshow('fgmask', color_image)
+
+
+
+    def get_areas_of_interest(self, grey_image, stored_grey_image, color_image):
+        gaussian_blured_image = cv2.GaussianBlur(grey_image, (21, 21), 0)
+        gaussian_blured_image_stored = cv2.GaussianBlur(stored_grey_image, (21, 21), 0)
+
+        # compute the absolute difference between the current frame and first frame
+        frameDelta = cv2.absdiff(gaussian_blured_image_stored, gaussian_blured_image)
+        thresh = cv2.threshold(frameDelta, 25, 255, cv2.THRESH_BINARY)[1]
+        #thresh = cv2.adaptiveThreshold(frameDelta, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+        # dilate the thresholded image to fill in holes, then find contours on thresholded image
+        thresh = cv2.dilate(thresh, None, iterations=3)
+        contours = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = imutils.grab_contours(contours)
+
+        black_image = np.zeros(shape=(RGB_RES_Y, RGB_RES_X, 3), dtype=np.uint8)
+        MIN_AREA = 100
+
+        # loop over the contours
+        for c in contours:
+            # if the contour is too small, ignore it
+            if cv2.contourArea(c) < MIN_AREA:
+                continue
+            #else:
+                #print("Bewegung gefunden")
+            # compute the bounding box for the contour, draw it on the frame,
+            # and update the text
+            # (x, y, w, h) = cv2.boundingRect(c)
+            # cv2.rectangle(color_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            # cv2.rectangle(black_image, (x, y), (x + w, y + h), (255, 255, 255), -1)
+
+        # color areas white where a change has been detected
+        areas_of_interest = cv2.drawContours(black_image, contours, -1, (255, 255, 255), -1)
+
+        color_image = np.where(areas_of_interest == 255, color_image, areas_of_interest)
+        # color_image[np.where((shadow_mask == [255, 255, 255]).all(axis=2))] = [0, 0, 0]
+
+        return color_image
+
 
     def moving_average_filter(self, image):
         if self.stored_depth_frame is None:
