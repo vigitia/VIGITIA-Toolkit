@@ -21,12 +21,12 @@ DIST_HOVERING = 0.01  # m
 MAX_DIST_TOUCH = 0.05  # m
 
 # Camera Settings
-DEPTH_RES_X = 848
-DEPTH_RES_Y = 480
-RGB_RES_X = 848
-RGB_RES_Y = 480
-DEPTH_FPS = 60
-RGB_FPS = 60
+DEPTH_RES_X = 1280
+DEPTH_RES_Y = 720
+RGB_RES_X = 1280
+RGB_RES_Y = 720
+DEPTH_FPS = 30
+RGB_FPS = 30
 
 NUM_FRAMES_WAIT_INITIALIZING = 100 # Let the camera warm up and let the auto white balance adjust
 NUM_FRAMES_FOR_BACKGROUND_MODEL = 50
@@ -158,7 +158,7 @@ class RealsenseD435Camera:
 
     def init_opencv(self):
         #cv2.namedWindow("realsense", cv2.WND_PROP_FULLSCREEN)
-        #cv2.setWindowProperty("window", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        #cv2.setWindowProperty("realsense", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
         cv2.namedWindow('realsense', cv2.WINDOW_AUTOSIZE)
 
         # Set mouse callbacks to extract the coordinates of clicked spots in the image
@@ -264,7 +264,7 @@ class RealsenseD435Camera:
                         output_image = self.extract_arms(depth_image, color_image)
                         #output_image = self.perspective_transformation(output_image)
 
-                        cv2.imshow('realsense', output_image)
+                        #cv2.imshow('depth', output_image)
 
                 key = cv2.waitKey(1)
                 # Press esc or 'q' to close the image window
@@ -379,20 +379,20 @@ class RealsenseD435Camera:
         mark_touch_pixels = np.where(mark_touch_pixels != 0, 65535, 0)
         mark_touch_pixels = cv2.convertScaleAbs(mark_touch_pixels, alpha=(255.0 / 65535.0))
 
-        if self.num_frame == 200:
-            print("Writing files")
-            cv2.imwrite('mark_arm_pixels.png', mark_arm_pixels)
-            cv2.imwrite('mark_touch_pixels.png', mark_touch_pixels)
+        #if self.num_frame == 200:
+        #    print("Writing files")
+        #    cv2.imwrite('mark_arm_pixels.png', mark_arm_pixels)
+        #    cv2.imwrite('mark_touch_pixels.png', mark_touch_pixels)
 
         remove_uncertain_pixels = np.where((remove_uncertain_pixels >= MIN_DIST_TOUCH / self.depth_scale), 65535, 0)
         remove_uncertain_pixels = cv2.convertScaleAbs(remove_uncertain_pixels, alpha=(255.0/65535.0))
 
         small_regions = self.remove_small_connected_regions(remove_uncertain_pixels, 10000, True)
 
-        if self.num_frame == 200:
-            print("Writing files")
-            cv2.imwrite('remove_uncertain_pixels.png', remove_uncertain_pixels)
-            cv2.imwrite('small_regions.png', small_regions)
+        #if self.num_frame == 200:
+        #    print("Writing files")
+        #    cv2.imwrite('remove_uncertain_pixels.png', remove_uncertain_pixels)
+        #    cv2.imwrite('small_regions.png', small_regions)
 
         remove_uncertain_pixels -=small_regions
         mark_arm_pixels -= small_regions
@@ -405,14 +405,14 @@ class RealsenseD435Camera:
         significant_pixels[np.where((mark_touch_pixels == [255, 255, 255]).all(axis=2))] = [0, 0, 255]
         significant_pixels[np.where((mark_arm_pixels == [255, 255, 255]).all(axis=2))] = [0, 255, 0]
 
-        unique, counts = np.unique(significant_pixels, return_counts=True)
-        print(dict(zip(unique, counts)))
+        #unique, counts = np.unique(significant_pixels, return_counts=True)
+        #print(dict(zip(unique, counts)))
 
         #significant_pixels_color = cv2.cvtColor(significant_pixels, cv2.COLOR_GRAY2BGR)
 
         hand_area = self.edge_test(color_image, depth_image)
-        hand_area = cv2.cvtColor(hand_area, cv2.COLOR_GRAY2BGR)
-        significant_pixels[np.where((hand_area == [0, 0, 0]).all(axis=2))] = [0, 0, 0]
+        #hand_area = cv2.cvtColor(hand_area, cv2.COLOR_GRAY2BGR)
+        #significant_pixels[np.where((hand_area == [0, 0, 0]).all(axis=2))] = [0, 0, 0]
 
         #edge_map = self.get_edge_map(color_image)
         #edge_map = cv2.cvtColor(edge_map, cv2.COLOR_GRAY2BGR)
@@ -420,7 +420,7 @@ class RealsenseD435Camera:
         #output_image = significant_pixels + edge_map
         output_image = significant_pixels
 
-        unique, counts = np.unique(output_image, return_counts=True)
+        #unique, counts = np.unique(output_image, return_counts=True)
         #print(dict(zip(unique, counts)))
 
         # TODO: Get extreme Points: https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_contours/py_contour_properties/py_contour_properties.html#contour-properties
@@ -515,6 +515,14 @@ class RealsenseD435Camera:
 
         # TODO: Fill holes if needed
 
+        # TODO: Find minimum inscribing circle for Hand detection
+        # See: https://stackoverflow.com/questions/53646022/opencv-c-find-inscribing-circle-of-a-contour
+        # See: https://www.youtube.com/watch?v=xML2S6bvMwI
+        dist = cv2.distanceTransform(fgmask, cv2.DIST_L2, 3)
+        minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(dist)
+        cv2.circle(color_image, maxLoc, int(maxVal), [255, 255, 255], -1)
+
+
         if len(contours) > 0:
             # Remove all points outside of the border
             table_border = np.array([self.table_corner_top_left, self.table_corner_top_right,
@@ -539,29 +547,31 @@ class RealsenseD435Camera:
                 # Draw largest contour in a different color
                 cv2.drawContours(color_image, [contours[0]], 0, (50, 50, 50), 2)
 
-                max_contour = contours[0]
+                #max_contour = contours[0]
 
-                hull, center_point, finger_candidates, inner_points = self.get_candidate_points(max_contour)
+                for contour in contours:
+                    hull, center_point, finger_candidates, inner_points, starts, ends = self.get_candidate_points(contour)
 
-                cv2.drawContours(color_image, [hull], 0, (0, 255, 0), 2)
-                cv2.circle(color_image, center_point, 5, [255, 255, 255], -1)
-                for i in range(len(finger_candidates)):
-                    current_point = finger_candidates[i]
-                    touch_state = self.get_touch_state(current_point, depth_image)
-                    cv2.circle(color_image, current_point, 10, touch_state, 2)
-                    # TODO: Check if distance between points is realistic
-                    if i < len(finger_candidates) - 1:
-                        next_point = finger_candidates[i+1]
-                        distance_between_points = distance.euclidean(current_point, next_point)
-                        print("Dist: ", distance_between_points)
-                        if distance_between_points < 200: # TODO: Tweak value by calculating real world values
-                            cv2.line(color_image, current_point, next_point, [255, 0, 0], 2)
-                for point in inner_points:
-                    cv2.circle(color_image, point, 5, [0, 255, 255], -1)
+                    #cv2.drawContours(color_image, [hull], 0, (0, 255, 0), 2)
+                    cv2.circle(color_image, center_point, 5, [255, 255, 255], -1)
+                    for i in range(len(finger_candidates)):
+                        current_point = finger_candidates[i]
+                        touch_state = self.get_touch_state(current_point, depth_image)
+                        cv2.circle(color_image, current_point, 10, touch_state, 2)
+                        # TODO: Check if distance between points is realistic
+                        if i < len(finger_candidates) - 1:
+                            next_point = finger_candidates[i+1]
+                            #print("Dist: ", distance_between_points)
+                            #if distance_between_points < 200: # TODO: Tweak value by calculating real world values
+                            #    cv2.line(color_image, current_point, next_point, [255, 0, 0], 2)
+                    for i in range(len(inner_points)):
+                        distance_between_points = distance.euclidean(starts[i], inner_points[i])
+                        cv2.circle(color_image, inner_points[i], 5, [0, 255, 255], -1)
+                        cv2.line(color_image, starts[i], inner_points[i], [255, 0, 0], 2)
+                        cv2.line(color_image, ends[i], inner_points[i], [127, 0, 0], 2)
 
-
-
-        cv2.imshow('mask', color_image)
+        color_image = self.perspective_transformation(color_image)
+        cv2.imshow('realsense', color_image)
 
         return fgmask
 
@@ -576,12 +586,18 @@ class RealsenseD435Camera:
         defects = cv2.convexityDefects(contour, hull)
 
         inner_points = []
+        starts = []
+        ends = []
 
         if defects is not None:
             for i in range(defects.shape[0]):
                 s, e, f, d = defects[i, 0]
+                start = tuple(contour[s][0])
+                end = tuple(contour[e][0])
                 far = tuple(contour[f][0])
                 inner_points.append(far)
+                starts.append(start)
+                ends.append(end)
 
         hull = cv2.convexHull(contour, returnPoints=True)
 
@@ -604,7 +620,7 @@ class RealsenseD435Camera:
             if distance_to_table_border > 20:
                 finger_candidates.append(tuple(point[0]))
 
-        return hull, center_point, finger_candidates, inner_points
+        return hull, center_point, finger_candidates, inner_points, starts, ends
 
     # Implemented like described in paper "DIRECT"
     def get_touch_state(self, point, depth_image):
