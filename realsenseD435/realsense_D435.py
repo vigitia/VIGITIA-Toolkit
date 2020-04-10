@@ -8,6 +8,7 @@ import sys
 import configparser
 # https://stackoverflow.com/questions/9763116/parse-a-tuple-from-a-string
 from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
+from scipy.spatial import distance
 
 
 from hand_tracking.hand_tracking_controller import HandTrackingController
@@ -533,38 +534,58 @@ class RealsenseD435Camera:
             contours = arm_candidates
             if len(contours) > 0:
                 cv2.drawContours(color_image, contours, -1, (255, 0, 0), 3)
-
                 # Draw largest contour in a different color
                 cv2.drawContours(color_image, [contours[0]], 0, (0, 0, 255), 3)
 
-                # https://webnautes.tistory.com/m/1378
                 max_contour = contours[0]
-                max_contour = cv2.approxPolyDP(max_contour, 0.02 * cv2.arcLength(max_contour, True), True)
-                hull = cv2.convexHull(max_contour)
+
+                hull, center_point, finger_candidates = self.get_candidate_points(max_contour)
+
                 cv2.drawContours(color_image, [hull], 0, (0, 255, 0), 2)
+                cv2.circle(color_image, center_point, 5, [255, 255, 255], -1)
+                for i in range(len(finger_candidates)):
+                    current_point = finger_candidates[i]
+                    cv2.circle(color_image, current_point, 5, [255, 0, 255], -1)
+                    # TODO: Check if distance between points is realistic
+                    if i < len(finger_candidates) - 1:
+                        next_point = finger_candidates[i+1]
+                        distance_between_points = distance.euclidean(current_point, next_point)
+                        print("Dist: ", distance_between_points)
+                        if distance_between_points < 100: # TODO: Tweak value by calculating real world values
+                            cv2.line(color_image, current_point, next_point, [255, 0, 255], 4)
 
-                try:
-                    # Find center of contour
-                    moments = cv2.moments(max_contour)
-                    cx = int(moments['m10'] / moments['m00'])
-                    cy = int(moments['m01'] / moments['m00'])
-                    cv2.circle(color_image, (cx, cy), 5, [255, 255, 255], -1)
-                except ZeroDivisionError:
-                    pass
-
-                for point in hull:
-                    distance_to_table_border = abs(cv2.pointPolygonTest(table_border, tuple(point[0]), True))
-                    # TODO Remove points close to the table border
-                    if distance_to_table_border > 20:
-                        cv2.circle(color_image, tuple(point[0]), 5, [255, 0, 255], -1)
 
         cv2.imshow('mask', color_image)
 
         return fgmask
 
+    # Inspired by https://webnautes.tistory.com/m/1378
+    def get_candidate_points(self, contour):
+        table_border = np.array([self.table_corner_top_left, self.table_corner_top_right,
+                                 self.table_corner_bottom_right, self.table_corner_bottom_left])
 
+        contour = cv2.approxPolyDP(contour, 0.02 * cv2.arcLength(contour, True), True)
+        hull = cv2.convexHull(contour)
 
+        center_point = (0, 0)
+        finger_candidates = []
 
+        try:
+            # Find center of contour
+            moments = cv2.moments(contour)
+            cx = int(moments['m10'] / moments['m00'])
+            cy = int(moments['m01'] / moments['m00'])
+            center_point = (cx, cy)
+        except ZeroDivisionError:
+            pass
+
+        for point in hull:
+            distance_to_table_border = abs(cv2.pointPolygonTest(table_border, tuple(point[0]), True))
+            # TODO Remove points close to the table border
+            if distance_to_table_border > 20:
+                finger_candidates.append(tuple(point[0]))
+
+        return hull, center_point, finger_candidates
 
 
     def compare_to_background_model(self, depth_image):
@@ -589,7 +610,7 @@ class RealsenseD435Camera:
         bg_removed[np.where((bg_removed == [0, 0, 0]).all(axis=2))] = COLOR_REMOVED_BACKGROUND
 
         return bg_removed
-    
+
 
 def main():
     realsenseCamera = RealsenseD435Camera()
