@@ -17,6 +17,7 @@ from hand_tracking.hand_tracking_controller import HandTrackingController
 DISTANCE_CAMERA_TABLE = 1.25  # m
 
 MIN_DIST_TOUCH = 0.003  # m
+DIST_HOVERING = 0.01  # m
 MAX_DIST_TOUCH = 0.05  # m
 
 # Camera Settings
@@ -409,7 +410,7 @@ class RealsenseD435Camera:
 
         #significant_pixels_color = cv2.cvtColor(significant_pixels, cv2.COLOR_GRAY2BGR)
 
-        hand_area = self.edge_test(color_image)
+        hand_area = self.edge_test(color_image, depth_image)
         hand_area = cv2.cvtColor(hand_area, cv2.COLOR_GRAY2BGR)
         significant_pixels[np.where((hand_area == [0, 0, 0]).all(axis=2))] = [0, 0, 0]
 
@@ -498,7 +499,8 @@ class RealsenseD435Camera:
 
         return black_image
 
-    def edge_test(self, color_image):
+    # Inspired by https://webnautes.tistory.com/m/1378
+    def edge_test(self, color_image, depth_image):
         blur = cv2.GaussianBlur(color_image, (5, 5), 0)
         fgmask = self.fgbg.apply(blur, learningRate=0)
 
@@ -535,24 +537,28 @@ class RealsenseD435Camera:
             if len(contours) > 0:
                 cv2.drawContours(color_image, contours, -1, (255, 0, 0), 3)
                 # Draw largest contour in a different color
-                cv2.drawContours(color_image, [contours[0]], 0, (0, 0, 255), 3)
+                cv2.drawContours(color_image, [contours[0]], 0, (50, 50, 50), 2)
 
                 max_contour = contours[0]
 
-                hull, center_point, finger_candidates = self.get_candidate_points(max_contour)
+                hull, center_point, finger_candidates, inner_points = self.get_candidate_points(max_contour)
 
                 cv2.drawContours(color_image, [hull], 0, (0, 255, 0), 2)
                 cv2.circle(color_image, center_point, 5, [255, 255, 255], -1)
                 for i in range(len(finger_candidates)):
                     current_point = finger_candidates[i]
-                    cv2.circle(color_image, current_point, 5, [255, 0, 255], -1)
+                    touch_state = self.get_touch_state(current_point, depth_image)
+                    cv2.circle(color_image, current_point, 10, touch_state, 2)
                     # TODO: Check if distance between points is realistic
                     if i < len(finger_candidates) - 1:
                         next_point = finger_candidates[i+1]
                         distance_between_points = distance.euclidean(current_point, next_point)
                         print("Dist: ", distance_between_points)
-                        if distance_between_points < 100: # TODO: Tweak value by calculating real world values
-                            cv2.line(color_image, current_point, next_point, [255, 0, 255], 4)
+                        if distance_between_points < 200: # TODO: Tweak value by calculating real world values
+                            cv2.line(color_image, current_point, next_point, [255, 0, 0], 2)
+                for point in inner_points:
+                    cv2.circle(color_image, point, 5, [0, 255, 255], -1)
+
 
 
         cv2.imshow('mask', color_image)
@@ -565,7 +571,20 @@ class RealsenseD435Camera:
                                  self.table_corner_bottom_right, self.table_corner_bottom_left])
 
         contour = cv2.approxPolyDP(contour, 0.02 * cv2.arcLength(contour, True), True)
-        hull = cv2.convexHull(contour)
+        hull = cv2.convexHull(contour, returnPoints=False)
+        # https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_contours/py_contours_more_functions/py_contours_more_functions.html
+        defects = cv2.convexityDefects(contour, hull)
+
+        inner_points = []
+
+        if defects is not None:
+            for i in range(defects.shape[0]):
+                s, e, f, d = defects[i, 0]
+                far = tuple(contour[f][0])
+                inner_points.append(far)
+
+        hull = cv2.convexHull(contour, returnPoints=True)
+
 
         center_point = (0, 0)
         finger_candidates = []
@@ -585,7 +604,28 @@ class RealsenseD435Camera:
             if distance_to_table_border > 20:
                 finger_candidates.append(tuple(point[0]))
 
-        return hull, center_point, finger_candidates
+        return hull, center_point, finger_candidates, inner_points
+
+    # Implemented like described in paper "DIRECT"
+    def get_touch_state(self, point, depth_image):
+        point_x = point[1]
+        point_y = point[0]
+        neighboring_pixels_stored = self.background_average[point_x-2:point_x+3, point_y-2:point_y+3]
+        neighboring_pixels_current = depth_image[point_x-2:point_x+3, point_y-2:point_y+3]
+        try:
+            highest_point = np.amin(neighboring_pixels_current)
+            max_distance = abs(np.mean(neighboring_pixels_stored) - highest_point)
+            if max_distance <= (DIST_HOVERING / self.depth_scale):
+                print('TOUCH!')
+                return [113, 204, 46]
+            elif max_distance <= (MAX_DIST_TOUCH / self.depth_scale):
+                print('HOVER')
+                return [18, 156, 243]
+            else:
+                print('NO TOUCH OR HOVER')
+                return [60, 76, 231]
+        except ValueError:
+            return [0,0,0]
 
 
     def compare_to_background_model(self, depth_image):
