@@ -12,8 +12,8 @@ from ast import literal_eval as make_tuple  # Needed to convert strings stored i
 
 from hand_tracking.hand_tracking_controller import HandTrackingController
 
-
-DISTANCE_CAMERA_TABLE = 1.23  # m
+# TODO: Calculate in calibration phase
+DISTANCE_CAMERA_TABLE = 1.25  # m
 
 MIN_DIST_TOUCH = 0.003  # m
 MAX_DIST_TOUCH = 0.05  # m
@@ -23,16 +23,16 @@ DEPTH_RES_X = 848
 DEPTH_RES_Y = 480
 RGB_RES_X = 848
 RGB_RES_Y = 480
-
 DEPTH_FPS = 60
 RGB_FPS = 60
 
-NUM_FRAMES_WAIT_INITIALIZING = 100
+NUM_FRAMES_WAIT_INITIALIZING = 100 # Let the camera warm up and let the auto white balance adjust
 NUM_FRAMES_FOR_BACKGROUND_MODEL = 50
 
 COLOR_REMOVED_BACKGROUND = [64, 177, 0]  # Chroma Green
 
-class RealsenseD435Camera():
+
+class RealsenseD435Camera:
 
     depth_scale = -1
     clipping_distance = -1
@@ -91,7 +91,7 @@ class RealsenseD435Camera():
 
         # TODO: Tweak camera settings
         depth_sensor.set_option(rs.option.laser_power, 360)
-        depth_sensor.set_option(rs.option.depth_units, 0.001)
+        depth_sensor.set_option(rs.option.depth_units, 0.001)  # Number of meters represented by a single depth unit
 
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
@@ -103,8 +103,7 @@ class RealsenseD435Camera():
         self.decimation_filter = rs.decimation_filter()
         self.temporal_filter = rs.temporal_filter()
 
-        # We will be removing the background of objects more than
-        #  clipping_distance_in_meters meters away
+        # We will be removing the background of objects more than clipping_distance_in_meters meters away
         self.clipping_distance = DISTANCE_CAMERA_TABLE / self.depth_scale
 
         self.read_config_file()
@@ -124,6 +123,7 @@ class RealsenseD435Camera():
             if len(self.last_mouse_click_coordinates) > 4:
                 self.last_mouse_click_coordinates = []
 
+    # In the config file, info like the table corner coordinates are stored
     def read_config_file(self):
         config = configparser.ConfigParser()
         config.read('config.ini')
@@ -136,7 +136,9 @@ class RealsenseD435Camera():
             self.table_corner_bottom_left = make_tuple(config['CORNERS']['CornerBottomLeft'])
             self.table_corner_bottom_right = make_tuple(config['CORNERS']['CornerBottomRight'])
 
-            print(self.table_corner_top_left)
+            print('Successfully read data from config file')
+        else:
+            print('Error reading data from config file')
 
     def init_background_model(self):
         background_temp = None
@@ -160,7 +162,7 @@ class RealsenseD435Camera():
         # Set mouse callbacks to extract the coordinates of clicked spots in the image
         cv2.setMouseCallback('realsense', self.on_mouse_click)
 
-    # Log mouse click positions to the console
+    # Process mouse click events
     def on_mouse_click(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
             print((x, y))
@@ -168,13 +170,14 @@ class RealsenseD435Camera():
             if len(self.last_mouse_click_coordinates) > 4:
                 self.last_mouse_click_coordinates = []
 
+    # The colorizer can colorize depth images
     def init_colorizer(self):
         self.colorizer = rs.colorizer()
         self.colorizer.set_option(rs.option.color_scheme, 0)   # Define the color scheme
         # Auto histogram color selection (0 = off, 1 = on)
         self.colorizer.set_option(rs.option.histogram_equalization_enabled, 0)
         self.colorizer.set_option(rs.option.min_distance, 0.5)  # meter
-        self.colorizer.set_option(rs.option.max_distance, 1.4)  # meter
+        self.colorizer.set_option(rs.option.max_distance, 1.3)  # meter
 
     def create_background_model(self, depth_image):
         pos = self.num_frame - NUM_FRAMES_WAIT_INITIALIZING - 1
@@ -192,34 +195,33 @@ class RealsenseD435Camera():
 
     def calculate_background_model_statistics(self):
         print('Calculating background model statistics')
+        # TODO: Improve performance
         for y in range(DEPTH_RES_Y):
             for x in range(DEPTH_RES_X):
                 stored_values_at_pixel = self.stored_background_values[y][x]
                 #stored_values_at_pixel = stored_values_at_pixel[stored_values_at_pixel != 0]
                 #if len(stored_values_at_pixel) == 0:
                 #    stored_values_at_pixel = [0]
+                # Calculate average depth value for all values stored for the specific pixel
                 self.background_average[y][x] = np.mean(stored_values_at_pixel)
+                # Implemented like in the paper "DIRECT"
                 self.background_standard_deviation[y][x] = 3 * np.std(stored_values_at_pixel)
 
+        # Write the background info to permanent storage. If conditions dont change, it does not need to be created every time
         np.save('background_average.npy', self.background_average)
         np.save('background_standard_deviation.npy', self.background_standard_deviation)
 
         print('Finished calculating background model statistics')
-        print(self.background_average[int(DEPTH_RES_Y/2)])
-        print(self.background_standard_deviation[int(DEPTH_RES_Y/2)])
 
+    # Streaming loop
     def loop(self):
-        # Streaming loop
         try:
             while True:
                 self.num_frame += 1
-                print('Frame:', self.num_frame)
+                print('Frame: ', self.num_frame)
 
                 # Get frameset of color and depth
                 frames = self.pipeline.wait_for_frames()
-
-                if self.num_frame < NUM_FRAMES_WAIT_INITIALIZING:
-                    continue
 
                 # Align the depth frame to color frame
                 aligned_frames = self.align.process(frames)
@@ -237,7 +239,10 @@ class RealsenseD435Camera():
                 # depth_image = np.asanyarray(aligned_depth_frame.get_data())
                 depth_image = np.array(aligned_depth_frame.get_data(), dtype=np.int16)
 
-                #depth_image = self.moving_average_filter(depth_image)
+                # depth_image = self.moving_average_filter(depth_image)
+
+                # depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+                # depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
 
                 # Validate that both frames are valid
                 if not aligned_depth_frame or not color_frame:
@@ -249,24 +254,15 @@ class RealsenseD435Camera():
                 if self.calibration_mode:
                     self.display_mode_calibration(color_image)
                 else:
-                    # Render images
-                    # depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
-                    depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
-
-                    # color_image = self.hand_tracking_contoller.detect_hands(color_image, aligned_depth_frame)
-
                     if not self.background_model_available and NUM_FRAMES_WAIT_INITIALIZING < self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL + NUM_FRAMES_WAIT_INITIALIZING:
                         self.create_background_model(depth_image)
                         continue
                     else:
-                        # Remove all pixels at defined cutoff value
-                        # bg_removed = self.remove_background(color_image, depth_image)
 
                         output_image = self.extract_arms(depth_image, color_image)
                         #output_image = self.perspective_transformation(output_image)
 
                         cv2.imshow('realsense', output_image)
-                        #cv2.imwrite('average_background.png', self.average_background)
 
                 key = cv2.waitKey(1)
                 # Press esc or 'q' to close the image window
@@ -293,8 +289,8 @@ class RealsenseD435Camera():
 
         cv2.putText(img=color_image, text='Calibration Mode - Press on each of the four corners of the table (' +
                                           str(len(self.last_mouse_click_coordinates)) + '/4)',
-                    org=(int(color_image.shape[1] / 30), int(color_image.shape[0] / 20)),
-                    fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(0, 0, 255))
+                    org=(int(color_image.shape[1] / 6), int(color_image.shape[0] / 2)),
+                    fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255))
 
         if len(self.last_mouse_click_coordinates) == 4:
             print('Calibrated')
@@ -355,7 +351,6 @@ class RealsenseD435Camera():
             averaged_image = combined_images/2
             self.stored_depth_frame = image
             return averaged_image
-
 
     def extract_arms(self, depth_image, color_image):
 
@@ -503,51 +498,65 @@ class RealsenseD435Camera():
         return black_image
 
     def edge_test(self, color_image):
-        blur = cv2.GaussianBlur(color_image, (7, 7), 0)
+        blur = cv2.GaussianBlur(color_image, (5, 5), 0)
         fgmask = self.fgbg.apply(blur, learningRate=0)
 
         # get rid of the small black regions in our mask by applying morphological closing (dilation followed by erosion) with a small x by x pixel kernel
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, 2)
 
         contours, hierarchy = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # Extract the 10 largest contours (more shold never be needed)
+        # Extract the 10 largest contours (more should never be needed)
         contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]
-
 
         # TODO: Fill holes if needed
 
         if len(contours) > 0:
-            for contour in contours:
-                cv2.drawContours(color_image, [contour], 0, (255, 0, 0), 3)
-
-            # Draw largest contour in a different color
-            cv2.drawContours(color_image, [contours[0]], 0, (0, 0, 255), 3)
-
-            # https://webnautes.tistory.com/m/1378
-            max_contour = contours[0]
-            max_contour = cv2.approxPolyDP(max_contour, 0.02 * cv2.arcLength(max_contour, True), True)
-            hull = cv2.convexHull(max_contour)
-            cv2.drawContours(color_image, [hull], 0, (0, 255, 0), 2)
-
-            try:
-                # Find center of contour
-                M = cv2.moments(max_contour)
-                cx = int(M['m10'] / M['m00'])
-                cy = int(M['m01'] / M['m00'])
-                cv2.circle(color_image, (cx, cy), 10, [255, 255, 255], -1)
-            except ZeroDivisionError:
-                pass
-
             # Remove all points outside of the border
             table_border = np.array([self.table_corner_top_left, self.table_corner_top_right,
                                      self.table_corner_bottom_right, self.table_corner_bottom_left])
-            for point in hull:
-                distance_to_table_border = abs(cv2.pointPolygonTest(table_border, tuple(point[0]), True))
-                # TODO Remove points close to the table border
-                if distance_to_table_border > 20:
-                    cv2.circle(color_image, tuple(point[0]), 5, [255, 0, 255], -1)
+
+            arm_candidates = []
+            for contour in contours:
+
+                connected_to_table_border = False
+
+                for point in contour:
+                    if cv2.pointPolygonTest(table_border, tuple(point[0]), False) <= 0:
+                        connected_to_table_border = True
+
+                if connected_to_table_border:
+                    print("Contour connected to table border")
+                    arm_candidates.append(contour)
+
+            contours = arm_candidates
+            if len(contours) > 0:
+                cv2.drawContours(color_image, contours, -1, (255, 0, 0), 3)
+
+                # Draw largest contour in a different color
+                cv2.drawContours(color_image, [contours[0]], 0, (0, 0, 255), 3)
+
+                # https://webnautes.tistory.com/m/1378
+                max_contour = contours[0]
+                max_contour = cv2.approxPolyDP(max_contour, 0.02 * cv2.arcLength(max_contour, True), True)
+                hull = cv2.convexHull(max_contour)
+                cv2.drawContours(color_image, [hull], 0, (0, 255, 0), 2)
+
+                try:
+                    # Find center of contour
+                    moments = cv2.moments(max_contour)
+                    cx = int(moments['m10'] / moments['m00'])
+                    cy = int(moments['m01'] / moments['m00'])
+                    cv2.circle(color_image, (cx, cy), 5, [255, 255, 255], -1)
+                except ZeroDivisionError:
+                    pass
+
+                for point in hull:
+                    distance_to_table_border = abs(cv2.pointPolygonTest(table_border, tuple(point[0]), True))
+                    # TODO Remove points close to the table border
+                    if distance_to_table_border > 20:
+                        cv2.circle(color_image, tuple(point[0]), 5, [255, 0, 255], -1)
 
         cv2.imshow('mask', color_image)
 
@@ -580,22 +589,7 @@ class RealsenseD435Camera():
         bg_removed[np.where((bg_removed == [0, 0, 0]).all(axis=2))] = COLOR_REMOVED_BACKGROUND
 
         return bg_removed
-
-    def depth_distance(self, aligned_depth_frame):
-        # Print a simple text-based representation of the image, by breaking it into 10x20 pixel regions and approximating the coverage of pixels within one meter
-        coverage = [0] * 64
-        for y in range(DEPTH_RES_Y):
-            for x in range(DEPTH_RES_X):
-                dist = aligned_depth_frame.get_distance(x, y)
-                if 0 < dist and dist < 1:
-                    coverage[x // 10] += 1
-
-            if y % 20 is 19:
-                line = ""
-                for c in coverage:
-                    line += " .:nhBXWW"[c // 25]
-                coverage = [0] * 64
-                print(line)
+    
 
 def main():
     realsenseCamera = RealsenseD435Camera()
