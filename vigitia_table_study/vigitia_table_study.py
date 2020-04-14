@@ -1,14 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import os
 import sys
 import time
+import datetime
 import numpy as np
 import cv2
 import configparser
 # https://stackoverflow.com/questions/9763116/parse-a-tuple-from-a-string
 from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
 from skimage.measure import compare_ssim
+from pathlib import Path
 
 # General constants
 WINDOW_NAME = 'VIGITIA_TABLE_STUDY'
@@ -21,6 +24,7 @@ TABLE_DEPTH_CM = 59
 FLIP_IMAGE_VERTICALLY = True
 FLIP_IMAGE_HORIZONTALLY = True
 MIN_TIME_BETWEEN_SAVED_FRAMES_SEC = 1
+MIN_DIFFERENCE_PERCENT_TO_SAVE = 10
 
 
 class VigitiaTableStudy:
@@ -95,7 +99,9 @@ class VigitiaTableStudy:
                 else:
                     frame_full = frame.copy()
                     frame_table = self.perspective_transformation(frame)
-                    self.check_save_frame(frame_table)
+                    if self.check_save_frame(frame_table):
+                        self.save_frame(frame_table, frame_full)
+
 
             key = cv2.waitKey(1)
             # Press 'ESC' or 'Q' to close the image window
@@ -168,7 +174,7 @@ class VigitiaTableStudy:
             print('Stored first frame')
             self.last_frame = frame
             self.last_frame_timestamp = time.time()
-            return
+            return False
 
         # 1. Check for movement
         # If movement is present and time difference <  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> don't save
@@ -181,9 +187,15 @@ class VigitiaTableStudy:
         #print(time_difference)
         if time_difference > MIN_TIME_BETWEEN_SAVED_FRAMES_SEC:
             print('Min time difference reached')
-            self.frame_difference(frame)
+            difference = self.frame_difference(frame)
+
             self.last_frame = frame
             self.last_frame_timestamp = now
+
+            if difference >= MIN_DIFFERENCE_PERCENT_TO_SAVE:
+                return True
+            else:
+                return False
 
         cv2.imshow(WINDOW_NAME, frame)
         #cv2.imwrite('test.png', frame)
@@ -202,10 +214,27 @@ class VigitiaTableStudy:
         diff = np.where(diff < 255, 0, diff)
         diff = cv2.bitwise_not(diff)
 
+        cv2.imshow('diff', diff)
+
         difference = int((np.sum(diff == 255) / diff.size) * 100)
         print('Difference:', difference, '%')
 
-        cv2.imshow('diff', diff)
+        return difference
+
+
+    def save_frame(self, frame_table, frame_full):
+        print('SAVING FRAME!')
+        now = datetime.datetime.now()
+        folder_name = str(now.date())
+
+        Path(os.path.join(TABLE_NAME, folder_name)).mkdir(parents=True, exist_ok=True)
+
+        time_string = now.strftime('%Y-%m-%d_%H-%M-%S-%f')[:-4]
+        file_name_table = TABLE_NAME + '_' + time_string + '_table.png'
+        file_name_full = TABLE_NAME + '_' + time_string + '_full.png'
+
+        cv2.imwrite(os.path.join(os.path.join(TABLE_NAME, folder_name), file_name_table), frame_table)
+        cv2.imwrite(os.path.join(os.path.join(TABLE_NAME, folder_name), file_name_full), frame_full)
 
     # Based on: https://www.youtube.com/watch?v=PtCQH93GucA
     def perspective_transformation(self, frame):
@@ -236,7 +265,7 @@ class VigitiaTableStudy:
         return frame
 
 
-    # Function taken from: https://gist.github.com/Integralist/4ca9ff94ea82b0e407f540540f1d8c6c
+    # Method taken from: https://gist.github.com/Integralist/4ca9ff94ea82b0e407f540540f1d8c6c
     def calculate_aspect_ratio(self, width: int, height: int):
         temp = 0
 
