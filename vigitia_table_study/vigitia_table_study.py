@@ -2,11 +2,13 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import time
 import numpy as np
 import cv2
 import configparser
 # https://stackoverflow.com/questions/9763116/parse-a-tuple-from-a-string
 from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
+from skimage.measure import compare_ssim
 
 # General constants
 WINDOW_NAME = 'VIGITIA_TABLE_STUDY'
@@ -18,12 +20,14 @@ TABLE_LENGTH_CM = 42
 TABLE_DEPTH_CM = 59
 FLIP_IMAGE_VERTICALLY = True
 FLIP_IMAGE_HORIZONTALLY = True
+MIN_TIME_BETWEEN_SAVED_FRAMES_SEC = 1
 
 
 class VigitiaTableStudy:
 
     capture = None
     last_frame = None
+    last_frame_timestamp = None
 
     last_mouse_click_coordinates = []
 
@@ -89,7 +93,9 @@ class VigitiaTableStudy:
                 if self.calibration_mode:
                     self.display_mode_calibration(frame)
                 else:
-                    self.check_save_frame(frame)
+                    frame_full = frame.copy()
+                    frame_table = self.perspective_transformation(frame)
+                    self.check_save_frame(frame_table)
 
             key = cv2.waitKey(1)
             # Press 'ESC' or 'Q' to close the image window
@@ -159,12 +165,47 @@ class VigitiaTableStudy:
 
     def check_save_frame(self, frame):
         if self.last_frame is None:
+            print('Stored first frame')
             self.last_frame = frame
+            self.last_frame_timestamp = time.time()
             return
 
-        frame = self.perspective_transformation(frame)
+        # 1. Check for movement
+        # If movement is present and time difference <  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> don't save
+        # If movement is present and time difference >  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> check difference or save
+        #   if interactions should be logged as well
+        # If no movement present and time difference >  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> check difference
+
+        now = time.time()
+        time_difference = now - self.last_frame_timestamp
+        #print(time_difference)
+        if time_difference > MIN_TIME_BETWEEN_SAVED_FRAMES_SEC:
+            print('Min time difference reached')
+            self.frame_difference(frame)
+            self.last_frame = frame
+            self.last_frame_timestamp = now
+
         cv2.imshow(WINDOW_NAME, frame)
         #cv2.imwrite('test.png', frame)
+
+    # https://www.pyimagesearch.com/2017/06/19/image-difference-with-opencv-and-python/
+    def frame_difference(self, frame):
+        grey_new = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        grey_old = cv2.cvtColor(self.last_frame, cv2.COLOR_BGR2GRAY)
+
+        # compute the Structural Similarity Index (SSIM) between the two
+        # images, ensuring that the difference image is returned
+        (score, diff) = compare_ssim(grey_new, grey_old, full=True)
+        diff = (diff * 255).astype("uint8")
+        #print("SSIM: {}".format(score))
+        diff = np.where(diff > 220, 255, diff)
+        diff = np.where(diff < 255, 0, diff)
+        diff = cv2.bitwise_not(diff)
+
+        difference = int((np.sum(diff == 255) / diff.size) * 100)
+        print('Difference:', difference, '%')
+
+        cv2.imshow('diff', diff)
 
     # Based on: https://www.youtube.com/watch?v=PtCQH93GucA
     def perspective_transformation(self, frame):
