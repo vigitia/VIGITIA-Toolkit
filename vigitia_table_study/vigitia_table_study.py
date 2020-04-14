@@ -8,8 +8,16 @@ import configparser
 # https://stackoverflow.com/questions/9763116/parse-a-tuple-from-a-string
 from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
 
-CAMERA_ID = 1
+# General constants
 WINDOW_NAME = 'VIGITIA_TABLE_STUDY'
+
+# Constants to fill out by the user
+CAMERA_ID = 1
+TABLE_NAME = 'Esstisch'
+TABLE_LENGTH_CM = 42
+TABLE_DEPTH_CM = 59
+FLIP_IMAGE_VERTICALLY = True
+FLIP_IMAGE_HORIZONTALLY = True
 
 
 class VigitiaTableStudy:
@@ -169,7 +177,46 @@ class VigitiaTableStudy:
 
         frame = cv2.warpPerspective(frame, matrix, (x, int(x / 2)))
 
+        frame = self.resize_frame_to_table(frame)
+
         return frame
+
+    def resize_frame_to_table(self, frame):
+        x, y = self.calculate_aspect_ratio(TABLE_LENGTH_CM, TABLE_DEPTH_CM)
+        new_width = int(frame.shape[1])
+        new_height = int((frame.shape[1] / x) * y)
+        frame = cv2.resize(frame, (new_height, new_width), interpolation=cv2.INTER_AREA)
+
+        if FLIP_IMAGE_HORIZONTALLY:
+            frame = cv2.flip(frame, 1)
+        if FLIP_IMAGE_VERTICALLY:
+            frame = cv2.flip(frame, 0)
+
+        return frame
+
+
+    # Function taken from: https://gist.github.com/Integralist/4ca9ff94ea82b0e407f540540f1d8c6c
+    def calculate_aspect_ratio(self, width: int, height: int):
+        temp = 0
+
+        def gcd(a, b):
+            """The GCD (greatest common divisor) is the highest number that evenly divides both width and height."""
+            return a if b == 0 else gcd(b, a % b)
+
+        if width == height:
+            return "1:1"
+
+        if width < height:
+            temp = width
+            width = height
+            height = temp
+
+        divisor = gcd(width, height)
+
+        x = int(width / divisor) if not temp else int(height / divisor)
+        y = int(height / divisor) if not temp else int(width / divisor)
+
+        return x, y
 
 
 
