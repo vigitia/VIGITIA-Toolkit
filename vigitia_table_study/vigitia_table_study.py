@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# 1. Check for movement
+# If movement is present and time difference <  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> don't save
+# If movement is present and time difference >  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> check difference or save
+#   if interactions should be logged as well
+# If no movement present and time difference >  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> check difference
+
 import os
 import sys
 import time
@@ -12,6 +18,7 @@ import configparser
 from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
 from skimage.measure import compare_ssim
 from pathlib import Path
+import imutils
 
 # General constants
 WINDOW_NAME = 'VIGITIA_TABLE_STUDY'
@@ -23,15 +30,19 @@ TABLE_LENGTH_CM = 42
 TABLE_DEPTH_CM = 59
 FLIP_IMAGE_VERTICALLY = True
 FLIP_IMAGE_HORIZONTALLY = True
-MIN_TIME_BETWEEN_SAVED_FRAMES_SEC = 1
-MIN_DIFFERENCE_PERCENT_TO_SAVE = 10
+MIN_TIME_BETWEEN_SAVED_FRAMES_SEC = 2
+MIN_TIME_WAIT_AFTER_MOVEMENT_SEC = 2
+MIN_DIFFERENCE_PERCENT_TO_SAVE = 5
+MIN_AREA_FOR_MOVEMENT_PX = 100
 
 
 class VigitiaTableStudy:
 
     capture = None
     last_frame = None
-    last_frame_timestamp = None
+    last_check_saving_frame_timestamp = None
+    last_saved_frame = None
+    last_movement_timestamp = None
 
     last_mouse_click_coordinates = []
 
@@ -102,7 +113,6 @@ class VigitiaTableStudy:
                     if self.check_save_frame(frame_table):
                         self.save_frame(frame_table, frame_full)
 
-
             key = cv2.waitKey(1)
             # Press 'ESC' or 'Q' to close the image window
             if key & 0xFF == ord('q') or key == 27:
@@ -170,40 +180,79 @@ class VigitiaTableStudy:
         self.calibration_mode = False
 
     def check_save_frame(self, frame):
+        now = time.time()
+
         if self.last_frame is None:
-            print('Stored first frame')
             self.last_frame = frame
-            self.last_frame_timestamp = time.time()
+            self.last_saved_frame = frame
+            self.last_check_saving_frame_timestamp = now
+            self.last_movement_timestamp = now
             return False
 
-        # 1. Check for movement
-        # If movement is present and time difference <  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> don't save
-        # If movement is present and time difference >  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> check difference or save
-        #   if interactions should be logged as well
-        # If no movement present and time difference >  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> check difference
+        time_since_last_check_saving_frame = now - self.last_check_saving_frame_timestamp
+        time_since_last_movement = now - self.last_movement_timestamp
 
-        now = time.time()
-        time_difference = now - self.last_frame_timestamp
-        #print(time_difference)
-        if time_difference > MIN_TIME_BETWEEN_SAVED_FRAMES_SEC:
-            print('Min time difference reached')
+        movement = self.detect_movement(frame)
+
+        if movement:
+            self.last_movement_timestamp = now
+
+        self.last_frame = frame
+
+        if time_since_last_movement > MIN_TIME_WAIT_AFTER_MOVEMENT_SEC and \
+                time_since_last_check_saving_frame > MIN_TIME_BETWEEN_SAVED_FRAMES_SEC:
+
+            self.last_check_saving_frame_timestamp = now
+
             difference = self.frame_difference(frame)
-
-            self.last_frame = frame
-            self.last_frame_timestamp = now
-
             if difference >= MIN_DIFFERENCE_PERCENT_TO_SAVE:
                 return True
-            else:
-                return False
+
+            return False
 
         cv2.imshow(WINDOW_NAME, frame)
         #cv2.imwrite('test.png', frame)
 
+    # https://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
+    def detect_movement(self, frame):
+        grey_new = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        grey_old = cv2.cvtColor(self.last_frame, cv2.COLOR_BGR2GRAY)
+        grey_new = cv2.GaussianBlur(grey_new, (21, 21), 0)
+        grey_old = cv2.GaussianBlur(grey_old, (21, 21), 0)
+
+        # compute the absolute difference between the current frame and
+        # first frame
+        frameDelta = cv2.absdiff(grey_old, grey_new)
+        thresh = cv2.threshold(frameDelta, 50, 255, cv2.THRESH_BINARY)[1]
+        # dilate the thresholded image to fill in holes, then find contours
+        # on thresholded image
+        thresh = cv2.dilate(thresh, None, iterations=2)
+        cnts = cv2.findContours(thresh.copy(), cv2.RETR_LIST,
+                                cv2.CHAIN_APPROX_SIMPLE)
+        cnts = imutils.grab_contours(cnts)
+
+        movement = False
+
+        # loop over the contours
+        for c in cnts:
+            # if the contour is too small, ignore it
+            if cv2.contourArea(c) >= MIN_AREA_FOR_MOVEMENT_PX:
+                (x, y, w, h) = cv2.boundingRect(c)
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                movement = True
+
+        if movement:
+            print('Movement detected')
+
+        cv2.imshow('movement', frame)
+        return movement
+
     # https://www.pyimagesearch.com/2017/06/19/image-difference-with-opencv-and-python/
     def frame_difference(self, frame):
         grey_new = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        grey_old = cv2.cvtColor(self.last_frame, cv2.COLOR_BGR2GRAY)
+        grey_old = cv2.cvtColor(self.last_saved_frame, cv2.COLOR_BGR2GRAY)
+        grey_new = cv2.GaussianBlur(grey_new, (21, 21), 0)
+        grey_old = cv2.GaussianBlur(grey_old, (21, 21), 0)
 
         # compute the Structural Similarity Index (SSIM) between the two
         # images, ensuring that the difference image is returned
@@ -221,8 +270,12 @@ class VigitiaTableStudy:
 
         return difference
 
-
     def save_frame(self, frame_table, frame_full):
+
+        self.last_saved_frame = frame_table
+
+        frame_full = self.flip_image(frame_full)
+
         print('SAVING FRAME!')
         now = datetime.datetime.now()
         folder_name = str(now.date())
@@ -257,6 +310,11 @@ class VigitiaTableStudy:
         new_height = int((frame.shape[1] / x) * y)
         frame = cv2.resize(frame, (new_height, new_width), interpolation=cv2.INTER_AREA)
 
+        self.flip_image(frame)
+
+        return frame
+
+    def flip_image(self, frame):
         if FLIP_IMAGE_HORIZONTALLY:
             frame = cv2.flip(frame, 1)
         if FLIP_IMAGE_VERTICALLY:
