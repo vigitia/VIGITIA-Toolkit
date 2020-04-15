@@ -31,9 +31,10 @@ TABLE_DEPTH_CM = 59
 FLIP_IMAGE_VERTICALLY = True
 FLIP_IMAGE_HORIZONTALLY = True
 MIN_TIME_BETWEEN_SAVED_FRAMES_SEC = 2
-MIN_TIME_WAIT_AFTER_MOVEMENT_SEC = 2
+MIN_TIME_WAIT_AFTER_MOVEMENT_SEC = 10
 MIN_DIFFERENCE_PERCENT_TO_SAVE = 5
 MIN_AREA_FOR_MOVEMENT_PX = 100
+MIN_BRIGHTNESS = 50  # Overall brightness of the image from 0 (completely black) to 255 (completely white)
 
 
 class VigitiaTableStudy:
@@ -192,6 +193,11 @@ class VigitiaTableStudy:
         time_since_last_check_saving_frame = now - self.last_check_saving_frame_timestamp
         time_since_last_movement = now - self.last_movement_timestamp
 
+        brightness = self.get_brightness_value(frame)
+        if brightness < MIN_BRIGHTNESS:
+            print('Too Dark')
+            return False
+
         movement = self.detect_movement(frame)
 
         if movement:
@@ -213,6 +219,13 @@ class VigitiaTableStudy:
         cv2.imshow(WINDOW_NAME, frame)
         #cv2.imwrite('test.png', frame)
 
+    # https://stackoverflow.com/questions/14243472/estimate-brightness-of-an-image-opencv
+    def get_brightness_value(self, frame):
+        hsv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        hue, saturation, value = cv2.split(hsv_image)
+        brightness = np.mean(value)
+        return brightness
+
     # https://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
     def detect_movement(self, frame):
         grey_new = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -227,6 +240,9 @@ class VigitiaTableStudy:
         # dilate the thresholded image to fill in holes, then find contours
         # on thresholded image
         thresh = cv2.dilate(thresh, None, iterations=2)
+
+        cv2.imshow('thresh', thresh)
+
         cnts = cv2.findContours(thresh.copy(), cv2.RETR_LIST,
                                 cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
