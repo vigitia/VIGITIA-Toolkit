@@ -30,6 +30,9 @@ RGB_FPS = 60
 
 NUM_FRAMES_FOR_BACKGROUND_MODEL = 50
 
+COLOR_TOUCH =[113, 204, 46]
+COLOR_HOVER = [18, 156, 243]
+COLOR_NO_TOUCH = [60, 76, 231]
 COLOR_REMOVED_BACKGROUND = [64, 177, 0]  # Chroma Green
 
 DEBUG_MODE = False
@@ -444,7 +447,8 @@ class HandTrackingV01:
         blur = cv2.GaussianBlur(color_image, (5, 5), 0)
         fgmask = self.fgbg.apply(blur, learningRate=0)
 
-        # get rid of the small black regions in our mask by applying morphological closing (dilation followed by erosion) with a small x by x pixel kernel
+        # get rid of the small black regions in our mask by applying morphological closing
+        # (dilation followed by erosion) with a small x by x pixel kernel
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, 2)
 
@@ -461,8 +465,11 @@ class HandTrackingV01:
         dist = cv2.distanceTransform(fgmask, cv2.DIST_L2, 3)
         minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(dist)
 
-        if DEBUG_MODE:
-            cv2.circle(color_image, maxLoc, int(maxVal), [255, 255, 255], -1)
+        center_point = maxLoc
+        radius = int(maxVal)
+
+        #if DEBUG_MODE:
+        cv2.circle(color_image, center_point, radius, [255, 255, 255], 3)
 
 
         if len(contours) > 0:
@@ -502,6 +509,7 @@ class HandTrackingV01:
                         current_point = finger_candidates[i]
                         touch_state = self.get_touch_state(current_point, depth_image)
                         cv2.circle(color_image, current_point, 10, touch_state, 2)
+                        cv2.line(color_image, current_point, center_point, [255, 0, 0], 2)
                         # TODO: Check if distance between points is realistic
                         if i < len(finger_candidates) - 1:
                             next_point = finger_candidates[i+1]
@@ -578,13 +586,12 @@ class HandTrackingV01:
             max_distance = abs(np.mean(neighboring_pixels_stored) - highest_point)
             if max_distance <= DIST_HOVERING:
                 print('TOUCH!')
-                return [113, 204, 46]
+                return COLOR_TOUCH
             elif max_distance <= MAX_DIST_TOUCH:
                 print('HOVER')
-                return [18, 156, 243]
+                return COLOR_HOVER
             else:
-                print('NO TOUCH OR HOVER')
-                return [60, 76, 231]
+                return COLOR_NO_TOUCH
         except ValueError:
             return [0, 0, 0]
 
