@@ -128,7 +128,7 @@ class RealsenseD435Camera:
             color_image = np.asanyarray(color_frame.get_data())
             depth_image = np.array(aligned_depth_frame.get_data(), dtype=np.uint16)
             depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
-            depth_image_mm = self.get_depth_image_mm(depth_image)
+            depth_image = self.get_depth_image_mm(depth_image)
 
             with self.read_lock:
                 self.color_image = color_image
@@ -136,11 +136,10 @@ class RealsenseD435Camera:
 
     # Convert the depth image into a numpy array where each pixel value corresponds to the measured distance in mm
     def get_depth_image_mm(self, depth_image):
-        depth_image_mm = depth_image * self.depth_scale * 1000
+        depth_image_mm = depth_image.copy() * self.depth_scale * 1000
         depth_image_mm = np.array(depth_image_mm, dtype=np.uint16)
 
         return depth_image_mm
-
 
     def get_frames(self):
         with self.read_lock:
