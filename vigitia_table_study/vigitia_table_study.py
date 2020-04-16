@@ -102,20 +102,22 @@ class VigitiaTableStudy:
                 self.last_mouse_click_coordinates = []
 
     def init_video_capture(self):
-        self.realsense = RealsenseD435Camera()
-        self.realsense.start()
-        #self.capture = cv2.VideoCapture(CAMERA_ID)
-        # self.capture.set(3, 1280)
-        # self.capture.set(4, 720)
-        # self.capture.set(cv2.CAP_PROP_FPS, 1)
+        if USE_REALSENSE_D435_CAMERA:
+            self.realsense = RealsenseD435Camera()
+            self.realsense.start()
+        else:
+            self.capture = cv2.VideoCapture(CAMERA_ID)
+            self.capture.set(3, 1280)
+            self.capture.set(4, 720)
+            self.capture.set(cv2.CAP_PROP_FPS, 30)
 
     def loop(self):
         while True:
-            # Capture frame-by-frame
-            #ret, frame = self.capture.read()
-            frame, depth_image = self.realsense.get_frames()
+            if USE_REALSENSE_D435_CAMERA:
+                frame, depth_image = self.realsense.get_frames()
+            else:
+                ret, frame = self.capture.read()
 
-            #if ret:
             if frame is not None:
                 if self.calibration_mode:
                     self.display_mode_calibration(frame)
@@ -133,8 +135,10 @@ class VigitiaTableStudy:
                 self.last_mouse_click_coordinates = []  # Reset list
                 self.calibration_mode = not self.calibration_mode
 
-        # When everything done, release the capture
-        self.capture.release()
+        if USE_REALSENSE_D435_CAMERA:
+            self.realsense.stop()
+        else:
+            self.capture.release()
         cv2.destroyAllWindows()
 
     def display_mode_calibration(self, frame):
@@ -234,6 +238,7 @@ class VigitiaTableStudy:
 
         cv2.imshow(WINDOW_NAME, frame)
 
+    # Get an value for the overall brightness of the image. We dont want to save images that are too dark to be useful
     # https://stackoverflow.com/questions/14243472/estimate-brightness-of-an-image-opencv
     def get_brightness_value(self, frame):
         hsv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
