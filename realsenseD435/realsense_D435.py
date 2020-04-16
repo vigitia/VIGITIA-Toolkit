@@ -10,60 +10,49 @@ import configparser
 from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
 from scipy.spatial import distance
 
-
 from hand_tracking.hand_tracking_controller import HandTrackingController
+from realsenseD435.realsense_D435_camera import RealsenseD435Camera
 
 # TODO: Calculate in calibration phase
-DISTANCE_CAMERA_TABLE = 1.25  # m
+DISTANCE_CAMERA_TABLE = 0.69  # m
 
 MIN_DIST_TOUCH = 0.003  # m
 DIST_HOVERING = 0.01  # m
 MAX_DIST_TOUCH = 0.05  # m
 
 # Camera Settings
-DEPTH_RES_X = 1280
-DEPTH_RES_Y = 720
-RGB_RES_X = 1280
-RGB_RES_Y = 720
-DEPTH_FPS = 30
-RGB_FPS = 30
+DEPTH_RES_X = 848
+DEPTH_RES_Y = 480
+RGB_RES_X = 848
+RGB_RES_Y = 480
+DEPTH_FPS = 60
+RGB_FPS = 60
 
-NUM_FRAMES_WAIT_INITIALIZING = 100 # Let the camera warm up and let the auto white balance adjust
 NUM_FRAMES_FOR_BACKGROUND_MODEL = 50
 
 COLOR_REMOVED_BACKGROUND = [64, 177, 0]  # Chroma Green
 
 
-class RealsenseD435Camera:
+class HandTrackingV01:
 
     depth_scale = -1
     clipping_distance = -1
 
     num_frame = 0
 
-    stored_background_values = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X, NUM_FRAMES_FOR_BACKGROUND_MODEL), dtype=np.int16)
-    background_average = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
-    background_standard_deviation = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
+    stored_background_values = None
+    background_average = None
+    background_standard_deviation = None
 
     stored_color_frame = None
     stored_depth_frame = None
-
-    pipeline = None
-    align = None
-    colorizer = None
-
-    hole_filling_filter = None
-    decimation_filter = None
-    spacial_filter = None
-    temporal_filter = None
-    disparity_to_depth_filter = None
-    depth_to_disparity_filter = None
 
     hand_tracking_contoller = None
 
     background_model_available = False
     calibration_mode = False
 
+    # TODO: Add support for differently shaped tables (not just rectangles)
     table_corner_top_left = (0, 0)
     table_corner_top_right = (0, 0)
     table_corner_bottom_left = (0, 0)
@@ -73,43 +62,18 @@ class RealsenseD435Camera:
 
     fgbg = cv2.createBackgroundSubtractorMOG2(varThreshold=200, detectShadows=0)
 
+    realsense = None
+
     def __init__(self):
-        # Create a pipeline
-        self.pipeline = rs.pipeline()
 
-        # Create a config and configure the pipeline to stream
-        #  different resolutions of color and depth streams
-        config = rs.config()
-        config.enable_stream(rs.stream.depth, DEPTH_RES_X, DEPTH_RES_Y, rs.format.z16, DEPTH_FPS)
-        config.enable_stream(rs.stream.color, RGB_RES_X, RGB_RES_Y, rs.format.bgr8, RGB_FPS)
-
-        # Start streaming
-        profile = self.pipeline.start(config)
-
-        # Getting the depth sensor's depth scale (see rs-align example for explanation)
-        depth_sensor = profile.get_device().first_depth_sensor()
-        self.depth_scale = depth_sensor.get_depth_scale()
-        print("Depth scale", self.depth_scale)
-
-        # TODO: Tweak camera settings
-        depth_sensor.set_option(rs.option.laser_power, 360)
-        depth_sensor.set_option(rs.option.depth_units, 0.001)  # Number of meters represented by a single depth unit
-
-        # Create an align object
-        # rs.align allows us to perform alignment of depth frames to others frames
-        # The "align_to" is the stream type to which we plan to align depth frames.
-        align_to = rs.stream.color
-        self.align = rs.align(align_to)
-
-        self.hole_filling_filter = rs.hole_filling_filter()
-        self.decimation_filter = rs.decimation_filter()
-        self.temporal_filter = rs.temporal_filter()
+        self.realsense = RealsenseD435Camera()
+        self.realsense.start()
+        self.depth_scale = self.realsense.get_depth_scale()
 
         # We will be removing the background of objects more than clipping_distance_in_meters meters away
         self.clipping_distance = DISTANCE_CAMERA_TABLE / self.depth_scale
 
         self.read_config_file()
-        self.init_colorizer()
         self.init_opencv()
         self.init_background_model()
 
@@ -172,18 +136,16 @@ class RealsenseD435Camera:
             if len(self.last_mouse_click_coordinates) > 4:
                 self.last_mouse_click_coordinates = []
 
-    # The colorizer can colorize depth images
-    def init_colorizer(self):
-        self.colorizer = rs.colorizer()
-        self.colorizer.set_option(rs.option.color_scheme, 0)   # Define the color scheme
-        # Auto histogram color selection (0 = off, 1 = on)
-        self.colorizer.set_option(rs.option.histogram_equalization_enabled, 0)
-        self.colorizer.set_option(rs.option.min_distance, 0.5)  # meter
-        self.colorizer.set_option(rs.option.max_distance, 1.3)  # meter
-
     def create_background_model(self, depth_image):
-        pos = self.num_frame - NUM_FRAMES_WAIT_INITIALIZING - 1
+        pos = self.num_frame - 1
         print('Storing frame ' + str(pos+1) + '/' + str(NUM_FRAMES_FOR_BACKGROUND_MODEL))
+
+        # TODO: Get dimensions from current frame
+        if self.stored_background_values is None:
+            self.stored_background_values = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X, NUM_FRAMES_FOR_BACKGROUND_MODEL), dtype=np.int16)
+            self.background_average = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
+            self.background_standard_deviation = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
+
         self.store_depth_values(depth_image, pos)
 
         if pos == (NUM_FRAMES_FOR_BACKGROUND_MODEL - 1):
@@ -209,7 +171,8 @@ class RealsenseD435Camera:
                 # Implemented like in the paper "DIRECT"
                 self.background_standard_deviation[y][x] = 3 * np.std(stored_values_at_pixel)
 
-        # Write the background info to permanent storage. If conditions dont change, it does not need to be created every time
+        # Write the background info to permanent storage.
+        # If conditions dont change, it does not need to be created every time
         np.save('background_average.npy', self.background_average)
         np.save('background_standard_deviation.npy', self.background_standard_deviation)
 
@@ -217,65 +180,38 @@ class RealsenseD435Camera:
 
     # Streaming loop
     def loop(self):
-        try:
-            while True:
+        while True:
+            color_image, depth_image = self.realsense.get_frames()
+
+            if color_image is not None:
                 self.num_frame += 1
                 print('Frame: ', self.num_frame)
 
-                # Get frameset of color and depth
-                frames = self.pipeline.wait_for_frames()
-
-                # Align the depth frame to color frame
-                aligned_frames = self.align.process(frames)
-
-                # Get aligned frames
-                aligned_depth_frame = aligned_frames.get_depth_frame()
-                color_frame = aligned_frames.get_color_frame()
-
-                # Apply Filters
-                #aligned_depth_frame = self.hole_filling_filter.process(aligned_depth_frame)
-                #aligned_depth_frame = self.decimation_filter.process(aligned_depth_frame)
-                #aligned_depth_frame = self.temporal_filter.process(aligned_depth_frame)
-
-                color_image = np.asanyarray(color_frame.get_data())
-                # depth_image = np.asanyarray(aligned_depth_frame.get_data())
-                depth_image = np.array(aligned_depth_frame.get_data(), dtype=np.int16)
-
-                # depth_image = self.moving_average_filter(depth_image)
-
-                # depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
-                # depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
-
-                # Validate that both frames are valid
-                if not aligned_depth_frame or not color_frame:
-                    continue
-
-                if self.num_frame < NUM_FRAMES_WAIT_INITIALIZING:
-                    continue
+                cv2.imshow('hands_depth', depth_image)
 
                 if self.calibration_mode:
                     self.display_mode_calibration(color_image)
                 else:
-                    if not self.background_model_available and NUM_FRAMES_WAIT_INITIALIZING < self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL + NUM_FRAMES_WAIT_INITIALIZING:
+                    if not self.background_model_available and self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL:
                         self.create_background_model(depth_image)
                         continue
                     else:
-
                         output_image = self.extract_arms(depth_image, color_image)
                         #output_image = self.perspective_transformation(output_image)
 
                         #cv2.imshow('depth', output_image)
 
-                key = cv2.waitKey(1)
-                # Press esc or 'q' to close the image window
-                if key & 0xFF == ord('q') or key == 27:
-                    cv2.destroyAllWindows()
-                    break
-                elif key == 99:  # C as in Calibrate
-                    self.last_mouse_click_coordinates = []  # Reset list
-                    self.calibration_mode = not self.calibration_mode
-        finally:
-            self.pipeline.stop()
+            key = cv2.waitKey(1)
+            # Press esc or 'q' to close the image window
+            if key & 0xFF == ord('q') or key == 27:
+                cv2.destroyAllWindows()
+                break
+            elif key == 99:  # C as in Calibrate
+                self.last_mouse_click_coordinates = []  # Reset list
+                self.calibration_mode = not self.calibration_mode
+
+        self.realsense.stop()
+        cv2.destroyAllWindows()
 
     def display_mode_calibration(self, color_image):
         print("In calibration mode")
@@ -404,6 +340,8 @@ class RealsenseD435Camera:
 
         significant_pixels[np.where((mark_touch_pixels == [255, 255, 255]).all(axis=2))] = [0, 0, 255]
         significant_pixels[np.where((mark_arm_pixels == [255, 255, 255]).all(axis=2))] = [0, 255, 0]
+
+        cv2.imshow('hands_depth', significant_pixels)
 
         #unique, counts = np.unique(significant_pixels, return_counts=True)
         #print(dict(zip(unique, counts)))
@@ -669,14 +607,9 @@ class RealsenseD435Camera:
 
 
 def main():
-    realsenseCamera = RealsenseD435Camera()
+    handTrackingV01 = HandTrackingV01()
     sys.exit()
 
 
 if __name__ == '__main__':
     main()
-
-
-
-# Crop depth data:
-#depth = depth[xmin_depth:xmax_depth,ymin_depth:ymax_depth].astype(float)
