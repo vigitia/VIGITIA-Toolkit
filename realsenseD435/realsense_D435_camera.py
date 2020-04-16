@@ -137,6 +137,14 @@ class RealsenseD435Camera():
                 self.color_image = color_image
                 self.depth_image = depth_image
 
+    # Convert the depth image into a numpy array where each pixel value corresponds to the measured distance in mm
+    def get_depth_image_mm(self, depth_image):
+        depth_image_mm = depth_image * self.depth_scale * 1000
+        depth_image_mm = np.array(depth_image_mm, dtype=np.uint16)
+
+        return depth_image_mm
+
+
     def get_frames(self):
         with self.read_lock:
             if self.color_image is not None and self.depth_image is not None:
