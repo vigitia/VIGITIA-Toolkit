@@ -7,6 +7,8 @@
 #   if interactions should be logged as well
 # If no movement present and time difference >  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> check difference
 
+# Only rectangle tables are currently supported
+
 import os
 import sys
 import time
@@ -20,21 +22,26 @@ from skimage.measure import compare_ssim
 from pathlib import Path
 import imutils
 
+from realsenseD435.realsense_D435_camera import RealsenseD435Camera
+
 # General constants
 WINDOW_NAME = 'VIGITIA_TABLE_STUDY'
 
 # Constants to fill out by the user
+USE_REALSENSE_D435_CAMERA = True
 CAMERA_ID = 1
 TABLE_NAME = 'Esstisch'
 TABLE_LENGTH_CM = 42
 TABLE_DEPTH_CM = 59
-FLIP_IMAGE_VERTICALLY = True
-FLIP_IMAGE_HORIZONTALLY = True
-MIN_TIME_BETWEEN_SAVED_FRAMES_SEC = 2
+FLIP_IMAGE_VERTICALLY = False
+FLIP_IMAGE_HORIZONTALLY = False
+MIN_TIME_BETWEEN_SAVED_FRAMES_SEC = 30
 MIN_TIME_WAIT_AFTER_MOVEMENT_SEC = 10
 MIN_DIFFERENCE_PERCENT_TO_SAVE = 5
 MIN_AREA_FOR_MOVEMENT_PX = 100
+MOVEMENT_THRESHOLD = 30  # Cutoff threshold for the difference image of two frames for movement detection
 MIN_BRIGHTNESS = 50  # Overall brightness of the image from 0 (completely black) to 255 (completely white)
+DEBUG_MODE = True
 
 
 class VigitiaTableStudy:
@@ -95,17 +102,21 @@ class VigitiaTableStudy:
                 self.last_mouse_click_coordinates = []
 
     def init_video_capture(self):
-        self.capture = cv2.VideoCapture(CAMERA_ID)
-        # self.capture.set(3, 1920)
-        # self.capture.set(4, 1080)
+        self.realsense = RealsenseD435Camera()
+        self.realsense.start()
+        #self.capture = cv2.VideoCapture(CAMERA_ID)
+        # self.capture.set(3, 1280)
+        # self.capture.set(4, 720)
         # self.capture.set(cv2.CAP_PROP_FPS, 1)
 
     def loop(self):
         while True:
             # Capture frame-by-frame
-            ret, frame = self.capture.read()
+            #ret, frame = self.capture.read()
+            frame, depth_image = self.realsense.get_frames()
 
-            if ret:
+            #if ret:
+            if frame is not None:
                 if self.calibration_mode:
                     self.display_mode_calibration(frame)
                 else:
@@ -183,6 +194,7 @@ class VigitiaTableStudy:
     def check_save_frame(self, frame):
         now = time.time()
 
+        # Init values at the beginning
         if self.last_frame is None:
             self.last_frame = frame
             self.last_saved_frame = frame
@@ -193,16 +205,19 @@ class VigitiaTableStudy:
         time_since_last_check_saving_frame = now - self.last_check_saving_frame_timestamp
         time_since_last_movement = now - self.last_movement_timestamp
 
+        # Don't save images at all if the room is too dark
         brightness = self.get_brightness_value(frame)
         if brightness < MIN_BRIGHTNESS:
             print('Too Dark')
             return False
 
+        # Check the image for current movement
         movement = self.detect_movement(frame)
 
         if movement:
             self.last_movement_timestamp = now
 
+        # Set the last stored frame to the current frame (needed the next time the code checks for movement)
         self.last_frame = frame
 
         if time_since_last_movement > MIN_TIME_WAIT_AFTER_MOVEMENT_SEC and \
@@ -210,6 +225,7 @@ class VigitiaTableStudy:
 
             self.last_check_saving_frame_timestamp = now
 
+            # Compare the difference between the last saved frame and the current frame
             difference = self.frame_difference(frame)
             if difference >= MIN_DIFFERENCE_PERCENT_TO_SAVE:
                 return True
@@ -217,7 +233,6 @@ class VigitiaTableStudy:
             return False
 
         cv2.imshow(WINDOW_NAME, frame)
-        #cv2.imwrite('test.png', frame)
 
     # https://stackoverflow.com/questions/14243472/estimate-brightness-of-an-image-opencv
     def get_brightness_value(self, frame):
@@ -236,34 +251,37 @@ class VigitiaTableStudy:
         # compute the absolute difference between the current frame and
         # first frame
         frameDelta = cv2.absdiff(grey_old, grey_new)
-        thresh = cv2.threshold(frameDelta, 50, 255, cv2.THRESH_BINARY)[1]
-        # dilate the thresholded image to fill in holes, then find contours
-        # on thresholded image
+        thresh = cv2.threshold(frameDelta, MOVEMENT_THRESHOLD, 255, cv2.THRESH_BINARY)[1]
+        # dilate the thresholded image to fill in holes, then find contours on thresholded image
         thresh = cv2.dilate(thresh, None, iterations=2)
 
-        cv2.imshow('thresh', thresh)
+        if DEBUG_MODE:
+            cv2.imshow('thresh', thresh)
 
-        cnts = cv2.findContours(thresh.copy(), cv2.RETR_LIST,
-                                cv2.CHAIN_APPROX_SIMPLE)
-        cnts = imutils.grab_contours(cnts)
+        contours = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = imutils.grab_contours(contours)
 
         movement = False
 
+        frame_show_movement = frame.copy()
+
         # loop over the contours
-        for c in cnts:
+        for contour in contours:
             # if the contour is too small, ignore it
-            if cv2.contourArea(c) >= MIN_AREA_FOR_MOVEMENT_PX:
-                (x, y, w, h) = cv2.boundingRect(c)
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            if cv2.contourArea(contour) >= MIN_AREA_FOR_MOVEMENT_PX:
+                (x, y, w, h) = cv2.boundingRect(contour)
+                cv2.rectangle(frame_show_movement, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 movement = True
 
         if movement:
             print('Movement detected')
 
-        cv2.imshow('movement', frame)
+        if DEBUG_MODE:
+            cv2.imshow('movement', frame_show_movement)
+
         return movement
 
-    # https://www.pyimagesearch.com/2017/06/19/image-difference-with-opencv-and-python/
+    # Based on https://www.pyimagesearch.com/2017/06/19/image-difference-with-opencv-and-python/
     def frame_difference(self, frame):
         grey_new = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         grey_old = cv2.cvtColor(self.last_saved_frame, cv2.COLOR_BGR2GRAY)
@@ -279,7 +297,8 @@ class VigitiaTableStudy:
         diff = np.where(diff < 255, 0, diff)
         diff = cv2.bitwise_not(diff)
 
-        cv2.imshow('diff', diff)
+        if DEBUG_MODE:
+            cv2.imshow('Areas of detected difference', diff)
 
         difference = int((np.sum(diff == 255) / diff.size) * 100)
         print('Difference:', difference, '%')
@@ -287,15 +306,16 @@ class VigitiaTableStudy:
         return difference
 
     def save_frame(self, frame_table, frame_full):
+        print('SAVING FRAME!')
 
         self.last_saved_frame = frame_table
 
         frame_full = self.flip_image(frame_full)
 
-        print('SAVING FRAME!')
         now = datetime.datetime.now()
         folder_name = str(now.date())
 
+        # Create folder if it does not exist yet
         Path(os.path.join(TABLE_NAME, folder_name)).mkdir(parents=True, exist_ok=True)
 
         time_string = now.strftime('%Y-%m-%d_%H-%M-%S-%f')[:-4]
@@ -326,10 +346,11 @@ class VigitiaTableStudy:
         new_height = int((frame.shape[1] / x) * y)
         frame = cv2.resize(frame, (new_height, new_width), interpolation=cv2.INTER_AREA)
 
-        self.flip_image(frame)
+        frame = self.flip_image(frame)
 
         return frame
 
+    # To save the image in the correct orientation (even if the camera is rotated)
     def flip_image(self, frame):
         if FLIP_IMAGE_HORIZONTALLY:
             frame = cv2.flip(frame, 1)
@@ -338,13 +359,13 @@ class VigitiaTableStudy:
 
         return frame
 
-
+    # Calculate the aspect ratio of the table to save images after perspective transformation without distortion
     # Method taken from: https://gist.github.com/Integralist/4ca9ff94ea82b0e407f540540f1d8c6c
     def calculate_aspect_ratio(self, width: int, height: int):
         temp = 0
 
         def gcd(a, b):
-            """The GCD (greatest common divisor) is the highest number that evenly divides both width and height."""
+            # The GCD (greatest common divisor) is the highest number that evenly divides both width and height.
             return a if b == 0 else gcd(b, a % b)
 
         if width == height:
@@ -361,8 +382,6 @@ class VigitiaTableStudy:
         y = int(height / divisor) if not temp else int(width / divisor)
 
         return x, y
-
-
 
 
 def main():
