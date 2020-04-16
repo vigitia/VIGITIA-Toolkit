@@ -32,6 +32,8 @@ NUM_FRAMES_FOR_BACKGROUND_MODEL = 50
 
 COLOR_REMOVED_BACKGROUND = [64, 177, 0]  # Chroma Green
 
+DEBUG_MODE = False
+
 
 class HandTrackingV01:
 
@@ -70,7 +72,7 @@ class HandTrackingV01:
         self.realsense.start()
 
         # We will be removing the background of objects more than clipping_distance_in_meters meters away
-        self.clipping_distance = DISTANCE_CAMERA_TABLE / self.depth_scale
+        #self.clipping_distance = DISTANCE_CAMERA_TABLE / self.depth_scale
 
         self.read_config_file()
         self.init_opencv()
@@ -266,6 +268,7 @@ class HandTrackingV01:
         # Go back to default display mode
         self.calibration_mode = False
 
+    # TODO: Check differences between camera and table aspect ratio
     # Based on: https://www.youtube.com/watch?v=PtCQH93GucA
     def perspective_transformation(self, frame):
         x = frame.shape[1]
@@ -291,7 +294,7 @@ class HandTrackingV01:
 
     def extract_arms(self, depth_image, color_image):
 
-        if self.num_frame == 200:
+        if DEBUG_MODE and self.num_frame == 200:
             print("Writing files")
             cv2.imwrite('depth_image.png', depth_image)
             cv2.imwrite('color_image.png', color_image)
@@ -457,7 +460,9 @@ class HandTrackingV01:
         # See: https://www.youtube.com/watch?v=xML2S6bvMwI
         dist = cv2.distanceTransform(fgmask, cv2.DIST_L2, 3)
         minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(dist)
-        cv2.circle(color_image, maxLoc, int(maxVal), [255, 255, 255], -1)
+
+        if DEBUG_MODE:
+            cv2.circle(color_image, maxLoc, int(maxVal), [255, 255, 255], -1)
 
 
         if len(contours) > 0:
@@ -480,9 +485,11 @@ class HandTrackingV01:
 
             contours = arm_candidates
             if len(contours) > 0:
-                cv2.drawContours(color_image, contours, -1, (255, 0, 0), 3)
-                # Draw largest contour in a different color
-                cv2.drawContours(color_image, [contours[0]], 0, (50, 50, 50), 2)
+
+                if DEBUG_MODE:
+                    cv2.drawContours(color_image, contours, -1, (255, 0, 0), 3)
+                    # Draw largest contour in a different color
+                    cv2.drawContours(color_image, [contours[0]], 0, (50, 50, 50), 2)
 
                 #max_contour = contours[0]
 
@@ -490,7 +497,7 @@ class HandTrackingV01:
                     hull, center_point, finger_candidates, inner_points, starts, ends = self.get_candidate_points(contour)
 
                     #cv2.drawContours(color_image, [hull], 0, (0, 255, 0), 2)
-                    cv2.circle(color_image, center_point, 5, [255, 255, 255], -1)
+                    #cv2.circle(color_image, center_point, 5, [255, 255, 255], -1)
                     for i in range(len(finger_candidates)):
                         current_point = finger_candidates[i]
                         touch_state = self.get_touch_state(current_point, depth_image)
@@ -501,11 +508,12 @@ class HandTrackingV01:
                             #print("Dist: ", distance_between_points)
                             #if distance_between_points < 200: # TODO: Tweak value by calculating real world values
                             #    cv2.line(color_image, current_point, next_point, [255, 0, 0], 2)
-                    for i in range(len(inner_points)):
-                        distance_between_points = distance.euclidean(starts[i], inner_points[i])
-                        cv2.circle(color_image, inner_points[i], 5, [0, 255, 255], -1)
-                        cv2.line(color_image, starts[i], inner_points[i], [255, 0, 0], 2)
-                        cv2.line(color_image, ends[i], inner_points[i], [127, 0, 0], 2)
+                    if DEBUG_MODE:
+                        for i in range(len(inner_points)):
+                            distance_between_points = distance.euclidean(starts[i], inner_points[i])
+                            cv2.circle(color_image, inner_points[i], 5, [0, 255, 255], -1)
+                            cv2.line(color_image, starts[i], inner_points[i], [255, 0, 0], 2)
+                            cv2.line(color_image, ends[i], inner_points[i], [127, 0, 0], 2)
 
         color_image = self.perspective_transformation(color_image)
         cv2.imshow('realsense', color_image)
