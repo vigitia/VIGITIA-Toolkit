@@ -18,21 +18,17 @@ RGB_FPS = 60
 
 NUM_FRAMES_WAIT_INITIALIZING = 100  # Let the camera warm up and let the auto white balance adjust
 
+# TODO: Add Debug mode
+# TODO: Show that camera is initializing
 
-class RealsenseD435Camera():
+
+class RealsenseD435Camera:
 
     num_frame = 0
 
     pipeline = None
     align = None
     colorizer = None
-
-    hole_filling_filter = None
-    decimation_filter = None
-    spacial_filter = None
-    temporal_filter = None
-    disparity_to_depth_filter = None
-    depth_to_disparity_filter = None
 
     color_image = None
     depth_image = None
@@ -92,15 +88,18 @@ class RealsenseD435Camera():
             return None
         else:
             self.started = True
-            thread = threading.Thread(target=self.update, args=())
+            self.thread = threading.Thread(target=self.update, args=())
             # thread.daemon = True
-            thread.start()
+            self.thread.start()
             return self
 
     def update(self):
+        print('[RealSense D435] Skip first ' + str(NUM_FRAMES_WAIT_INITIALIZING) +
+              ' frames to allow Auto White Balance to adjust')
+
         while self.started:
             self.num_frame += 1
-            print('Frame: ', self.num_frame)
+            #print('Frame: ', self.num_frame)
 
             # Get frameset of color and depth
             frames = self.pipeline.wait_for_frames()
@@ -118,6 +117,8 @@ class RealsenseD435Camera():
 
             if self.num_frame < NUM_FRAMES_WAIT_INITIALIZING:
                 continue
+            elif self.num_frame == NUM_FRAMES_WAIT_INITIALIZING:
+                print('[RealSense D435] Camera ready')
 
             # Apply Filters
             # aligned_depth_frame = self.hole_filling_filter.process(aligned_depth_frame)
@@ -125,13 +126,9 @@ class RealsenseD435Camera():
             # aligned_depth_frame = self.temporal_filter.process(aligned_depth_frame)
 
             color_image = np.asanyarray(color_frame.get_data())
-            # depth_image = np.asanyarray(aligned_depth_frame.get_data())
-            depth_image = np.array(aligned_depth_frame.get_data(), dtype=np.int16)
-
-            # depth_image = self.moving_average_filter(depth_image)
-
-            # depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
-            # depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
+            depth_image = np.array(aligned_depth_frame.get_data(), dtype=np.uint16)
+            depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
+            depth_image_mm = self.get_depth_image_mm(depth_image)
 
             with self.read_lock:
                 self.color_image = color_image
