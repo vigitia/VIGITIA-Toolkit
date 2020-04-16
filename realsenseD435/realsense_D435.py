@@ -16,9 +16,9 @@ from realsenseD435.realsense_D435_camera import RealsenseD435Camera
 # TODO: Calculate in calibration phase
 DISTANCE_CAMERA_TABLE = 0.69  # m
 
-MIN_DIST_TOUCH = 0.003  # m
-DIST_HOVERING = 0.01  # m
-MAX_DIST_TOUCH = 0.05  # m
+MIN_DIST_TOUCH = 3  # mm
+DIST_HOVERING = 10  # mm
+MAX_DIST_TOUCH = 50  # mm
 
 # Camera Settings
 DEPTH_RES_X = 848
@@ -68,7 +68,6 @@ class HandTrackingV01:
 
         self.realsense = RealsenseD435Camera()
         self.realsense.start()
-        self.depth_scale = self.realsense.get_depth_scale()
 
         # We will be removing the background of objects more than clipping_distance_in_meters meters away
         self.clipping_distance = DISTANCE_CAMERA_TABLE / self.depth_scale
@@ -302,16 +301,16 @@ class HandTrackingV01:
 
         remove_uncertain_pixels = difference_to_background - self.background_standard_deviation
         remove_uncertain_pixels = np.where(remove_uncertain_pixels < 0, 0, difference_to_background)
-        remove_uncertain_pixels = np.where((remove_uncertain_pixels < MIN_DIST_TOUCH / self.depth_scale), 0, remove_uncertain_pixels)
+        remove_uncertain_pixels = np.where((remove_uncertain_pixels < MIN_DIST_TOUCH), 0, remove_uncertain_pixels)
 
         depth_holes = np.where(depth_image == 0, 0, 65535)
         remove_uncertain_pixels = np.where(depth_holes == 0, 0, remove_uncertain_pixels)
 
         # Arm pixels are pixels at least MAX_DIST_TOUCH away from the the background mean
-        mark_arm_pixels = np.where((remove_uncertain_pixels > MAX_DIST_TOUCH / self.depth_scale), 65535, 0)
+        mark_arm_pixels = np.where((remove_uncertain_pixels > MAX_DIST_TOUCH), 65535, 0)
         mark_arm_pixels = cv2.convertScaleAbs(mark_arm_pixels, alpha=(255.0 / 65535.0))
 
-        mark_touch_pixels = np.where((remove_uncertain_pixels >= MAX_DIST_TOUCH / self.depth_scale), 0, remove_uncertain_pixels)
+        mark_touch_pixels = np.where((remove_uncertain_pixels >= MAX_DIST_TOUCH), 0, remove_uncertain_pixels)
         mark_touch_pixels = np.where(mark_touch_pixels != 0, 65535, 0)
         mark_touch_pixels = cv2.convertScaleAbs(mark_touch_pixels, alpha=(255.0 / 65535.0))
 
@@ -320,7 +319,7 @@ class HandTrackingV01:
         #    cv2.imwrite('mark_arm_pixels.png', mark_arm_pixels)
         #    cv2.imwrite('mark_touch_pixels.png', mark_touch_pixels)
 
-        remove_uncertain_pixels = np.where((remove_uncertain_pixels >= MIN_DIST_TOUCH / self.depth_scale), 65535, 0)
+        remove_uncertain_pixels = np.where((remove_uncertain_pixels >= MIN_DIST_TOUCH), 65535, 0)
         remove_uncertain_pixels = cv2.convertScaleAbs(remove_uncertain_pixels, alpha=(255.0/65535.0))
 
         small_regions = self.remove_small_connected_regions(remove_uncertain_pixels, 10000, True)
@@ -569,18 +568,17 @@ class HandTrackingV01:
         try:
             highest_point = np.amin(neighboring_pixels_current)
             max_distance = abs(np.mean(neighboring_pixels_stored) - highest_point)
-            if max_distance <= (DIST_HOVERING / self.depth_scale):
+            if max_distance <= DIST_HOVERING:
                 print('TOUCH!')
                 return [113, 204, 46]
-            elif max_distance <= (MAX_DIST_TOUCH / self.depth_scale):
+            elif max_distance <= MAX_DIST_TOUCH:
                 print('HOVER')
                 return [18, 156, 243]
             else:
                 print('NO TOUCH OR HOVER')
                 return [60, 76, 231]
         except ValueError:
-            return [0,0,0]
-
+            return [0, 0, 0]
 
     def compare_to_background_model(self, depth_image):
         #depth_image = np.where((abs(self.average_background - depth_image) < 300, 0, depth_image))
