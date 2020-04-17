@@ -11,7 +11,7 @@ import configparser
 from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
 from scipy.spatial import distance
 
-from realsenseD435.realsense_D435_camera import RealsenseD435Camera
+from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
 
 # TODO: Calculate in calibration phase
 DISTANCE_CAMERA_TABLE = 0.69  # m
