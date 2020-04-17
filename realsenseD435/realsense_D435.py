@@ -1,4 +1,5 @@
-# Built upon: https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/align-depth2color.py
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import pyrealsense2 as rs
 import numpy as np
@@ -10,7 +11,6 @@ import configparser
 from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
 from scipy.spatial import distance
 
-from hand_tracking.hand_tracking_controller import HandTrackingController
 from realsenseD435.realsense_D435_camera import RealsenseD435Camera
 
 # TODO: Calculate in calibration phase
@@ -52,8 +52,6 @@ class HandTrackingV01:
     stored_color_frame = None
     stored_depth_frame = None
 
-    hand_tracking_contoller = None
-
     background_model_available = False
     calibration_mode = False
 
@@ -80,8 +78,6 @@ class HandTrackingV01:
         self.read_config_file()
         self.init_opencv()
         self.init_background_model()
-
-        self.hand_tracking_contoller = HandTrackingController()
 
         self.loop()
 
@@ -452,6 +448,19 @@ class HandTrackingV01:
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, 2)
 
+        # Remove all points outside of the border
+        table_border = np.array([self.table_corner_top_left, self.table_corner_top_right,
+                                 self.table_corner_bottom_right, self.table_corner_bottom_left])
+
+        table_mask = np.zeros(shape=(fgmask.shape), dtype=np.uint8)
+        cv2.fillPoly(table_mask, pts =[table_border], color=(255))
+
+        fgmask = np.where(table_mask == 0, 0, fgmask)
+
+
+        cv2.imshow('fgmask', fgmask)
+        cv2.imshow('table_mask', table_mask)
+
         contours, hierarchy = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         # Extract the 10 largest contours (more should never be needed)
@@ -459,23 +468,7 @@ class HandTrackingV01:
 
         # TODO: Fill holes if needed
 
-        # TODO: Find minimum inscribing circle for Hand detection
-        # See: https://stackoverflow.com/questions/53646022/opencv-c-find-inscribing-circle-of-a-contour
-        # See: https://www.youtube.com/watch?v=xML2S6bvMwI
-        dist = cv2.distanceTransform(fgmask, cv2.DIST_L2, 3)
-        minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(dist)
-
-        center_point = maxLoc
-        radius = int(maxVal)
-
-        #if DEBUG_MODE:
-        cv2.circle(color_image, center_point, radius, [255, 255, 255], 3)
-
-
         if len(contours) > 0:
-            # Remove all points outside of the border
-            table_border = np.array([self.table_corner_top_left, self.table_corner_top_right,
-                                     self.table_corner_bottom_right, self.table_corner_bottom_left])
 
             arm_candidates = []
             for contour in contours:
@@ -487,7 +480,7 @@ class HandTrackingV01:
                         connected_to_table_border = True
 
                 if connected_to_table_border:
-                    print("Contour connected to table border")
+                    #print("Contour connected to table border")
                     arm_candidates.append(contour)
 
             contours = arm_candidates
@@ -501,21 +494,46 @@ class HandTrackingV01:
                 #max_contour = contours[0]
 
                 for contour in contours:
+
+                    contour_mask = np.zeros(shape=(fgmask.shape), dtype=np.uint8)
+                    cv2.fillPoly(contour_mask, pts=[contour], color=(255))
+
+
+                    # Find minimum inscribing circle for Hand detection
+                    # See: https://stackoverflow.com/questions/53646022/opencv-c-find-inscribing-circle-of-a-contour
+                    # See: https://www.youtube.com/watch?v=xML2S6bvMwI
+                    # TODO: Do this for each contour
+                    dist = cv2.distanceTransform(contour_mask, cv2.DIST_L2, 3)
+                    minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(dist)
+                    center_point_palm = maxLoc
+                    palm_radius = int(maxVal)
+
+                    # if DEBUG_MODE:
+                    cv2.circle(color_image, center_point_palm, palm_radius, [255, 255, 255], 3)
+
+
                     hull, center_point, finger_candidates, inner_points, starts, ends = self.get_candidate_points(contour)
 
                     #cv2.drawContours(color_image, [hull], 0, (0, 255, 0), 2)
                     #cv2.circle(color_image, center_point, 5, [255, 255, 255], -1)
                     for i in range(len(finger_candidates)):
                         current_point = finger_candidates[i]
-                        touch_state = self.get_touch_state(current_point, depth_image)
-                        cv2.circle(color_image, current_point, 10, touch_state, 2)
-                        cv2.line(color_image, current_point, center_point, [255, 0, 0], 2)
-                        # TODO: Check if distance between points is realistic
-                        if i < len(finger_candidates) - 1:
-                            next_point = finger_candidates[i+1]
-                            #print("Dist: ", distance_between_points)
-                            #if distance_between_points < 200: # TODO: Tweak value by calculating real world values
-                            #    cv2.line(color_image, current_point, next_point, [255, 0, 0], 2)
+                        # Check if point is inside the table border
+                        if cv2.pointPolygonTest(table_border, current_point, False) > 0:
+                            touch_state = self.get_touch_state(current_point, depth_image)
+                            cv2.circle(color_image, current_point, 10, touch_state, 2)
+
+                            distance_between_points = distance.euclidean(center_point_palm, current_point)
+                            if distance_between_points > 1.5 * palm_radius:
+                                cv2.line(color_image, current_point, center_point_palm, [0, 255, 0], 2)
+                            else:
+                                cv2.line(color_image, current_point, center_point_palm, [255, 0, 0], 2)
+                            # TODO: Check if distance between points is realistic
+                            if i < len(finger_candidates) - 1:
+                                next_point = finger_candidates[i+1]
+                                #print("Dist: ", distance_between_points)
+                                #if distance_between_points < 200: # TODO: Tweak value by calculating real world values
+                                #    cv2.line(color_image, current_point, next_point, [255, 0, 0], 2)
                     if DEBUG_MODE:
                         for i in range(len(inner_points)):
                             distance_between_points = distance.euclidean(starts[i], inner_points[i])
@@ -523,7 +541,7 @@ class HandTrackingV01:
                             cv2.line(color_image, starts[i], inner_points[i], [255, 0, 0], 2)
                             cv2.line(color_image, ends[i], inner_points[i], [127, 0, 0], 2)
 
-        color_image = self.perspective_transformation(color_image)
+        #color_image = self.perspective_transformation(color_image)
         cv2.imshow('realsense', color_image)
 
         return fgmask
