@@ -38,7 +38,7 @@ COLOR_REMOVED_BACKGROUND = [64, 177, 0]  # Chroma Green
 DEBUG_MODE = False
 
 
-class HandTrackingV01:
+class VigitiaHandTracker:
 
     depth_scale = -1
     clipping_distance = -1
@@ -638,7 +638,7 @@ class HandTrackingV01:
 
 
 def main():
-    handTrackingV01 = HandTrackingV01()
+    vigitiaHandTracker = VigitiaHandTracker()
     sys.exit()
 
 

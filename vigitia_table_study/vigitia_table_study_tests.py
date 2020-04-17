@@ -6,9 +6,10 @@ import cv2
 import imutils
 import sys
 
+# TODO: Calculate in calibration phase
+DISTANCE_CAMERA_TABLE = 1.25  # m
 
-DISTANCE_CAMERA_TABLE = 1.22  # m
-
+# Values taken from Paper "DIRECT"
 MIN_DIST_TOUCH = 0.003  # m
 MAX_DIST_TOUCH = 0.05  # m
 
@@ -17,16 +18,16 @@ DEPTH_RES_X = 848
 DEPTH_RES_Y = 480
 RGB_RES_X = 848
 RGB_RES_Y = 480
-
 DEPTH_FPS = 60
 RGB_FPS = 60
 
-NUM_FRAMES_WAIT_INITIALIZING = 100
+NUM_FRAMES_WAIT_INITIALIZING = 100  # Let the camera warm up and let the auto white balance adjust
 NUM_FRAMES_FOR_BACKGROUND_MODEL = 10
 
 COLOR_REMOVED_BACKGROUND = [64, 177, 0]  # Chroma Green
 
-class RealsenseD435Camera():
+
+class RealsenseD435Camera:
 
     depth_scale = -1
     clipping_distance = -1
@@ -57,13 +58,11 @@ class RealsenseD435Camera():
         # Create a pipeline
         self.pipeline = rs.pipeline()
 
-        # Create a config and configure the pipeline to stream
-        #  different resolutions of color and depth streams
+        # Create a config and configure the pipeline to stream different resolutions of color and depth streams
         config = rs.config()
         config.enable_stream(rs.stream.depth, DEPTH_RES_X, DEPTH_RES_Y, rs.format.z16, DEPTH_FPS)
         config.enable_stream(rs.stream.color, RGB_RES_X, RGB_RES_Y, rs.format.bgr8, RGB_FPS)
 
-        # Start streaming
         profile = self.pipeline.start(config)
 
         # Getting the depth sensor's depth scale (see rs-align example for explanation)
@@ -85,8 +84,7 @@ class RealsenseD435Camera():
         self.decimation_filter = rs.decimation_filter()
         self.temporal_filter = rs.temporal_filter()
 
-        # We will be removing the background of objects more than
-        #  clipping_distance_in_meters meters away
+        # We will be removing the background of objects more than clipping_distance_in_meters meters away
         self.clipping_distance = DISTANCE_CAMERA_TABLE / self.depth_scale
 
         #self.init_opencv()
@@ -95,10 +93,12 @@ class RealsenseD435Camera():
         self.loop()
 
     def init_opencv(self):
+        # TODO: let application run in fullscreen
         #cv2.namedWindow("realsense", cv2.WND_PROP_FULLSCREEN)
         #cv2.setWindowProperty("window", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
         cv2.namedWindow('realsense', cv2.WINDOW_AUTOSIZE)
 
+    # The colorizer can colorize depth images
     def init_colorizer(self):
         self.colorizer = rs.colorizer()
         self.colorizer.set_option(rs.option.color_scheme, 0)   # Define the color scheme
@@ -149,8 +149,6 @@ class RealsenseD435Camera():
                 # Get frameset of color and depth
                 frames = self.pipeline.wait_for_frames()
 
-                if self.num_frame < NUM_FRAMES_WAIT_INITIALIZING:
-                    continue
 
                 # Align the depth frame to color frame
                 aligned_frames = self.align.process(frames)
@@ -170,6 +168,8 @@ class RealsenseD435Camera():
                 depth_image = np.array(aligned_depth_frame.get_data(), dtype=np.int16)
                 depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
 
+                if self.num_frame < NUM_FRAMES_WAIT_INITIALIZING:
+                    continue
                 #if NUM_FRAMES_WAIT_INITIALIZING < self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL + NUM_FRAMES_WAIT_INITIALIZING:
                 #    self.create_background_model(depth_image, color_image)
                 #    continue
@@ -281,7 +281,7 @@ class RealsenseD435Camera():
         self.background_substractor(color_image)
 
         cv2.imshow('rgb -> grey', areas_of_interest_grey)
-        cv2.imshow('value', areas_of_interest_value)
+        cv2.imshow('hue', areas_of_interest_hue)
         cv2.imshow('l', areas_of_interest_l)
 
         return areas_of_interest_grey
@@ -298,8 +298,6 @@ class RealsenseD435Camera():
         color_image[np.where((fgmask == [0, 0, 0]).all(axis=2))] = [0, 0, 0]
 
         cv2.imshow('fgmask', color_image)
-
-
 
     def get_areas_of_interest(self, grey_image, stored_grey_image, color_image):
         gaussian_blured_image = cv2.GaussianBlur(grey_image, (21, 21), 0)
