@@ -1,3 +1,0 @@
-TODO: Remove this files and link to the GitHub Repo where they are from:
-
-https://github.com/metalwhale/hand_tracking/
