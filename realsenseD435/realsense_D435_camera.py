@@ -4,6 +4,9 @@
 # Code parts for asynchronous video capture taken from
 # http://blog.blitzblit.com/2017/12/24/asynchronous-video-capture-in-python-with-opencv/
 
+# Code parts for the RealSense Camera taken from
+# https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/align-depth2color.py
+
 import pyrealsense2 as rs
 import numpy as np
 import threading
@@ -16,10 +19,13 @@ RGB_RES_Y = 480
 DEPTH_FPS = 60
 RGB_FPS = 60
 
+COLORIZER_MIN_DISTANCE = 0.5  # m
+COLORIZER_MAX_DISTANCE = 1.5  # m
+
 NUM_FRAMES_WAIT_INITIALIZING = 100  # Let the camera warm up and let the auto white balance adjust
 
+DEBUG_MODE = False
 # TODO: Add Debug mode
-# TODO: Show that camera is initializing
 
 
 class RealsenseD435Camera:
@@ -52,8 +58,8 @@ class RealsenseD435Camera:
         self.depth_scale = depth_sensor.get_depth_scale()
         print("Depth scale", self.depth_scale)
 
-        # TODO: Tweak camera settings
-        depth_sensor.set_option(rs.option.laser_power, 360)
+        # TODO: Allow settings to be changed on initializing the function
+        depth_sensor.set_option(rs.option.laser_power, 360)  # 0 - 360
         depth_sensor.set_option(rs.option.depth_units, 0.001)  # Number of meters represented by a single depth unit
 
         # Create an align object
@@ -79,8 +85,8 @@ class RealsenseD435Camera:
         self.colorizer.set_option(rs.option.color_scheme, 0)  # Define the color scheme
         # Auto histogram color selection (0 = off, 1 = on)
         self.colorizer.set_option(rs.option.histogram_equalization_enabled, 0)
-        self.colorizer.set_option(rs.option.min_distance, 0.5)  # meter
-        self.colorizer.set_option(rs.option.max_distance, 1.3)  # meter
+        self.colorizer.set_option(rs.option.min_distance, COLORIZER_MIN_DISTANCE)  # meter
+        self.colorizer.set_option(rs.option.max_distance, COLORIZER_MAX_DISTANCE)  # meter
 
     def start(self):
         if self.started:
@@ -99,7 +105,8 @@ class RealsenseD435Camera:
 
         while self.started:
             self.num_frame += 1
-            #print('Frame: ', self.num_frame)
+            if DEBUG_MODE:
+                print('[RealSense D435] Frame: ', self.num_frame)
 
             # Get frameset of color and depth
             frames = self.pipeline.wait_for_frames()
@@ -127,20 +134,23 @@ class RealsenseD435Camera:
 
             color_image = np.asanyarray(color_frame.get_data())
             depth_image = np.array(aligned_depth_frame.get_data(), dtype=np.uint16)
-            depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
             depth_image = self.get_depth_image_mm(depth_image)
+            depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
 
             with self.read_lock:
                 self.color_image = color_image
                 self.depth_image = depth_image
 
     # Convert the depth image into a numpy array where each pixel value corresponds to the measured distance in mm
+    # This conversion only works if the depth units are set to 0.001
     def get_depth_image_mm(self, depth_image):
         depth_image_mm = depth_image.copy() * self.depth_scale * 1000
         depth_image_mm = np.array(depth_image_mm, dtype=np.uint16)
 
         return depth_image_mm
 
+    # Returns the requested camera frames
+    # TODO: Return only the frames that are requested via params
     def get_frames(self):
         with self.read_lock:
             if self.color_image is not None and self.depth_image is not None:
