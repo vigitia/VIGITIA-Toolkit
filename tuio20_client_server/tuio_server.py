@@ -26,6 +26,7 @@ class TUIOServer:
 
     def __init__(self):
         self.udp_client = udp_client.SimpleUDPClient(IP, PORT)
+        self.start_time_ms = int(round(time.time() * 1000))
         #self.send_test()
         #self.start_tuio_bundle()
 
@@ -102,7 +103,8 @@ class TUIOServer:
         self.current_tuio_frame_bundle = osc_bundle_builder.OscBundleBuilder(osc_bundle_builder.IMMEDIATELY)
 
         self.current_frame_id += 1
-        frame_time_tag = int(round(time.time() * 1000))
+        time_now_ms = int(round(time.time() * 1000))
+        frame_time_tag = time_now_ms - self.start_time_ms
 
         frame_message = osc_message_builder.OscMessageBuilder(address="/tuio2/frm")
         frame_message.add_arg(self.current_frame_id)  # f_id
@@ -115,7 +117,7 @@ class TUIOServer:
         alive_message = osc_message_builder.OscMessageBuilder(address="/tuio2/alv")
         # TODO: Add a list of all active session IDs to the alive message
         alive_message.add_arg(0)
-        alive_message.add_content(alive_message.build())
+        self.current_tuio_frame_bundle.add_content(alive_message.build())
 
         self.udp_client.send(self.current_tuio_frame_bundle.build())
 
