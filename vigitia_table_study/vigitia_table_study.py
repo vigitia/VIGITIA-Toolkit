@@ -28,29 +28,29 @@ from skimage.measure import compare_ssim
 from pathlib import Path
 import imutils
 
-from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
+# from realsense_D435_camera import RealsenseD435Camera
 
 # General constants
 WINDOW_NAME = 'VIGITIA_TABLE_STUDY'
 
 # Constants to fill out by the user
-USE_REALSENSE_D435_CAMERA = True  # Select whether the INTEL REALSENSE D435 camera or a generic webcam should be used
+USE_REALSENSE_D435_CAMERA = False  # Select whether the INTEL REALSENSE D435 camera or a generic webcam should be used
 CAMERA_ID = 1  # IF USE_REALSENSE_D435_CAMERA == False, select the camera ID for Opencv video capture
 CAMERA_RESOLUTION_X = 1280
 CAMERA_RESOLUTION_Y = 720
-CAMERA_FPS = 30
+CAMERA_FPS = 10
 TABLE_NAME = 'Esstisch'  # This name is used for the filenames of the saved images
 TABLE_LENGTH_CM = 41  # Length and depth of the table are used to store the images distortion free in the correct aspect
 TABLE_DEPTH_CM = 57   # ratio after perspective transformation
-FLIP_IMAGE_VERTICALLY = False  # If images are not saved in the correct orientation, this can be fixed here
-FLIP_IMAGE_HORIZONTALLY = False
+FLIP_IMAGE_VERTICALLY = True  # If images are not saved in the correct orientation, this can be fixed here
+FLIP_IMAGE_HORIZONTALLY = True
 MIN_TIME_BETWEEN_SAVED_FRAMES_SEC = 30  # Minimum distance between two saved frames in seconds
 MIN_TIME_WAIT_AFTER_MOVEMENT_SEC = 10  # Minimum time to wait
 MIN_DIFFERENCE_PERCENT_TO_SAVE = 5  # If the current image is at least X % different from the last saved image -> save
 MIN_AREA_FOR_MOVEMENT_PX = 100  # An area where movement is detected needs to be at least XXX pixels in size
 MOVEMENT_THRESHOLD = 30  # Cutoff threshold for the difference image of two frames for movement detection
 MIN_BRIGHTNESS = 50  # Overall brightness of the image from 0 (completely black) to 255 (completely white)
-DEBUG_MODE = True  # If Debug mode is on, more data is displayed
+DEBUG_MODE = False  # If Debug mode is on, more data is displayed
 DIFFERCENCE_CUTOFF_VALUE = 220
 
 
@@ -74,7 +74,6 @@ class VigitiaTableStudy:
     def __init__(self):
 
         self.read_config_file()
-        self.init_opencv()
         self.init_video_capture()
 
         self.loop()
@@ -83,7 +82,6 @@ class VigitiaTableStudy:
     def read_config_file(self):
         config = configparser.ConfigParser()
         config.read('config.ini')
-        print(config.sections())
 
         if len(config.sections()) > 0:
             # Coordinates of table corners for perspective transformation
@@ -95,7 +93,8 @@ class VigitiaTableStudy:
             print('Successfully read data from config file')
             self.calibration_mode = False
         else:
-            print('Error reading data from config file')
+            print('No config file found. Create a new one and entering calibration mode')
+            self.init_opencv()
             self.calibration_mode = True
 
     def init_opencv(self):
@@ -181,6 +180,8 @@ class VigitiaTableStudy:
             self.update_table_corner_calibration()
 
         cv2.imshow(WINDOW_NAME, frame)
+        if self.calibration_mode == False:
+            cv2.destroyWindow(WINDOW_NAME)
 
     def update_table_corner_calibration(self):
         # Order coordinates by x value
@@ -255,7 +256,8 @@ class VigitiaTableStudy:
 
             return False
 
-        cv2.imshow(WINDOW_NAME, frame)
+        if DEBUG_MODE:
+            cv2.imshow(WINDOW_NAME, frame)
 
     # Get an value for the overall brightness of the image. We dont want to save images that are too dark to be useful
     # https://stackoverflow.com/questions/14243472/estimate-brightness-of-an-image-opencv
