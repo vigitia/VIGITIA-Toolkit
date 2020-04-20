@@ -29,13 +29,14 @@ from pathlib import Path
 import imutils
 
 # from realsense_D435_camera import RealsenseD435Camera
+from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
 
 # General constants
 WINDOW_NAME = 'VIGITIA_TABLE_STUDY'
 
 # Constants to fill out by the user
-USE_REALSENSE_D435_CAMERA = False  # Select whether the INTEL REALSENSE D435 camera or a generic webcam should be used
-CAMERA_ID = 1  # IF USE_REALSENSE_D435_CAMERA == False, select the camera ID for Opencv video capture
+USE_REALSENSE_D435_CAMERA = True  # Select whether the INTEL REALSENSE D435 camera or a generic webcam should be used
+CAMERA_ID = 0  # IF USE_REALSENSE_D435_CAMERA == False, select the camera ID for Opencv video capture
 CAMERA_RESOLUTION_X = 1280
 CAMERA_RESOLUTION_Y = 720
 CAMERA_FPS = 10
@@ -50,7 +51,7 @@ MIN_DIFFERENCE_PERCENT_TO_SAVE = 5  # If the current image is at least X % diffe
 MIN_AREA_FOR_MOVEMENT_PX = 100  # An area where movement is detected needs to be at least XXX pixels in size
 MOVEMENT_THRESHOLD = 30  # Cutoff threshold for the difference image of two frames for movement detection
 MIN_BRIGHTNESS = 50  # Overall brightness of the image from 0 (completely black) to 255 (completely white)
-DEBUG_MODE = False  # If Debug mode is on, more data is displayed
+DEBUG_MODE = True  # If Debug mode is on, more data is displayed
 DIFFERCENCE_CUTOFF_VALUE = 220
 
 

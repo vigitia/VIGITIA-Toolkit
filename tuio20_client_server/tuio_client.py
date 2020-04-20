@@ -25,7 +25,7 @@ class TUIOClient:
         dispatcher.map("/tuio2/*", print)
 
         osc_udp_server = BlockingOSCUDPServer((IP, PORT), dispatcher)
-        print("Serving on {}".format(osc_udp_server.server_address))
+        print("Listening on {}".format(osc_udp_server.server_address))
         osc_udp_server.serve_forever()
 
 
