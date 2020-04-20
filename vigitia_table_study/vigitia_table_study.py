@@ -1,13 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# 1. Check for movement
-# If movement is present and time difference <  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> don't save
-# If movement is present and time difference >  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> check difference or save
-#   if interactions should be logged as well
-# If no movement present and time difference >  MIN_TIME_BETWEEN_SAVED_FRAMES_SEC -> check difference
+"""
+Setup procedure:
 
-# Only rectangle tables are currently supported
+1. Mount a camera above the table so that the entire table is within the frame of the camera
+2. Modify the user constants below (some tweaks later might be necessary, too)
+3. Start the script. if no previous config file is found, the application will launch directly to calibration mode.
+   Click on the four corners of the table.
+4. Now the script is ready. If the table is moved, the four corner calibration needs to be done again (Just press 'C'
+   to enter calibration mode)
+"""
+
+# TODO: Only rectangle tables are currently supported. Support more shapes
+# TODO: Changes in brightness can also trigger
 
 import os
 import sys
@@ -22,26 +28,31 @@ from skimage.measure import compare_ssim
 from pathlib import Path
 import imutils
 
-from realsenseD435.realsense_D435_camera import RealsenseD435Camera
+# from realsense_D435_camera import RealsenseD435Camera
+from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
 
 # General constants
 WINDOW_NAME = 'VIGITIA_TABLE_STUDY'
 
 # Constants to fill out by the user
-USE_REALSENSE_D435_CAMERA = True
-CAMERA_ID = 1
-TABLE_NAME = 'Esstisch'
-TABLE_LENGTH_CM = 42
-TABLE_DEPTH_CM = 59
-FLIP_IMAGE_VERTICALLY = False
-FLIP_IMAGE_HORIZONTALLY = False
-MIN_TIME_BETWEEN_SAVED_FRAMES_SEC = 30
-MIN_TIME_WAIT_AFTER_MOVEMENT_SEC = 10
-MIN_DIFFERENCE_PERCENT_TO_SAVE = 5
-MIN_AREA_FOR_MOVEMENT_PX = 100
+USE_REALSENSE_D435_CAMERA = True  # Select whether the INTEL REALSENSE D435 camera or a generic webcam should be used
+CAMERA_ID = 0  # IF USE_REALSENSE_D435_CAMERA == False, select the camera ID for Opencv video capture
+CAMERA_RESOLUTION_X = 1280
+CAMERA_RESOLUTION_Y = 720
+CAMERA_FPS = 10
+TABLE_NAME = 'Esstisch'  # This name is used for the filenames of the saved images
+TABLE_LENGTH_CM = 41  # Length and depth of the table are used to store the images distortion free in the correct aspect
+TABLE_DEPTH_CM = 57   # ratio after perspective transformation
+FLIP_IMAGE_VERTICALLY = True  # If images are not saved in the correct orientation, this can be fixed here
+FLIP_IMAGE_HORIZONTALLY = True
+MIN_TIME_BETWEEN_SAVED_FRAMES_SEC = 30  # Minimum distance between two saved frames in seconds
+MIN_TIME_WAIT_AFTER_MOVEMENT_SEC = 10  # Minimum time to wait
+MIN_DIFFERENCE_PERCENT_TO_SAVE = 5  # If the current image is at least X % different from the last saved image -> save
+MIN_AREA_FOR_MOVEMENT_PX = 100  # An area where movement is detected needs to be at least XXX pixels in size
 MOVEMENT_THRESHOLD = 30  # Cutoff threshold for the difference image of two frames for movement detection
 MIN_BRIGHTNESS = 50  # Overall brightness of the image from 0 (completely black) to 255 (completely white)
-DEBUG_MODE = True
+DEBUG_MODE = True  # If Debug mode is on, more data is displayed
+DIFFERCENCE_CUTOFF_VALUE = 220
 
 
 class VigitiaTableStudy:
@@ -64,7 +75,6 @@ class VigitiaTableStudy:
     def __init__(self):
 
         self.read_config_file()
-        self.init_opencv()
         self.init_video_capture()
 
         self.loop()
@@ -73,7 +83,6 @@ class VigitiaTableStudy:
     def read_config_file(self):
         config = configparser.ConfigParser()
         config.read('config.ini')
-        print(config.sections())
 
         if len(config.sections()) > 0:
             # Coordinates of table corners for perspective transformation
@@ -85,7 +94,8 @@ class VigitiaTableStudy:
             print('Successfully read data from config file')
             self.calibration_mode = False
         else:
-            print('Error reading data from config file')
+            print('No config file found. Create a new one and entering calibration mode')
+            self.init_opencv()
             self.calibration_mode = True
 
     def init_opencv(self):
@@ -101,29 +111,36 @@ class VigitiaTableStudy:
             if len(self.last_mouse_click_coordinates) > 4:
                 self.last_mouse_click_coordinates = []
 
+    # Either the INTEL REALSENSE D435 or a generic (web)cam is used
     def init_video_capture(self):
         if USE_REALSENSE_D435_CAMERA:
             self.realsense = RealsenseD435Camera()
             self.realsense.start()
         else:
             self.capture = cv2.VideoCapture(CAMERA_ID)
-            self.capture.set(3, 1280)
-            self.capture.set(4, 720)
-            self.capture.set(cv2.CAP_PROP_FPS, 30)
+            self.capture.set(3, CAMERA_RESOLUTION_X)
+            self.capture.set(4, CAMERA_RESOLUTION_Y)
+            self.capture.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
 
+    # The main application loop
     def loop(self):
         while True:
+
+            # Get frames
             if USE_REALSENSE_D435_CAMERA:
                 frame, depth_image = self.realsense.get_frames()
             else:
                 ret, frame = self.capture.read()
 
+            # If a new frame has arrived
             if frame is not None:
                 if self.calibration_mode:
                     self.display_mode_calibration(frame)
                 else:
-                    frame_full = frame.copy()
-                    frame_table = self.perspective_transformation(frame)
+                    frame_full = frame.copy()  # The entire picture the camera sees
+                    frame_table = self.perspective_transformation(frame)  # Just the table area
+
+                    # If all criteria are fulfilled, save the two frames to the hard drive
                     if self.check_save_frame(frame_table):
                         self.save_frame(frame_table, frame_full)
 
@@ -131,7 +148,7 @@ class VigitiaTableStudy:
             # Press 'ESC' or 'Q' to close the image window
             if key & 0xFF == ord('q') or key == 27:
                 break
-            elif key == 99:  # C as in Calibrate
+            elif key == 99:  # C as in Calibrate to activate calibration mode
                 self.last_mouse_click_coordinates = []  # Reset list
                 self.calibration_mode = not self.calibration_mode
 
@@ -141,6 +158,7 @@ class VigitiaTableStudy:
             self.capture.release()
         cv2.destroyAllWindows()
 
+    # Code for when the calibration mode is acitve
     def display_mode_calibration(self, frame):
         print('In calibration mode')
         # Show circles of previous coordinates
@@ -163,6 +181,8 @@ class VigitiaTableStudy:
             self.update_table_corner_calibration()
 
         cv2.imshow(WINDOW_NAME, frame)
+        if self.calibration_mode == False:
+            cv2.destroyWindow(WINDOW_NAME)
 
     def update_table_corner_calibration(self):
         # Order coordinates by x value
@@ -195,6 +215,7 @@ class VigitiaTableStudy:
         # Go back to default display mode
         self.calibration_mode = False
 
+    # Check if the current frame fulfills all criteria to be saved
     def check_save_frame(self, frame):
         now = time.time()
 
@@ -217,13 +238,13 @@ class VigitiaTableStudy:
 
         # Check the image for current movement
         movement = self.detect_movement(frame)
-
         if movement:
             self.last_movement_timestamp = now
 
         # Set the last stored frame to the current frame (needed the next time the code checks for movement)
         self.last_frame = frame
 
+        # If enough time has passed since last movement and last saved frame
         if time_since_last_movement > MIN_TIME_WAIT_AFTER_MOVEMENT_SEC and \
                 time_since_last_check_saving_frame > MIN_TIME_BETWEEN_SAVED_FRAMES_SEC:
 
@@ -232,31 +253,32 @@ class VigitiaTableStudy:
             # Compare the difference between the last saved frame and the current frame
             difference = self.frame_difference(frame)
             if difference >= MIN_DIFFERENCE_PERCENT_TO_SAVE:
-                return True
+                return True  # All criteria are fulfulled
 
             return False
 
-        cv2.imshow(WINDOW_NAME, frame)
+        if DEBUG_MODE:
+            cv2.imshow(WINDOW_NAME, frame)
 
     # Get an value for the overall brightness of the image. We dont want to save images that are too dark to be useful
     # https://stackoverflow.com/questions/14243472/estimate-brightness-of-an-image-opencv
-    def get_brightness_value(self, frame):
+    @staticmethod
+    def get_brightness_value(frame):
         hsv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         hue, saturation, value = cv2.split(hsv_image)
         brightness = np.mean(value)
         return brightness
 
-    # https://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
+    # Based onhttps://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
     def detect_movement(self, frame):
         grey_new = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         grey_old = cv2.cvtColor(self.last_frame, cv2.COLOR_BGR2GRAY)
         grey_new = cv2.GaussianBlur(grey_new, (21, 21), 0)
         grey_old = cv2.GaussianBlur(grey_old, (21, 21), 0)
 
-        # compute the absolute difference between the current frame and
-        # first frame
-        frameDelta = cv2.absdiff(grey_old, grey_new)
-        thresh = cv2.threshold(frameDelta, MOVEMENT_THRESHOLD, 255, cv2.THRESH_BINARY)[1]
+        # compute the absolute difference between the current frame and first frame
+        frame_delta = cv2.absdiff(grey_old, grey_new)
+        thresh = cv2.threshold(frame_delta, MOVEMENT_THRESHOLD, 255, cv2.THRESH_BINARY)[1]
         # dilate the thresholded image to fill in holes, then find contours on thresholded image
         thresh = cv2.dilate(thresh, None, iterations=2)
 
@@ -278,27 +300,27 @@ class VigitiaTableStudy:
                 cv2.rectangle(frame_show_movement, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 movement = True
 
-        if movement:
-            print('Movement detected')
-
         if DEBUG_MODE:
+            if movement:
+                print('Movement detected')
             cv2.imshow('movement', frame_show_movement)
 
         return movement
 
+    # Calculate the difference between the current and the last frame in percent
     # Based on https://www.pyimagesearch.com/2017/06/19/image-difference-with-opencv-and-python/
     def frame_difference(self, frame):
+        # Convert frame to grey and blur them to reduce noise
         grey_new = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         grey_old = cv2.cvtColor(self.last_saved_frame, cv2.COLOR_BGR2GRAY)
         grey_new = cv2.GaussianBlur(grey_new, (21, 21), 0)
         grey_old = cv2.GaussianBlur(grey_old, (21, 21), 0)
 
-        # compute the Structural Similarity Index (SSIM) between the two
-        # images, ensuring that the difference image is returned
+        # compute the Structural Similarity Index (SSIM) between the two images,
+        # ensuring that the difference image is returned
         (score, diff) = compare_ssim(grey_new, grey_old, full=True)
         diff = (diff * 255).astype("uint8")
-        #print("SSIM: {}".format(score))
-        diff = np.where(diff > 220, 255, diff)
+        diff = np.where(diff > DIFFERCENCE_CUTOFF_VALUE, 255, diff)
         diff = np.where(diff < 255, 0, diff)
         diff = cv2.bitwise_not(diff)
 
@@ -310,19 +332,22 @@ class VigitiaTableStudy:
 
         return difference
 
+    # Write the two frames to the hard drive
     def save_frame(self, frame_table, frame_full):
         print('SAVING FRAME!')
 
         self.last_saved_frame = frame_table
 
+        # The full sensor image has not been flipped yet like the table image. This is done now here
         frame_full = self.flip_image(frame_full)
 
         now = datetime.datetime.now()
         folder_name = str(now.date())
 
-        # Create folder if it does not exist yet
+        # Create two folders if they not exist yet (main folder is the name of the table, subfolder is the current date)
         Path(os.path.join(TABLE_NAME, folder_name)).mkdir(parents=True, exist_ok=True)
 
+        # Save the frames
         time_string = now.strftime('%Y-%m-%d_%H-%M-%S-%f')[:-4]
         file_name_table = TABLE_NAME + '_' + time_string + '_table.png'
         file_name_full = TABLE_NAME + '_' + time_string + '_full.png'
@@ -330,6 +355,7 @@ class VigitiaTableStudy:
         cv2.imwrite(os.path.join(os.path.join(TABLE_NAME, folder_name), file_name_table), frame_table)
         cv2.imwrite(os.path.join(os.path.join(TABLE_NAME, folder_name), file_name_full), frame_full)
 
+    # Do a perspective transformation to extract the table surface
     # Based on: https://www.youtube.com/watch?v=PtCQH93GucA
     def perspective_transformation(self, frame):
         x = frame.shape[1]
@@ -345,6 +371,7 @@ class VigitiaTableStudy:
 
         return frame
 
+    # Resize the image after perspective transformation so that the table aspect ratio is preserved
     def resize_frame_to_table(self, frame):
         x, y = self.calculate_aspect_ratio(TABLE_LENGTH_CM, TABLE_DEPTH_CM)
         new_width = int(frame.shape[1])
@@ -356,7 +383,8 @@ class VigitiaTableStudy:
         return frame
 
     # To save the image in the correct orientation (even if the camera is rotated)
-    def flip_image(self, frame):
+    @staticmethod
+    def flip_image(frame):
         if FLIP_IMAGE_HORIZONTALLY:
             frame = cv2.flip(frame, 1)
         if FLIP_IMAGE_VERTICALLY:
@@ -366,7 +394,8 @@ class VigitiaTableStudy:
 
     # Calculate the aspect ratio of the table to save images after perspective transformation without distortion
     # Method taken from: https://gist.github.com/Integralist/4ca9ff94ea82b0e407f540540f1d8c6c
-    def calculate_aspect_ratio(self, width: int, height: int):
+    @staticmethod
+    def calculate_aspect_ratio(width: int, height: int):
         temp = 0
 
         def gcd(a, b):
@@ -390,7 +419,7 @@ class VigitiaTableStudy:
 
 
 def main():
-    vigitiaTableStudy = VigitiaTableStudy()
+    vigitia_table_study = VigitiaTableStudy()
     sys.exit()
 
 
