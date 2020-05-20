@@ -4,7 +4,7 @@
 # The TUIO 2.0 server endcodes and sends TUIO messages via UDP to the defined IP address and port
 # using the python-osc library: https://github.com/attwad/python-osc
 
-# Based upon the TUIO 2.0 C++ Library by Martin Kaltebrunner
+# Based upon the TUIO 2.0 C++ Library by Martin Kaltenbrunner
 # https://github.com/mkalten/TUIO20_CPP/blob/b3fc7998670200091e5768747c3e04ac758084e3/TUIO2/TuioServer.cpp
 # and the TUIO 2.0 Protocol Specification by Martin Kaltenbrunner
 # http://www.tuio.org/?tuio20
