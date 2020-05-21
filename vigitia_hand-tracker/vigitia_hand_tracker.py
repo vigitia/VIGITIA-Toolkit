@@ -488,8 +488,8 @@ class VigitiaHandTracker:
 
         # Get rid of the small black regions in our mask by applying morphological closing
         # (dilation followed by erosion) with a small x by x pixel kernel
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        foreground_mask = cv2.morphologyEx(foreground_mask, cv2.MORPH_CLOSE, kernel, 4)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
+        foreground_mask = cv2.morphologyEx(foreground_mask, cv2.MORPH_CLOSE, kernel, 2)
 
         if DEBUG_MODE:
             cv2.imshow('foreground mask', foreground_mask)
