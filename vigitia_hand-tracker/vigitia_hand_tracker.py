@@ -30,12 +30,12 @@ RGB_FPS = 60
 
 NUM_FRAMES_FOR_BACKGROUND_MODEL = 50
 
-COLOR_TOUCH =[113, 204, 46]
+COLOR_TOUCH = [113, 204, 46]
 COLOR_HOVER = [18, 156, 243]
 COLOR_NO_TOUCH = [60, 76, 231]
 COLOR_REMOVED_BACKGROUND = [64, 177, 0]  # Chroma Green
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 
 class VigitiaHandTracker:
@@ -60,6 +60,9 @@ class VigitiaHandTracker:
     table_corner_top_right = (0, 0)
     table_corner_bottom_left = (0, 0)
     table_corner_bottom_right = (0, 0)
+
+    table_border = None
+    table_mask = None
 
     last_mouse_click_coordinates = []
 
@@ -121,9 +124,11 @@ class VigitiaHandTracker:
             self.background_model_available = True
 
     def init_opencv(self):
-        #cv2.namedWindow("realsense", cv2.WND_PROP_FULLSCREEN)
-        #cv2.setWindowProperty("realsense", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-        cv2.namedWindow('realsense', cv2.WINDOW_AUTOSIZE)
+        if not DEBUG_MODE:
+            cv2.namedWindow('realsense', cv2.WND_PROP_FULLSCREEN)
+            cv2.setWindowProperty('realsense', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        else:
+            cv2.namedWindow('realsense', cv2.WINDOW_AUTOSIZE)
 
         # Set mouse callbacks to extract the coordinates of clicked spots in the image
         cv2.setMouseCallback('realsense', self.on_mouse_click)
@@ -142,7 +147,8 @@ class VigitiaHandTracker:
 
         # TODO: Get dimensions from current frame
         if self.stored_background_values is None:
-            self.stored_background_values = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X, NUM_FRAMES_FOR_BACKGROUND_MODEL), dtype=np.int16)
+            self.stored_background_values = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X, NUM_FRAMES_FOR_BACKGROUND_MODEL),
+                                                     dtype=np.int16)
             self.background_average = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
             self.background_standard_deviation = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
 
@@ -187,8 +193,6 @@ class VigitiaHandTracker:
                 self.num_frame += 1
                 print('Frame: ', self.num_frame)
 
-                cv2.imshow('hands_depth', depth_image)
-
                 if self.calibration_mode:
                     self.display_mode_calibration(color_image)
                 else:
@@ -213,9 +217,16 @@ class VigitiaHandTracker:
         self.realsense.stop()
         cv2.destroyAllWindows()
 
+    def coortinates_to_full_hd(self, low_res_tuple):
+        tuple_as_list = list(low_res_tuple)
+        tuple_as_list[0] = int(tuple_as_list[0] / 848 * 1920)
+        tuple_as_list[1] = int(tuple_as_list[1] / 480 * 1080)
+        return tuple(tuple_as_list)
+
     def display_mode_calibration(self, color_image):
         print("In calibration mode")
         # Show circles of previous coordinates
+
         cv2.circle(color_image, self.table_corner_top_left, 2, (0, 0, 255), -1)
         cv2.circle(color_image, self.table_corner_top_right, 2, (0, 0, 255), -1)
         cv2.circle(color_image, self.table_corner_bottom_left, 2, (0, 0, 255), -1)
@@ -272,8 +283,11 @@ class VigitiaHandTracker:
     def perspective_transformation(self, frame):
         x = frame.shape[1]
 
-        pts1 = np.float32([list(self.table_corner_top_left), list(self.table_corner_top_right),
-                           list(self.table_corner_bottom_left), list(self.table_corner_bottom_right)])
+        pts1 = np.float32([list(self.coortinates_to_full_hd(self.table_corner_top_left)),
+                           list(self.coortinates_to_full_hd(self.table_corner_top_right)),
+                           list(self.coortinates_to_full_hd(self.table_corner_bottom_left)),
+                           list(self.coortinates_to_full_hd(self.table_corner_bottom_right))])
+
         pts2 = np.float32([[0, 0], [x, 0], [0, x / 2], [x, x / 2]])
         matrix = cv2.getPerspectiveTransform(pts1, pts2)
 
@@ -281,26 +295,32 @@ class VigitiaHandTracker:
 
         return frame
 
-    def moving_average_filter(self, image):
-        if self.stored_depth_frame is None:
-            self.stored_depth_frame = image
-            return image
-        else:
-            combined_images = self.stored_depth_frame + image
-            averaged_image = combined_images/2
-            self.stored_depth_frame = image
-            return averaged_image
+    # def moving_average_filter(self, image):
+    #     if self.stored_depth_frame is None:
+    #         self.stored_depth_frame = image
+    #         return image
+    #     else:
+    #         combined_images = self.stored_depth_frame + image
+    #         averaged_image = combined_images/2
+    #         self.stored_depth_frame = image
+    #         return averaged_image
 
     def extract_arms(self, depth_image, color_image):
 
-        if DEBUG_MODE and self.num_frame == 200:
-            print("Writing files")
-            cv2.imwrite('depth_image.png', depth_image)
-            cv2.imwrite('color_image.png', color_image)
+        hand_area = self.get_touch_points(color_image, depth_image)
+        return None
 
+        # if DEBUG_MODE and self.num_frame == 200:
+        #     print("Writing files")
+        #     cv2.imwrite('depth_image.png', depth_image)
+        #     cv2.imwrite('color_image.png', color_image)
+
+        # Compare the current depth image with the stored average of the background
         difference_to_background = self.background_average - depth_image
+        # Make sure that there are no negative values in the array
         difference_to_background = np.where(difference_to_background < 0, 0, difference_to_background)
 
+        # Ignore pixels that are too close to the table surface
         remove_uncertain_pixels = difference_to_background - self.background_standard_deviation
         remove_uncertain_pixels = np.where(remove_uncertain_pixels < 0, 0, difference_to_background)
         remove_uncertain_pixels = np.where((remove_uncertain_pixels < MIN_DIST_TOUCH), 0, remove_uncertain_pixels)
@@ -342,14 +362,16 @@ class VigitiaHandTracker:
         significant_pixels[np.where((mark_touch_pixels == [255, 255, 255]).all(axis=2))] = [0, 0, 255]
         significant_pixels[np.where((mark_arm_pixels == [255, 255, 255]).all(axis=2))] = [0, 255, 0]
 
-        cv2.imshow('hands_depth', significant_pixels)
+        if DEBUG_MODE:
+            cv2.imshow('hands_depth', significant_pixels)
 
         #unique, counts = np.unique(significant_pixels, return_counts=True)
         #print(dict(zip(unique, counts)))
 
         #significant_pixels_color = cv2.cvtColor(significant_pixels, cv2.COLOR_GRAY2BGR)
 
-        hand_area = self.edge_test(color_image, depth_image)
+        hand_area = self.get_touch_points(color_image, depth_image)
+
         #hand_area = cv2.cvtColor(hand_area, cv2.COLOR_GRAY2BGR)
         #significant_pixels[np.where((hand_area == [0, 0, 0]).all(axis=2))] = [0, 0, 0]
 
@@ -384,7 +406,7 @@ class VigitiaHandTracker:
 
         return output_image
 
-    def get_edge_map(self, image):
+    def get_edge_map_old(self, image):
 
         # https://www.pyimagesearch.com/2014/04/21/building-pokedex-python-finding-game-boy-screen-step-4-6/
         #image = cv2.bilateralFilter(image, 11, 17, 17)
@@ -438,123 +460,165 @@ class VigitiaHandTracker:
 
         return black_image
 
-    # Inspired by https://webnautes.tistory.com/m/1378
-    def edge_test(self, color_image, depth_image):
-        blur = cv2.GaussianBlur(color_image, (5, 5), 0)
+    def get_foreground_mask(self, frame):
+        blur = cv2.GaussianBlur(frame, (9, 9), 0)
         fgmask = self.fgbg.apply(blur, learningRate=0)
 
-        # get rid of the small black regions in our mask by applying morphological closing
+        # Get rid of the small black regions in our mask by applying morphological closing
         # (dilation followed by erosion) with a small x by x pixel kernel
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, 2)
 
+        return fgmask
+
+    def remove_pixels_outside_table_border(self, foreground_mask):
+        # Store table border coordinates in an array and create a mask for the table
+        if self.table_border is None:
+            self.table_border = np.array([self.table_corner_top_left, self.table_corner_top_right,
+                                          self.table_corner_bottom_right, self.table_corner_bottom_left])
+
+            self.table_mask = np.zeros(shape=foreground_mask.shape, dtype=np.uint8)
+            cv2.fillPoly(self.table_mask, pts=[self.table_border], color=255)
+
         # Remove all points outside of the border
-        table_border = np.array([self.table_corner_top_left, self.table_corner_top_right,
-                                 self.table_corner_bottom_right, self.table_corner_bottom_left])
+        foreground_mask = np.where(self.table_mask == 0, 0, foreground_mask)
 
-        table_mask = np.zeros(shape=(fgmask.shape), dtype=np.uint8)
-        cv2.fillPoly(table_mask, pts =[table_border], color=(255))
+        return foreground_mask
 
-        fgmask = np.where(table_mask == 0, 0, fgmask)
-
-
-        cv2.imshow('fgmask', fgmask)
-        cv2.imshow('table_mask', table_mask)
-
-        contours, hierarchy = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    def get_arm_candidates(self, foreground_mask):
+        contours, hierarchy = cv2.findContours(foreground_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         # Extract the 10 largest contours (more should never be needed)
         contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]
 
         # TODO: Fill holes if needed
 
-        if len(contours) > 0:
+        arm_candidates = []
 
-            arm_candidates = []
+        if len(contours) > 0:
             for contour in contours:
 
                 connected_to_table_border = False
 
+                # Check all points in the contour if the lie on or within the table area
                 for point in contour:
-                    if cv2.pointPolygonTest(table_border, tuple(point[0]), False) <= 0:
+                    if cv2.pointPolygonTest(self.table_border, tuple(point[0]), False) <= 0:
                         connected_to_table_border = True
 
+                # If they are connected to the table border, they are considered as a hand candidate.
                 if connected_to_table_border:
-                    #print("Contour connected to table border")
                     arm_candidates.append(contour)
 
-            contours = arm_candidates
-            if len(contours) > 0:
+            # if DEBUG_MODE:
+            #     # Draw all contours
+            #     cv2.drawContours(full_hd_image, contours, -1, (255, 0, 0), 3)
+            #     # Draw largest contour in a different color
+            #     cv2.drawContours(full_hd_image, [contours[0]], 0, (50, 50, 50), 2)
 
-                if DEBUG_MODE:
-                    cv2.drawContours(color_image, contours, -1, (255, 0, 0), 3)
-                    # Draw largest contour in a different color
-                    cv2.drawContours(color_image, [contours[0]], 0, (50, 50, 50), 2)
+        return arm_candidates
 
-                #max_contour = contours[0]
+    def find_palm_in_hand(self, foreground_mask, arm_candidate):
+        contour_mask = np.zeros(shape=foreground_mask.shape, dtype=np.uint8)
+        cv2.fillPoly(contour_mask, pts=[arm_candidate], color=255)
 
-                for contour in contours:
+        # Find minimum inscribing circle for Hand detection
+        # See: https://stackoverflow.com/questions/53646022/opencv-c-find-inscribing-circle-of-a-contour
+        # See: https://www.youtube.com/watch?v=xML2S6bvMwI
+        dist = cv2.distanceTransform(contour_mask, cv2.DIST_L2, 3)
+        minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(dist)
+        center_point_palm = maxLoc
+        palm_radius = int(maxVal)
 
-                    contour_mask = np.zeros(shape=(fgmask.shape), dtype=np.uint8)
-                    cv2.fillPoly(contour_mask, pts=[contour], color=(255))
+        # if DEBUG_MODE:
+        # Draw a circle where the palm is estimated to be
+        # cv2.circle(full_hd_image, self.coortinates_to_full_hd(center_point_palm), palm_radius, [255, 255, 255], 3)
 
-
-                    # Find minimum inscribing circle for Hand detection
-                    # See: https://stackoverflow.com/questions/53646022/opencv-c-find-inscribing-circle-of-a-contour
-                    # See: https://www.youtube.com/watch?v=xML2S6bvMwI
-                    # TODO: Do this for each contour
-                    dist = cv2.distanceTransform(contour_mask, cv2.DIST_L2, 3)
-                    minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(dist)
-                    center_point_palm = maxLoc
-                    palm_radius = int(maxVal)
-
-                    # if DEBUG_MODE:
-                    cv2.circle(color_image, center_point_palm, palm_radius, [255, 255, 255], 3)
-
-
-                    hull, center_point, finger_candidates, inner_points, starts, ends = self.get_candidate_points(contour)
-
-                    #cv2.drawContours(color_image, [hull], 0, (0, 255, 0), 2)
-                    #cv2.circle(color_image, center_point, 5, [255, 255, 255], -1)
-                    for i in range(len(finger_candidates)):
-                        current_point = finger_candidates[i]
-                        # Check if point is inside the table border
-                        if cv2.pointPolygonTest(table_border, current_point, False) > 0:
-                            touch_state = self.get_touch_state(current_point, depth_image)
-                            cv2.circle(color_image, current_point, 10, touch_state, 2)
-
-                            distance_between_points = distance.euclidean(center_point_palm, current_point)
-                            if distance_between_points > 1.5 * palm_radius:
-                                cv2.line(color_image, current_point, center_point_palm, [0, 255, 0], 2)
-                            else:
-                                cv2.line(color_image, current_point, center_point_palm, [255, 0, 0], 2)
-                            # TODO: Check if distance between points is realistic
-                            if i < len(finger_candidates) - 1:
-                                next_point = finger_candidates[i+1]
-                                #print("Dist: ", distance_between_points)
-                                #if distance_between_points < 200: # TODO: Tweak value by calculating real world values
-                                #    cv2.line(color_image, current_point, next_point, [255, 0, 0], 2)
-                    if DEBUG_MODE:
-                        for i in range(len(inner_points)):
-                            distance_between_points = distance.euclidean(starts[i], inner_points[i])
-                            cv2.circle(color_image, inner_points[i], 5, [0, 255, 255], -1)
-                            cv2.line(color_image, starts[i], inner_points[i], [255, 0, 0], 2)
-                            cv2.line(color_image, ends[i], inner_points[i], [127, 0, 0], 2)
-
-        #color_image = self.perspective_transformation(color_image)
-        cv2.imshow('realsense', color_image)
-
-        return fgmask
+        return center_point_palm, palm_radius
 
     # Inspired by https://webnautes.tistory.com/m/1378
-    def get_candidate_points(self, contour):
+    def get_touch_points(self, color_image, depth_image):
+        # TEST!
+        full_hd_image = np.zeros(shape=(1080, 1920, 3), dtype=np.uint8)
+
+        foreground_mask = self.get_foreground_mask(color_image)
+        foreground_mask = self.remove_pixels_outside_table_border(foreground_mask)
+
+        if DEBUG_MODE:
+            cv2.imshow('foreground mask', foreground_mask)
+
+        # TODO: Fill holes if needed
+
+        arm_candidates = self.get_arm_candidates(foreground_mask)
+
+        if len(arm_candidates) > 0:
+
+            for arm_candidate in arm_candidates:
+
+                center_point_palm, palm_radius = self.find_palm_in_hand(foreground_mask, arm_candidate)
+
+                hull, center_point, finger_candidates, inner_points, starts, ends = self.get_finger_points(arm_candidate)
+
+                if DEBUG_MODE:
+                    # Draw the contour in green
+                    cv2.drawContours(full_hd_image, [hull], 0, (0, 255, 0), 2)
+                    # Draw the center point of the contour
+                    cv2.circle(full_hd_image, self.coortinates_to_full_hd(center_point), 5, [255, 255, 255], -1)
+
+                # Check each finger candidate
+                for finger_candidate in finger_candidates:
+
+                    # Check if
+                    touch_state = self.get_touch_state(finger_candidate, depth_image)
+
+                    # To full HD
+                    finger_candidate = self.coortinates_to_full_hd(finger_candidate)
+
+                    # cv2.circle(full_hd_image, finger_candidate, 10, touch_state, 2)
+                    #cv2.circle(color_image, finger_candidate, 10, touch_state, 2)
+                    if touch_state is not COLOR_NO_TOUCH:
+                        #cv2.circle(full_hd_image, finger_candidate, 10, touch_state, 2)
+                        cv2.circle(full_hd_image, finger_candidate, 10, COLOR_TOUCH, 2)
+
+                    distance_between_points = distance.euclidean(self.coortinates_to_full_hd(center_point_palm), finger_candidate)
+                    if DEBUG_MODE:
+                        if distance_between_points > 1.5 * palm_radius:
+                            cv2.line(full_hd_image, finger_candidate, self.coortinates_to_full_hd(center_point_palm), [0, 255, 0], 2)
+                        else:
+                            cv2.line(full_hd_image, finger_candidate, self.coortinates_to_full_hd(center_point_palm), [255, 0, 0], 2)
+
+                    # TODO: Check if distance between points is realistic
+                    #if i < len(finger_candidates) - 1:
+                        #next_point = finger_candidates[i+1]
+                        #print("Dist: ", distance_between_points)
+                        #if distance_between_points < 200: # TODO: Tweak value by calculating real world values
+                        #    cv2.line(full_hd_image, finger_candidate, next_point, [255, 0, 0], 2)
+                if DEBUG_MODE:
+                    for i in range(len(inner_points)):
+                        distance_between_points = distance.euclidean(starts[i], inner_points[i])
+                        #if DEBUG_MODE:
+                        #cv2.circle(full_hd_image, self.coortinates_to_full_hd(inner_points[i]), 5, [0, 255, 255], -1)
+                        #cv2.line(full_hd_image, self.coortinates_to_full_hd(starts[i]), self.coortinates_to_full_hd(inner_points[i]), [255, 0, 0], 2)
+                        #cv2.line(full_hd_image, self.coortinates_to_full_hd(ends[i]), self.coortinates_to_full_hd(inner_points[i]), [127, 0, 0], 2)
+
+        #color_image = self.perspective_transformation(color_image)
+        #color_image = cv2.flip(color_image, -1)
+        #cv2.imshow('realsense', color_image)
+
+        full_hd_image = self.perspective_transformation(full_hd_image)
+        #full_hd_image = cv2.flip(full_hd_image, -1)
+        cv2.imshow('realsense', full_hd_image)
+
+        return foreground_mask
+
+    # Inspired by https://webnautes.tistory.com/m/1378
+    def get_finger_points(self, arm_candidate):
         table_border = np.array([self.table_corner_top_left, self.table_corner_top_right,
                                  self.table_corner_bottom_right, self.table_corner_bottom_left])
 
-        contour = cv2.approxPolyDP(contour, 0.02 * cv2.arcLength(contour, True), True)
-        hull = cv2.convexHull(contour, returnPoints=False)
+        arm_candidate = cv2.approxPolyDP(arm_candidate, 0.02 * cv2.arcLength(arm_candidate, True), True)
+        hull = cv2.convexHull(arm_candidate, returnPoints=False)
         # https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_contours/py_contours_more_functions/py_contours_more_functions.html
-        defects = cv2.convexityDefects(contour, hull)
+        defects = cv2.convexityDefects(arm_candidate, hull)
 
         inner_points = []
         starts = []
@@ -563,22 +627,21 @@ class VigitiaHandTracker:
         if defects is not None:
             for i in range(defects.shape[0]):
                 s, e, f, d = defects[i, 0]
-                start = tuple(contour[s][0])
-                end = tuple(contour[e][0])
-                far = tuple(contour[f][0])
+                start = tuple(arm_candidate[s][0])
+                end = tuple(arm_candidate[e][0])
+                far = tuple(arm_candidate[f][0])
                 inner_points.append(far)
                 starts.append(start)
                 ends.append(end)
 
-        hull = cv2.convexHull(contour, returnPoints=True)
-
+        hull = cv2.convexHull(arm_candidate, returnPoints=True)
 
         center_point = (0, 0)
         finger_candidates = []
 
         try:
             # Find center of contour
-            moments = cv2.moments(contour)
+            moments = cv2.moments(arm_candidate)
             cx = int(moments['m10'] / moments['m00'])
             cy = int(moments['m01'] / moments['m00'])
             center_point = (cx, cy)
@@ -588,10 +651,14 @@ class VigitiaHandTracker:
         for point in hull:
             distance_to_table_border = abs(cv2.pointPolygonTest(table_border, tuple(point[0]), True))
             # TODO Remove points close to the table border
-            if distance_to_table_border > 20:
+            MIN_FINGER_DISTANCE_FROM_TABLE_BORDER = 20
+            if distance_to_table_border > MIN_FINGER_DISTANCE_FROM_TABLE_BORDER:
                 finger_candidates.append(tuple(point[0]))
 
         return hull, center_point, finger_candidates, inner_points, starts, ends
+
+    def filter_candidate_finger_points(self):
+        pass
 
     # Implemented like described in paper "DIRECT"
     def get_touch_state(self, point, depth_image):
