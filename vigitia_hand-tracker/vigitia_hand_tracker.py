@@ -12,6 +12,7 @@ from ast import literal_eval as make_tuple  # Needed to convert strings stored i
 from scipy.spatial import distance
 
 from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
+from sensors.cameras.kinect2.kinectV2_camera import KinectV2Camera
 
 # TODO: Calculate in calibration phase
 DISTANCE_CAMERA_TABLE = 0.69  # m
@@ -25,6 +26,10 @@ DEPTH_RES_X = 848
 DEPTH_RES_Y = 480
 RGB_RES_X = 848
 RGB_RES_Y = 480
+# DEPTH_RES_X = 512
+# DEPTH_RES_Y = 424
+# RGB_RES_X = 512
+# RGB_RES_Y = 424
 DEPTH_FPS = 60
 RGB_FPS = 60
 
@@ -68,12 +73,14 @@ class VigitiaHandTracker:
 
     fgbg = cv2.createBackgroundSubtractorMOG2(varThreshold=200, detectShadows=0)
 
-    realsense = None
+    camera = None
 
     def __init__(self):
 
-        self.realsense = RealsenseD435Camera()
-        self.realsense.start()
+        self.camera = RealsenseD435Camera()
+        #self.camera = KinectV2Camera()
+
+        self.camera.start()
 
         # We will be removing the background of objects more than clipping_distance_in_meters meters away
         #self.clipping_distance = DISTANCE_CAMERA_TABLE / self.depth_scale
@@ -187,9 +194,10 @@ class VigitiaHandTracker:
     # Streaming loop
     def loop(self):
         while True:
-            color_image, depth_image = self.realsense.get_frames()
+            color_image, depth_image = self.camera.get_frames()
 
             if color_image is not None:
+
                 self.num_frame += 1
                 print('Frame: ', self.num_frame)
 
@@ -206,6 +214,8 @@ class VigitiaHandTracker:
                         #output_image = self.perspective_transformation(output_image)
 
                         #cv2.imshow('depth', output_image)
+            else:
+                print("No color image")
 
             key = cv2.waitKey(1)
             # Press esc or 'q' to close the image window
@@ -216,7 +226,7 @@ class VigitiaHandTracker:
                 self.last_mouse_click_coordinates = []  # Reset list
                 self.calibration_mode = not self.calibration_mode
 
-        self.realsense.stop()
+        self.camera.stop()
         cv2.destroyAllWindows()
 
     def coortinates_to_full_hd(self, low_res_tuple):
@@ -468,13 +478,18 @@ class VigitiaHandTracker:
         return black_image
 
     def get_foreground_mask(self, frame):
-        blur = cv2.GaussianBlur(frame, (7, 7), 0)
+
+        # Use the Hue channel on the test background for good detection results
+        hsv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        hue, saturation, value = cv2.split(hsv_image)
+
+        blur = cv2.GaussianBlur(hue, (7, 7), 0)
         foreground_mask = self.fgbg.apply(blur, learningRate=0)
 
         # Get rid of the small black regions in our mask by applying morphological closing
         # (dilation followed by erosion) with a small x by x pixel kernel
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        foreground_mask = cv2.morphologyEx(foreground_mask, cv2.MORPH_CLOSE, kernel, 2)
+        foreground_mask = cv2.morphologyEx(foreground_mask, cv2.MORPH_CLOSE, kernel, 4)
 
         if DEBUG_MODE:
             cv2.imshow('foreground mask', foreground_mask)
@@ -558,6 +573,8 @@ class VigitiaHandTracker:
         foreground_mask = self.get_foreground_mask(color_image)
         foreground_mask = self.remove_pixels_outside_table_border(foreground_mask)
 
+        print(color_image.shape, depth_image.shape)
+
         black_image += np.dstack((foreground_mask, foreground_mask, foreground_mask))
 
         # TODO: Fill holes if needed
@@ -582,24 +599,21 @@ class VigitiaHandTracker:
                 # Check each finger candidate
                 for finger_candidate in finger_candidates:
 
-
-
                     # Check distance between point and table surface to get touch state and the corresponding color
                     max_distance_mm, touch_state = self.get_touch_state(finger_candidate, depth_image)
-
                     if max_distance_mm < MAX_DIST_TOUCH:
-                        cv2.circle(black_image, finger_candidate, 10, touch_state, 2)
-
-                    distance_between_points = distance.euclidean(center_point_palm, finger_candidate)
-                    if DEBUG_MODE:
+                        distance_between_points = distance.euclidean(center_point_palm, finger_candidate)
                         if distance_between_points > 1.5 * palm_radius:
-                            cv2.line(black_image, finger_candidate, center_point_palm, [0, 255, 0], 2)
-                        else:
-                            cv2.line(black_image, finger_candidate, center_point_palm, [255, 0, 0], 2)
+                            if DEBUG_MODE:
+                                cv2.line(black_image, finger_candidate, center_point_palm, [0, 255, 0], 2)
+                            cv2.circle(black_image, finger_candidate, 10, touch_state, 2)
+                            touch_points.append(FingerTouch(finger_candidate[0], finger_candidate[1], index, max_distance_mm))
+                        #else:
+                        #    cv2.line(black_image, finger_candidate, center_point_palm, [255, 0, 0], 2)
 
-                    # TODO: Check if distance between points is realistic
+                        # TODO: Check if distance between points is realistic
 
-                    touch_points.append(FingerTouch(finger_candidate[0], finger_candidate[1], index, max_distance_mm))
+
 
         black_image = self.perspective_transformation(black_image)
         black_image = cv2.flip(black_image, -1)
