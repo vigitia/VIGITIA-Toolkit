@@ -12,13 +12,13 @@ from ast import literal_eval as make_tuple  # Needed to convert strings stored i
 from scipy.spatial import distance
 
 from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
-from sensors.cameras.kinect2.kinectV2_camera import KinectV2Camera
+#from sensors.cameras.kinect2.kinectV2_camera import KinectV2Camera
 
 # TODO: Calculate in calibration phase
 DISTANCE_CAMERA_TABLE = 0.69  # m
 
 MIN_DIST_TOUCH = 3  # mm
-DIST_HOVERING = 10  # mm
+DIST_HOVERING = 12  # mm
 MAX_DIST_TOUCH = 50  # mm
 
 # Camera Settings
@@ -38,6 +38,7 @@ NUM_FRAMES_FOR_BACKGROUND_MODEL = 50
 COLOR_TOUCH = [113, 204, 46]
 COLOR_HOVER = [18, 156, 243]
 COLOR_NO_TOUCH = [60, 76, 231]
+COLOR_PALM_CENTER = [80, 80, 80]
 COLOR_REMOVED_BACKGROUND = [64, 177, 0]  # Chroma Green
 
 DEBUG_MODE = True
@@ -208,7 +209,8 @@ class VigitiaHandTracker:
                         self.create_background_model(depth_image)
                         continue
                     else:
-                        self.get_touch_points(color_image, depth_image)
+                        touch_points = self.get_touch_points(color_image, depth_image)
+                        self.draw_touch_points(touch_points)
 
                         #output_image = self.extract_arms(depth_image, color_image)
                         #output_image = self.perspective_transformation(output_image)
@@ -554,10 +556,6 @@ class VigitiaHandTracker:
         center_point_palm = maxLoc
         palm_radius = int(maxVal)
 
-        # if DEBUG_MODE:
-        # Draw a circle where the palm is estimated to be
-        # cv2.circle(full_hd_image, self.coortinates_to_full_hd(center_point_palm), palm_radius, [255, 255, 255], 3)
-
         return center_point_palm, palm_radius
 
     # Inspired by https://webnautes.tistory.com/m/1378
@@ -588,9 +586,15 @@ class VigitiaHandTracker:
 
                 center_point_palm, palm_radius = self.find_palm_in_hand(foreground_mask, arm_candidate)
 
+                if DEBUG_MODE:
+                    # Draw a circle where the palm is estimated to be
+                    cv2.circle(black_image, center_point_palm, palm_radius,
+                               [80, 80, 80], 3)
+
                 hull, center_point, finger_candidates, inner_points, starts, ends = self.get_finger_points(arm_candidate)
 
-                if DEBUG_MODE:
+                #if DEBUG_MODE:
+                if False:
                     # Draw the contour
                     cv2.drawContours(black_image, [hull], 0, (0, 255, 255), 2)
                     # Draw the center point of the contour
@@ -603,17 +607,17 @@ class VigitiaHandTracker:
                     max_distance_mm, touch_state = self.get_touch_state(finger_candidate, depth_image)
                     if max_distance_mm < MAX_DIST_TOUCH:
                         distance_between_points = distance.euclidean(center_point_palm, finger_candidate)
-                        if distance_between_points > 1.5 * palm_radius:
+                        if distance_between_points > 1.7 * palm_radius:
                             if DEBUG_MODE:
                                 cv2.line(black_image, finger_candidate, center_point_palm, [0, 255, 0], 2)
                             cv2.circle(black_image, finger_candidate, 10, touch_state, 2)
-                            touch_points.append(FingerTouch(finger_candidate[0], finger_candidate[1], index, max_distance_mm))
+                            touch_points.append(TouchPoint(finger_candidate[0], finger_candidate[1], index,
+                                                           max_distance_mm, center_point_palm[0],
+                                                           center_point_palm[1]))
                         #else:
                         #    cv2.line(black_image, finger_candidate, center_point_palm, [255, 0, 0], 2)
 
                         # TODO: Check if distance between points is realistic
-
-
 
         black_image = self.perspective_transformation(black_image)
         black_image = cv2.flip(black_image, -1)
@@ -621,6 +625,22 @@ class VigitiaHandTracker:
 
         print(touch_points)
         return touch_points
+
+    def draw_touch_points(self, touch_points):
+
+        # TEST!
+        # full_hd_image = np.zeros(shape=(1080, 1920, 3), dtype=np.uint8)
+        black_image = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X, 3), dtype=np.uint8)
+
+        for touch_point in touch_points:
+            cv2.circle(black_image, touch_point.get_touch_coordinates(), 10,
+                       self.get_touch_color(touch_point.get_distance_to_table_mm()), 2)
+            cv2.circle(black_image, touch_point.get_palm_center_coordinates(), 5, COLOR_PALM_CENTER, -1)
+
+        black_image = self.perspective_transformation(black_image)
+        black_image = cv2.flip(black_image, -1)
+        cv2.imshow('touch points', black_image)
+
 
     # Inspired by https://webnautes.tistory.com/m/1378
     def get_finger_points(self, arm_candidate):
@@ -692,6 +712,15 @@ class VigitiaHandTracker:
         except ValueError:
             return -1, COLOR_NO_TOUCH
 
+    @staticmethod
+    def get_touch_color(distance_to_table_mm):
+        if distance_to_table_mm <= DIST_HOVERING:
+            return COLOR_TOUCH
+        elif distance_to_table_mm <= MAX_DIST_TOUCH:
+            return COLOR_HOVER
+        else:
+            return COLOR_NO_TOUCH
+
     def compare_to_background_model(self, depth_image):
         #depth_image = np.where((abs(self.average_background - depth_image) < 300, 0, depth_image))
 
@@ -717,16 +746,24 @@ class VigitiaHandTracker:
 
 
 # Class representing a single finger touch
-class FingerTouch:
+class TouchPoint:
 
-    def __init__(self, x, y, hand_id, distance_to_table_mm):
+    def __init__(self, x, y, hand_id, distance_to_table_mm, palm_center_x, palm_center_y):
         self.x = x
         self.y = y
         self.hand_id = hand_id
         self.distance_to_table_mm = distance_to_table_mm
+        self.palm_center_x = palm_center_x
+        self.palm_center_y = palm_center_y
 
-    def get_coordinate(self):
+    def get_touch_coordinates(self):
         return tuple([self.x, self.y])
+
+    def get_palm_center_coordinates(self):
+        return tuple([self.palm_center_x, self.palm_center_y])
+
+    def get_distance_to_table_mm(self):
+        return self.distance_to_table_mm
 
     def __repr__(self):
         return 'TouchPoint at ({}, {}). Distance to the table: {}mm.'.format(str(self.x), str(self.y),
