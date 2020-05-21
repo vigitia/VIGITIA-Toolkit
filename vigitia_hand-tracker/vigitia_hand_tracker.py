@@ -200,7 +200,9 @@ class VigitiaHandTracker:
                         self.create_background_model(depth_image)
                         continue
                     else:
-                        output_image = self.extract_arms(depth_image, color_image)
+                        self.get_touch_points(color_image, depth_image)
+
+                        #output_image = self.extract_arms(depth_image, color_image)
                         #output_image = self.perspective_transformation(output_image)
 
                         #cv2.imshow('depth', output_image)
@@ -283,10 +285,15 @@ class VigitiaHandTracker:
     def perspective_transformation(self, frame):
         x = frame.shape[1]
 
-        pts1 = np.float32([list(self.coortinates_to_full_hd(self.table_corner_top_left)),
-                           list(self.coortinates_to_full_hd(self.table_corner_top_right)),
-                           list(self.coortinates_to_full_hd(self.table_corner_bottom_left)),
-                           list(self.coortinates_to_full_hd(self.table_corner_bottom_right))])
+        # pts1 = np.float32([list(self.coortinates_to_full_hd(self.table_corner_top_left)),
+        #                    list(self.coortinates_to_full_hd(self.table_corner_top_right)),
+        #                    list(self.coortinates_to_full_hd(self.table_corner_bottom_left)),
+        #                    list(self.coortinates_to_full_hd(self.table_corner_bottom_right))])
+
+        pts1 = np.float32([list(self.table_corner_top_left),
+                           list(self.table_corner_top_right),
+                           list(self.table_corner_bottom_left),
+                           list(self.table_corner_bottom_right)])
 
         pts2 = np.float32([[0, 0], [x, 0], [0, x / 2], [x, x / 2]])
         matrix = cv2.getPerspectiveTransform(pts1, pts2)
@@ -307,8 +314,8 @@ class VigitiaHandTracker:
 
     def extract_arms(self, depth_image, color_image):
 
-        hand_area = self.get_touch_points(color_image, depth_image)
-        return None
+        #hand_area = self.get_touch_points(color_image, depth_image)
+        #return None
 
         # if DEBUG_MODE and self.num_frame == 200:
         #     print("Writing files")
@@ -461,15 +468,18 @@ class VigitiaHandTracker:
         return black_image
 
     def get_foreground_mask(self, frame):
-        blur = cv2.GaussianBlur(frame, (9, 9), 0)
-        fgmask = self.fgbg.apply(blur, learningRate=0)
+        blur = cv2.GaussianBlur(frame, (7, 7), 0)
+        foreground_mask = self.fgbg.apply(blur, learningRate=0)
 
         # Get rid of the small black regions in our mask by applying morphological closing
         # (dilation followed by erosion) with a small x by x pixel kernel
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel, 2)
+        foreground_mask = cv2.morphologyEx(foreground_mask, cv2.MORPH_CLOSE, kernel, 2)
 
-        return fgmask
+        if DEBUG_MODE:
+            cv2.imshow('foreground mask', foreground_mask)
+
+        return foreground_mask
 
     def remove_pixels_outside_table_border(self, foreground_mask):
         # Store table border coordinates in an array and create a mask for the table
@@ -537,14 +547,18 @@ class VigitiaHandTracker:
 
     # Inspired by https://webnautes.tistory.com/m/1378
     def get_touch_points(self, color_image, depth_image):
+
+        # List to be filled by this method:
+        touch_points = []
+
         # TEST!
-        full_hd_image = np.zeros(shape=(1080, 1920, 3), dtype=np.uint8)
+        #full_hd_image = np.zeros(shape=(1080, 1920, 3), dtype=np.uint8)
+        black_image = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X, 3), dtype=np.uint8)
 
         foreground_mask = self.get_foreground_mask(color_image)
         foreground_mask = self.remove_pixels_outside_table_border(foreground_mask)
 
-        if DEBUG_MODE:
-            cv2.imshow('foreground mask', foreground_mask)
+        black_image += np.dstack((foreground_mask, foreground_mask, foreground_mask))
 
         # TODO: Fill holes if needed
 
@@ -552,63 +566,47 @@ class VigitiaHandTracker:
 
         if len(arm_candidates) > 0:
 
-            for arm_candidate in arm_candidates:
+            # Check each arm candidate
+            for index, arm_candidate in enumerate(arm_candidates):
 
                 center_point_palm, palm_radius = self.find_palm_in_hand(foreground_mask, arm_candidate)
 
                 hull, center_point, finger_candidates, inner_points, starts, ends = self.get_finger_points(arm_candidate)
 
                 if DEBUG_MODE:
-                    # Draw the contour in green
-                    cv2.drawContours(full_hd_image, [hull], 0, (0, 255, 0), 2)
+                    # Draw the contour
+                    cv2.drawContours(black_image, [hull], 0, (0, 255, 255), 2)
                     # Draw the center point of the contour
-                    cv2.circle(full_hd_image, self.coortinates_to_full_hd(center_point), 5, [255, 255, 255], -1)
+                    cv2.circle(black_image, center_point, 5, [255, 255, 255], -1)
 
                 # Check each finger candidate
                 for finger_candidate in finger_candidates:
 
-                    # Check if
-                    touch_state = self.get_touch_state(finger_candidate, depth_image)
 
-                    # To full HD
-                    finger_candidate = self.coortinates_to_full_hd(finger_candidate)
 
-                    # cv2.circle(full_hd_image, finger_candidate, 10, touch_state, 2)
-                    #cv2.circle(color_image, finger_candidate, 10, touch_state, 2)
-                    if touch_state is not COLOR_NO_TOUCH:
-                        #cv2.circle(full_hd_image, finger_candidate, 10, touch_state, 2)
-                        cv2.circle(full_hd_image, finger_candidate, 10, COLOR_TOUCH, 2)
+                    # Check distance between point and table surface to get touch state and the corresponding color
+                    max_distance_mm, touch_state = self.get_touch_state(finger_candidate, depth_image)
 
-                    distance_between_points = distance.euclidean(self.coortinates_to_full_hd(center_point_palm), finger_candidate)
+                    if max_distance_mm < MAX_DIST_TOUCH:
+                        cv2.circle(black_image, finger_candidate, 10, touch_state, 2)
+
+                    distance_between_points = distance.euclidean(center_point_palm, finger_candidate)
                     if DEBUG_MODE:
                         if distance_between_points > 1.5 * palm_radius:
-                            cv2.line(full_hd_image, finger_candidate, self.coortinates_to_full_hd(center_point_palm), [0, 255, 0], 2)
+                            cv2.line(black_image, finger_candidate, center_point_palm, [0, 255, 0], 2)
                         else:
-                            cv2.line(full_hd_image, finger_candidate, self.coortinates_to_full_hd(center_point_palm), [255, 0, 0], 2)
+                            cv2.line(black_image, finger_candidate, center_point_palm, [255, 0, 0], 2)
 
                     # TODO: Check if distance between points is realistic
-                    #if i < len(finger_candidates) - 1:
-                        #next_point = finger_candidates[i+1]
-                        #print("Dist: ", distance_between_points)
-                        #if distance_between_points < 200: # TODO: Tweak value by calculating real world values
-                        #    cv2.line(full_hd_image, finger_candidate, next_point, [255, 0, 0], 2)
-                if DEBUG_MODE:
-                    for i in range(len(inner_points)):
-                        distance_between_points = distance.euclidean(starts[i], inner_points[i])
-                        #if DEBUG_MODE:
-                        #cv2.circle(full_hd_image, self.coortinates_to_full_hd(inner_points[i]), 5, [0, 255, 255], -1)
-                        #cv2.line(full_hd_image, self.coortinates_to_full_hd(starts[i]), self.coortinates_to_full_hd(inner_points[i]), [255, 0, 0], 2)
-                        #cv2.line(full_hd_image, self.coortinates_to_full_hd(ends[i]), self.coortinates_to_full_hd(inner_points[i]), [127, 0, 0], 2)
 
-        #color_image = self.perspective_transformation(color_image)
-        #color_image = cv2.flip(color_image, -1)
-        #cv2.imshow('realsense', color_image)
+                    touch_points.append(FingerTouch(finger_candidate[0], finger_candidate[1], index, max_distance_mm))
 
-        full_hd_image = self.perspective_transformation(full_hd_image)
-        #full_hd_image = cv2.flip(full_hd_image, -1)
-        cv2.imshow('realsense', full_hd_image)
+        black_image = self.perspective_transformation(black_image)
+        black_image = cv2.flip(black_image, -1)
+        cv2.imshow('realsense', black_image)
 
-        return foreground_mask
+        print(touch_points)
+        return touch_points
 
     # Inspired by https://webnautes.tistory.com/m/1378
     def get_finger_points(self, arm_candidate):
@@ -664,21 +662,21 @@ class VigitiaHandTracker:
     def get_touch_state(self, point, depth_image):
         point_x = point[1]
         point_y = point[0]
+        # Check the neighboring pixels in a 5x5 area
         neighboring_pixels_stored = self.background_average[point_x-2:point_x+3, point_y-2:point_y+3]
         neighboring_pixels_current = depth_image[point_x-2:point_x+3, point_y-2:point_y+3]
         try:
             highest_point = np.amin(neighboring_pixels_current)
-            max_distance = abs(np.mean(neighboring_pixels_stored) - highest_point)
-            if max_distance <= DIST_HOVERING:
-                print('TOUCH!')
-                return COLOR_TOUCH
-            elif max_distance <= MAX_DIST_TOUCH:
-                print('HOVER')
-                return COLOR_HOVER
+            # Compare the highest point in the area with the mean of the 5x5 pixel area
+            max_distance_mm = int(abs(np.mean(neighboring_pixels_stored) - highest_point))
+            if max_distance_mm <= DIST_HOVERING:
+                return max_distance_mm, COLOR_TOUCH
+            elif max_distance_mm <= MAX_DIST_TOUCH:
+                return max_distance_mm, COLOR_HOVER
             else:
-                return COLOR_NO_TOUCH
+                return max_distance_mm, COLOR_NO_TOUCH
         except ValueError:
-            return [0, 0, 0]
+            return -1, COLOR_NO_TOUCH
 
     def compare_to_background_model(self, depth_image):
         #depth_image = np.where((abs(self.average_background - depth_image) < 300, 0, depth_image))
@@ -702,6 +700,24 @@ class VigitiaHandTracker:
         bg_removed[np.where((bg_removed == [0, 0, 0]).all(axis=2))] = COLOR_REMOVED_BACKGROUND
 
         return bg_removed
+
+
+# Class representing a single finger touch
+class FingerTouch:
+
+    def __init__(self, x, y, hand_id, distance_to_table_mm):
+        self.x = x
+        self.y = y
+        self.hand_id = hand_id
+        self.distance_to_table_mm = distance_to_table_mm
+
+    def get_coordinate(self):
+        return tuple([self.x, self.y])
+
+    def __repr__(self):
+        return 'TouchPoint at ({}, {}). Distance to the table: {}mm.'.format(str(self.x), str(self.y),
+                                                                             str(self.distance_to_table_mm))
+
 
 
 def main():
