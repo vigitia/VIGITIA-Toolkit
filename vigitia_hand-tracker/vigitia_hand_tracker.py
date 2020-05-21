@@ -72,6 +72,10 @@ class VigitiaHandTracker:
 
     last_mouse_click_coordinates = []
 
+    active_touch_points = []
+
+    highest_touch_id = 1
+
     fgbg = cv2.createBackgroundSubtractorMOG2(varThreshold=200, detectShadows=0)
 
     camera = None
@@ -200,7 +204,7 @@ class VigitiaHandTracker:
             if color_image is not None:
 
                 self.num_frame += 1
-                print('Frame: ', self.num_frame)
+                #print('Frame: ', self.num_frame)
 
                 if self.calibration_mode:
                     self.display_mode_calibration(color_image)
@@ -209,15 +213,15 @@ class VigitiaHandTracker:
                         self.create_background_model(depth_image)
                         continue
                     else:
-                        touch_points = self.get_touch_points(color_image, depth_image)
-                        self.draw_touch_points(touch_points)
+                        new_touch_points = self.get_touch_points(color_image, depth_image)
+
+                        self.active_touch_points = self.merge_touch_points(new_touch_points)
+                        self.draw_touch_points(self.active_touch_points)
 
                         #output_image = self.extract_arms(depth_image, color_image)
                         #output_image = self.perspective_transformation(output_image)
 
                         #cv2.imshow('depth', output_image)
-            else:
-                print("No color image")
 
             key = cv2.waitKey(1)
             # Press esc or 'q' to close the image window
@@ -571,8 +575,6 @@ class VigitiaHandTracker:
         foreground_mask = self.get_foreground_mask(color_image)
         foreground_mask = self.remove_pixels_outside_table_border(foreground_mask)
 
-        print(color_image.shape, depth_image.shape)
-
         black_image += np.dstack((foreground_mask, foreground_mask, foreground_mask))
 
         # TODO: Fill holes if needed
@@ -623,7 +625,7 @@ class VigitiaHandTracker:
         black_image = cv2.flip(black_image, -1)
         cv2.imshow('realsense', black_image)
 
-        print(touch_points)
+        #print(touch_points)
         return touch_points
 
     def draw_touch_points(self, touch_points):
@@ -633,14 +635,78 @@ class VigitiaHandTracker:
         black_image = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X, 3), dtype=np.uint8)
 
         for touch_point in touch_points:
-            cv2.circle(black_image, touch_point.get_touch_coordinates(), 10,
-                       self.get_touch_color(touch_point.get_distance_to_table_mm()), 2)
+            cv2.circle(black_image, touch_point.get_touch_coordinates(), 8,
+                       self.get_touch_color(touch_point.distance_to_table_mm), -1)
             cv2.circle(black_image, touch_point.get_palm_center_coordinates(), 5, COLOR_PALM_CENTER, -1)
+            cv2.putText(black_image, text=str(touch_point.id), org=touch_point.get_touch_coordinates(),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255))
 
         black_image = self.perspective_transformation(black_image)
-        black_image = cv2.flip(black_image, -1)
+        #black_image = cv2.flip(black_image, -1)
         cv2.imshow('touch points', black_image)
 
+    # Implemented like described in paper "DIRECT: Making Touch Tracking on Ordinary Surfaces Practical with
+    # Hybrid Depth-Infrared Sensing." by Xiao, R., Hudson, S., & Harrison, C. (2016).
+    def merge_touch_points(self, new_touch_points):
+
+        distances = []
+        for i in range(len(self.active_touch_points)):
+            for j in range(len(new_touch_points)):
+                distance_between_points = distance.euclidean(self.active_touch_points[i].get_touch_coordinates(),
+                                                             new_touch_points[j].get_touch_coordinates())
+
+                # If distance is large enough, there is no need to check if the touch point already exists
+                if distance_between_points > 100:
+                    continue
+                distances.append([i, j, distance_between_points])
+
+        # Sort list of lists by third element
+        # https://stackoverflow.com/questions/4174941/how-to-sort-a-list-of-lists-by-a-specific-index-of-the-inner-list
+        distances.sort(key=lambda x: x[2])
+
+        for entry in distances:
+            active_touch_point = self.active_touch_points[entry[0]]
+            new_touch_point = new_touch_points[entry[1]]
+
+            if active_touch_point.id < 0 or new_touch_point.id >= 0:
+                continue
+
+            # Move the ID from the active touch point into the new touch point
+            new_touch_point.id = active_touch_point.id
+            active_touch_point.id = -1
+
+            # Simple Smoothing
+            SMOOTHING_FACTOR = 0.3
+
+            new_touch_point.x = int(SMOOTHING_FACTOR * (new_touch_point.x - active_touch_point.x) + active_touch_point.x)
+            new_touch_point.y = int(SMOOTHING_FACTOR * (new_touch_point.y - active_touch_point.y) + active_touch_point.y)
+            new_touch_point.distance_to_table_mm = (new_touch_point.distance_to_table_mm -
+                                                    active_touch_point.distance_to_table_mm) + \
+                                                   active_touch_point.distance_to_table_mm
+
+        for touch_point in new_touch_points:
+            touch_point.missing = False
+            touch_point.num_frames_missing = 0
+
+        for touch_point in self.active_touch_points:
+            if touch_point.id >= 0 and (not touch_point.missing or touch_point.num_frames_missing < 3):
+                if touch_point.missing:
+                    touch_point.num_frames_missing += 1
+                else:
+                    touch_point.num_frames_missing = 0
+
+                touch_point.missing = True
+                new_touch_points.append(touch_point)
+
+        final_touch_points = []
+        for touch_point in new_touch_points:
+            if touch_point.id < 0:
+                touch_point.id = self.highest_touch_id
+                self.highest_touch_id += 1
+
+            final_touch_points.append(touch_point)
+
+        return final_touch_points
 
     # Inspired by https://webnautes.tistory.com/m/1378
     def get_finger_points(self, arm_candidate):
@@ -692,7 +758,8 @@ class VigitiaHandTracker:
     def filter_candidate_finger_points(self):
         pass
 
-    # Implemented like described in paper "DIRECT"
+    # Implemented like described in paper "DIRECT: Making Touch Tracking on Ordinary Surfaces Practical with
+    # Hybrid Depth-Infrared Sensing." by Xiao, R., Hudson, S., & Harrison, C. (2016).
     def get_touch_state(self, point, depth_image):
         point_x = point[1]
         point_y = point[0]
@@ -746,9 +813,13 @@ class VigitiaHandTracker:
 
 
 # Class representing a single finger touch
+# Implementation inspired by the paper "DIRECT: Making Touch Tracking on Ordinary Surfaces Practical with
+# Hybrid Depth-Infrared Sensing." by Xiao, R., Hudson, S., & Harrison, C. (2016).
+# See https://github.com/nneonneo/direct-handtracking/blob/master/ofx/apps/handTracking/direct/src/Touch.h
 class TouchPoint:
 
     def __init__(self, x, y, hand_id, distance_to_table_mm, palm_center_x, palm_center_y):
+        self.id = -1
         self.x = x
         self.y = y
         self.hand_id = hand_id
@@ -756,14 +827,14 @@ class TouchPoint:
         self.palm_center_x = palm_center_x
         self.palm_center_y = palm_center_y
 
+        self.missing = False
+        self.num_frames_missing = 0
+
     def get_touch_coordinates(self):
         return tuple([self.x, self.y])
 
     def get_palm_center_coordinates(self):
         return tuple([self.palm_center_x, self.palm_center_y])
-
-    def get_distance_to_table_mm(self):
-        return self.distance_to_table_mm
 
     def __repr__(self):
         return 'TouchPoint at ({}, {}). Distance to the table: {}mm.'.format(str(self.x), str(self.y),
