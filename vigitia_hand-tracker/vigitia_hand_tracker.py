@@ -203,6 +203,9 @@ class VigitiaHandTracker:
 
             if color_image is not None:
 
+                if DEBUG_MODE:
+                    cv2.imshow('Color frame', color_image)
+
                 self.num_frame += 1
                 #print('Frame: ', self.num_frame)
 
@@ -552,7 +555,7 @@ class VigitiaHandTracker:
         contour_mask = np.zeros(shape=foreground_mask.shape, dtype=np.uint8)
         cv2.fillPoly(contour_mask, pts=[arm_candidate], color=255)
 
-        # Find minimum inscribing circle for Hand detection
+        # Find maximum inscribing circle for Hand detection
         # See: https://stackoverflow.com/questions/53646022/opencv-c-find-inscribing-circle-of-a-contour
         # See: https://www.youtube.com/watch?v=xML2S6bvMwI
         dist = cv2.distanceTransform(contour_mask, cv2.DIST_L2, 3)
@@ -622,8 +625,8 @@ class VigitiaHandTracker:
                         # TODO: Check if distance between points is realistic
 
         black_image = self.perspective_transformation(black_image)
-        black_image = cv2.flip(black_image, -1)
-        cv2.imshow('realsense', black_image)
+        #black_image = cv2.flip(black_image, -1)
+        cv2.imshow('Detected hands', black_image)
 
         #print(touch_points)
         return touch_points
@@ -656,7 +659,8 @@ class VigitiaHandTracker:
                                                              new_touch_points[j].get_touch_coordinates())
 
                 # If distance is large enough, there is no need to check if the touch point already exists
-                if distance_between_points > 100:
+                DISTANCE_MOVEMENT_BETWEEN_FRAMES_THRESHOLD = 100
+                if distance_between_points > DISTANCE_MOVEMENT_BETWEEN_FRAMES_THRESHOLD:
                     continue
                 distances.append([i, j, distance_between_points])
 
@@ -676,7 +680,7 @@ class VigitiaHandTracker:
             active_touch_point.id = -1
 
             # Simple Smoothing
-            SMOOTHING_FACTOR = 0.3
+            SMOOTHING_FACTOR = 0.3  # Value between 0 and 1, depending if the old or the new value should count more.
 
             new_touch_point.x = int(SMOOTHING_FACTOR * (new_touch_point.x - active_touch_point.x) + active_touch_point.x)
             new_touch_point.y = int(SMOOTHING_FACTOR * (new_touch_point.y - active_touch_point.y) + active_touch_point.y)
@@ -684,12 +688,16 @@ class VigitiaHandTracker:
                                                     active_touch_point.distance_to_table_mm) + \
                                                    active_touch_point.distance_to_table_mm
 
+            new_touch_point.palm_center_x = int(SMOOTHING_FACTOR * (new_touch_point.palm_center_x - active_touch_point.palm_center_x) + active_touch_point.palm_center_x)
+            new_touch_point.palm_center_y = int(SMOOTHING_FACTOR * (new_touch_point.palm_center_y - active_touch_point.palm_center_y) + active_touch_point.palm_center_y)
+
         for touch_point in new_touch_points:
             touch_point.missing = False
             touch_point.num_frames_missing = 0
 
         for touch_point in self.active_touch_points:
-            if touch_point.id >= 0 and (not touch_point.missing or touch_point.num_frames_missing < 3):
+            NUM_FRAMES_TOUCH_POINT_MISSING_THRESHOLD = 3
+            if touch_point.id >= 0 and (not touch_point.missing or touch_point.num_frames_missing < NUM_FRAMES_TOUCH_POINT_MISSING_THRESHOLD):
                 if touch_point.missing:
                     touch_point.num_frames_missing += 1
                 else:
