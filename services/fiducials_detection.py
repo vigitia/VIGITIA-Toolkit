@@ -36,6 +36,7 @@ class FiducialsDetection:
 
             if color_image is not None:
                 aruco_markers = self.track_aruco_markers(color_image)
+                tuio_messages = self.to_tuio_messages(aruco_markers)
 
             key = cv2.waitKey(1)
             # Press esc or 'q' to close the image window
@@ -54,7 +55,7 @@ class FiducialsDetection:
         corners, ids, rejected_points = aruco.detectMarkers(gray, self.aruco_dictionary,
                                                             parameters=self.aruco_detector_parameters)
 
-        aruco_markers = {}
+        aruco_markers = []
 
         # check if the ids list is not empty
         if np.all(ids is not None):
@@ -64,11 +65,12 @@ class FiducialsDetection:
                 aruco.drawDetectedMarkers(frame, corners, ids)
 
             for i in range(len(ids)):
-                aruco_marker = {'angle': self.calculate_aruco_marker_rotation(corners[i][0], frame),
+                aruco_marker = {'id': ids[i][0],
+                                'angle': self.calculate_aruco_marker_rotation(corners[i][0], frame),
                                 'corners': corners[i][0],
                                 'centroid': self.centroid(corners[i][0])}
 
-                aruco_markers[ids[i][0]] = aruco_marker
+                aruco_markers.append(aruco_marker)
 
                 if DEBUG_MODE:
                     cv2.putText(img=frame, text=str(aruco_marker['angle']) + ' Grad',
@@ -109,6 +111,19 @@ class FiducialsDetection:
         _x = sum(_x_list) / _len
         _y = sum(_y_list) / _len
         return (_x, _y)
+
+    def to_tuio_messages(self, aruco_markers):
+        tuio_messages = []
+
+        for marker in aruco_markers:
+            #print(marker)
+            blank_tuio_message = '/tuio2/tok {s_id} {tu_id} {c_id} {x_pos} {y_pos} {angle}'
+            tuio_message = blank_tuio_message.format(s_id=marker['id'], tu_id=0, c_id=marker['id'], x_pos=marker['centroid'][0], y_pos=marker['centroid'][0], angle=marker['angle'])
+            print(tuio_message)
+
+            tuio_messages.append(tuio_message)
+
+        return tuio_messages
 
 
 def main():
