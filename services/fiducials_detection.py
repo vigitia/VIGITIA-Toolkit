@@ -6,6 +6,7 @@ import cv2
 import cv2.aruco as aruco
 import numpy as np
 from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
+from calibration.table_surface_extractor import TableSurfaceExtractor
 
 DEBUG_MODE = True
 
@@ -19,6 +20,8 @@ class FiducialsDetection:
     def __init__(self):
         self.camera = RealsenseD435Camera()
         self.camera.start()
+
+        self.table_surface_extractor = TableSurfaceExtractor()
 
         self.init_aruco_tracking()
 
@@ -35,6 +38,8 @@ class FiducialsDetection:
             color_image, depth_image = self.camera.get_frames()
 
             if color_image is not None:
+                color_image = self.table_surface_extractor.extract_table_area(color_image)
+
                 aruco_markers = self.track_aruco_markers(color_image)
                 tuio_messages = self.to_tuio_messages(aruco_markers)
 
@@ -57,28 +62,30 @@ class FiducialsDetection:
 
         aruco_markers = []
 
+
         # check if the ids list is not empty
         if np.all(ids is not None):
             if DEBUG_MODE:
-                frame = np.zeros((frame_color.shape[0], frame_color.shape[1], 3), np.uint8)
                 # Draw a square around the markers
-                aruco.drawDetectedMarkers(frame, corners, ids)
+                aruco.drawDetectedMarkers(frame_color, corners, ids)
 
             for i in range(len(ids)):
                 aruco_marker = {'id': ids[i][0],
-                                'angle': self.calculate_aruco_marker_rotation(corners[i][0], frame),
+                                'angle': self.calculate_aruco_marker_rotation(corners[i][0], frame_color),
                                 'corners': corners[i][0],
                                 'centroid': self.centroid(corners[i][0])}
 
                 aruco_markers.append(aruco_marker)
 
                 if DEBUG_MODE:
-                    cv2.putText(img=frame, text=str(aruco_marker['angle']) + ' Grad',
-                                org=(int(frame.shape[1] / 6), int(frame.shape[0] / 4)),
+                    cv2.putText(img=frame_color, text=str(aruco_marker['angle']) + ' Grad',
+                                org=(int(frame_color.shape[1] / 6), int(frame_color.shape[0] / 4)),
                                 fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
 
         if DEBUG_MODE:
-            cv2.imshow('marker', frame)
+            cv2.imshow('marker', frame_color)
+
+        print(aruco_markers)
 
         return aruco_markers
 
