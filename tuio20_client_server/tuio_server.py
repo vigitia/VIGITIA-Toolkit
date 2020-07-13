@@ -15,7 +15,7 @@ from pythonosc import udp_client
 from pythonosc import osc_bundle_builder
 from pythonosc import osc_message_builder
 
-IP = "192.168.178.81"
+IP = "132.199.130.68"
 PORT = 8000
 
 
@@ -68,13 +68,20 @@ class TUIOServer:
     def commit_tuio_frame(self):
         pass
 
-    def add_token_message(self):
-        pass
+    # /tuio2/tok {s_id} {tu_id} {c_id} {x_pos} {y_pos} {angle}
+    def add_token_message(self, s_id, tu_id, c_id, x_pos, y_pos, angle):
+        pointer_message = osc_message_builder.OscMessageBuilder(address="/tuio2/tok")
+        pointer_message.add_arg(s_id)
+        pointer_message.add_arg(tu_id)  # tu_id refers to type/user and can be 0 for now
+        pointer_message.add_arg(c_id)  # c_id for touch points and hands refers to the individual finger (index, ring, thumb, …) or hand (left/right)
+        pointer_message.add_arg(x_pos)
+        pointer_message.add_arg(y_pos)
+        pointer_message.add_arg(angle)
+        self.current_tuio_frame_bundle.add_content(pointer_message.build())
 
     # /tuio2/ptr s_id tu_id c_id x_pos y_pos angle shear radius press [x_vel y_vel p_vel m_acc p_acc]
     # /tuio2/ptr int32 int32 int32 float float float float float [float float float float float]
     def add_pointer_message(self, s_id, tu_id, c_id, x_pos, y_pos, angle, shear, radius, press):
-
         pointer_message = osc_message_builder.OscMessageBuilder(address="/tuio2/ptr")
         pointer_message.add_arg(s_id)
         pointer_message.add_arg(tu_id)  # tu_id refers to type/user and can be 0 for now
