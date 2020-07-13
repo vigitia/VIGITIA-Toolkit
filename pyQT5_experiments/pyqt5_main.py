@@ -4,6 +4,9 @@ from PyQt5.QtCore import *
 from PyQt5.QtWebEngineWidgets import *
 import sys
 
+from pyQT5_experiments.qt_custom_transparent_widget_example import TransparentWidget
+from pyQT5_experiments.pyqt_paint_example import PaintExample
+from pyQT5_experiments.pyQT5_browser import BrowserWidget
 
 class Window(QMainWindow):
     def __init__(self):
@@ -15,13 +18,45 @@ class Window(QMainWindow):
 
         self.show()
 
+        print(QApplication.desktop().screenGeometry().width(), QApplication.desktop().screenGeometry().height())
+
+
     def initUI(self):
+        self.setStyleSheet("background-color: black;")
+
         web = QWebEngineView()
-        web.setMaximumHeight(1000)
-        web.setMaximumWidth(1000)
+        web.setMaximumWidth(500)
         web.load(QUrl('https://maps.google.com'))
 
-        self.setCentralWidget(web)
+        # web = BrowserWidget()
+
+        web2 = QWebEngineView()
+        web2.setMaximumHeight(1000)
+        web2.setMaximumWidth(2000)
+        web2.load(QUrl('https://google.com'))
+        web2.setGeometry(1000, 1000, 300, 300)
+
+        paint = PaintExample()
+
+
+        transparent = TransparentWidget()
+        transparent.setMaximumWidth(1000)
+
+        # Use a 1x1 Grid layout to allow free placement of the widgets
+        layout = QGridLayout()
+        layout.addWidget(web, 0, 0, Qt.AlignLeft)
+        #layout.addWidget(web2, 0, 0, Qt.AlignLeft)
+        #layout.addWidget(transparent, 0, 0, Qt.AlignLeft)
+        layout.addWidget(paint, 0, 0, Qt.AlignRight)
+
+
+        widget = QWidget()
+        widget.setLayout(layout)
+        self.setCentralWidget(widget)
+
+
+
+        #self.setCentralWidget(web)
 
 
     def keyPressEvent(self, event):
