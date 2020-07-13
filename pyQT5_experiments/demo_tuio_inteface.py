@@ -9,11 +9,13 @@
 # and the TUIO 2.0 Protocol Specification by Martin Kaltenbrunner
 # http://www.tuio.org/?tuio20
 
-# Using the ObserverPattern
+# Using the Observer Pattern
+# Using the Singleton Pattern (https://www.tutorialspoint.com/python_design_patterns/python_design_patterns_singleton.htm)
 
 import sys
+import threading
 
-from pythonosc.osc_server import BlockingOSCUDPServer
+from pythonosc.osc_server import BlockingOSCUDPServer, ThreadingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 
 IP = "132.199.130.68"
@@ -21,14 +23,28 @@ PORT = 8000
 
 
 class DataInterface:
+    __instance = None
+
+    @staticmethod
+    def getInstance():
+        """ Static access method. """
+        if DataInterface.__instance == None:
+            DataInterface()
+        return DataInterface.__instance
 
     def __init__(self):
+        if DataInterface.__instance != None:
+            raise Exception("This class is a singleton!")
+        else:
+            print('Initialized DataInterface')
+            DataInterface.__instance = self
+
         self.subscribers = set()
 
         self.init_tuio_interface()
 
     def register_subscriber(self, new_subscriber):
-        print('New Subscriber:', new_subscriber)
+        print('New Subscriber:', new_subscriber.__class__.__name__)
         self.subscribers.add(new_subscriber)
 
     def unregister_subscriber(self, subscriber):
@@ -39,15 +55,21 @@ class DataInterface:
         # dispatcher.map("/tuio2/*", self.dispatch)
         dispatcher.map("/tuio2/tok", self.on_new_token_message)
 
-        osc_udp_server = BlockingOSCUDPServer((IP, PORT), dispatcher)
+        osc_udp_server = ThreadingOSCUDPServer((IP, PORT), dispatcher)
         print("Listening on {}".format(osc_udp_server.server_address))
-        osc_udp_server.serve_forever()
+
+        server_thread = threading.Thread(target=osc_udp_server.serve_forever)
+        server_thread.start()
+
+        # osc_udp_server.serve_forever()
+
+        print('Initialized TUIO interface')
 
     def on_new_token_message(self, *messages):
-        print(messages)
         for subscriber in self.subscribers:
-            print('Sending message to subscriber:', subscriber)
-            subscriber.update(messages)
+            #print('Sending message to subscriber:', subscriber.__class__.__name__)
+            subscriber.on_new_data(messages)
+
 
 def main():
     data_interface = DataInterface()
