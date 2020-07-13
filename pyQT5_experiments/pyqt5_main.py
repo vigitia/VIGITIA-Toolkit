@@ -24,17 +24,32 @@ class Window(QMainWindow):
     def initUI(self):
         self.setStyleSheet("background-color: black;")
 
+        # web = QWebEngineView()
+        # web.setMaximumWidth(500)
+        # web.load(QUrl('https://maps.google.com'))
+        #
+        # # web = BrowserWidget()
+        #
+        # web2 = QWebEngineView()
+        # web2.setMaximumHeight(1000)
+        # web2.setMaximumWidth(2000)
+        # web2.load(QUrl('https://google.com'))
+        # web2.setGeometry(1000, 1000, 300, 300)
+
         web = QWebEngineView()
-        web.setMaximumWidth(500)
+        web.setMaximumWidth(1000)
         web.load(QUrl('https://maps.google.com'))
 
-        # web = BrowserWidget()
+        graphics_view = QGraphicsView()
+        scene = QGraphicsScene(graphics_view)
+        graphics_view.setScene(scene)
 
-        web2 = QWebEngineView()
-        web2.setMaximumHeight(1000)
-        web2.setMaximumWidth(2000)
-        web2.load(QUrl('https://google.com'))
-        web2.setGeometry(1000, 1000, 300, 300)
+        proxy = QGraphicsProxyWidget()
+        proxy.setWidget(web)
+        proxy.setTransformOriginPoint(proxy.boundingRect().center())
+        scene.addItem(proxy)
+
+        proxy.setRotation(45)
 
         paint = PaintExample()
 
@@ -44,10 +59,11 @@ class Window(QMainWindow):
 
         # Use a 1x1 Grid layout to allow free placement of the widgets
         layout = QGridLayout()
-        layout.addWidget(web, 0, 0, Qt.AlignLeft)
+        #layout.addWidget(web, 0, 0, Qt.AlignLeft)
         #layout.addWidget(web2, 0, 0, Qt.AlignLeft)
         #layout.addWidget(transparent, 0, 0, Qt.AlignLeft)
         layout.addWidget(paint, 0, 0, Qt.AlignRight)
+        layout.addWidget(graphics_view, 0, 0, Qt.AlignLeft)
 
 
         widget = QWidget()
