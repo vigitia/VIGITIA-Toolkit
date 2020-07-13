@@ -44,15 +44,16 @@ class TableSurfaceExtractor:
     # Based on: https://www.youtube.com/watch?v=PtCQH93GucA
     def extract_table_area(self, frame):
         x = frame.shape[1]
+        y = frame.shape[0]
 
         pts1 = np.float32([list(self.table_corner_top_left),
                            list(self.table_corner_top_right),
                            list(self.table_corner_bottom_left),
                            list(self.table_corner_bottom_right)])
 
-        pts2 = np.float32([[0, 0], [x, 0], [0, x / 2], [x, x / 2]])
+        pts2 = np.float32([[0, 0], [x, 0], [0, y], [x, y]])
         matrix = cv2.getPerspectiveTransform(pts1, pts2)
 
-        frame = cv2.warpPerspective(frame, matrix, (x, int(x / 2)))
+        frame = cv2.warpPerspective(frame, matrix, (x, y))
 
         return frame
