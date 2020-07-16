@@ -5,10 +5,11 @@ import sys
 import cv2
 import cv2.aruco as aruco
 import numpy as np
-from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
-from calibration.table_surface_extractor import TableSurfaceExtractor
 
-DEBUG_MODE = True
+
+ADAPTIVE_THRESH_CONSTANT = 10  # TODO: Find best value
+ARUCO_DICT = aruco.DICT_4X4_100
+
 
 class FiducialsDetector:
 
@@ -18,26 +19,16 @@ class FiducialsDetector:
     marker_frame = None
 
     def __init__(self):
-
-        self.table_surface_extractor = TableSurfaceExtractor()
-
         self.init_aruco_tracking()
+        print('Fiducials Detector ready')
 
     def init_aruco_tracking(self):
-        self.aruco_dictionary = aruco.Dictionary_get(aruco.DICT_4X4_100)
+        self.aruco_dictionary = aruco.Dictionary_get(ARUCO_DICT)
         self.aruco_detector_parameters = aruco.DetectorParameters_create()
-        self.aruco_detector_parameters.adaptiveThreshConstant = 10  # TODO: Tweak value
+        self.aruco_detector_parameters.adaptiveThreshConstant = ADAPTIVE_THRESH_CONSTANT
 
-    # Streaming loop
-    def detect_fiducials(self, color_image):
-
-        aruco_markers = self.track_aruco_markers(color_image)
-        return aruco_markers
-
-
-    # Code for tracking Aruco markers taken from https://github.com/njanirudh/Aruco_Tracker
-    def track_aruco_markers(self, frame_color):
-
+    # Code for tracking Aruco markers based on https://github.com/njanirudh/Aruco_Tracker
+    def detect_fiducials(self, frame_color):
         gray = cv2.cvtColor(frame_color, cv2.COLOR_BGR2GRAY)
         corners, ids, rejected_points = aruco.detectMarkers(gray, self.aruco_dictionary,
                                                             parameters=self.aruco_detector_parameters)
@@ -53,11 +44,6 @@ class FiducialsDetector:
                                 'centroid': self.centroid(corners[i][0])}
 
                 aruco_markers.append(aruco_marker)
-
-                if DEBUG_MODE:
-                    cv2.putText(img=frame_color, text=str(aruco_marker['angle']) + ' Grad',
-                                org=(int(frame_color.shape[1] / 6), int(frame_color.shape[0] / 4)),
-                                fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(255, 255, 255))
 
         return aruco_markers
 
