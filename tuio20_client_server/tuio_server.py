@@ -27,34 +27,6 @@ class TUIOServer:
     def __init__(self):
         self.udp_client = udp_client.SimpleUDPClient(IP, PORT)
         self.start_time_ms = int(round(time.time() * 1000))
-        #self.send_test()
-        #self.start_tuio_bundle()
-
-    # Get sample points for testing
-    def get_hand_point(self):
-        # /tuio2/ptr s_id tu_id c_id x_pos y_pos angle shear radius press
-        s_id = 0
-        t_id = 1
-        c_id = 2
-        x_pos = 100
-        y_pos = 200
-        angle = 0
-        shear = 0
-        radius = 0
-        press = 1
-        return [s_id, t_id, c_id, x_pos, y_pos, angle, shear, radius, press]
-
-    def create_tuio_pointer(self, x_pos, y_pos, angle, shear, radius, pressure):
-
-        return None
-
-    def send_test(self):
-        for x in range(5):
-            print('send test message')
-
-            hand_point_args = self.get_hand_point()
-            self.udp_client.send_message("/tuio2/ptr", hand_point_args)
-            time.sleep(1)
 
     def init_tuio_frame(self):
         # frameTimeTag = TuioTime::getSystemTimeTag();
@@ -94,10 +66,24 @@ class TUIOServer:
         pointer_message.add_arg(press)
         self.current_tuio_frame_bundle.add_content(pointer_message.build())
 
-    def add_bounds_message(self):
+    # /tuio2/ocg s_id x_p0 y_p0 ... x_pN y_pN
+    def add_outer_contour_geometry_message(self):
         pass
 
+    # /tuio2/bnd s_id x_pos y_pos angle width height area
+    def add_bounding_box_message(self):
+        pass
+
+    # /tuio2/sym s_id tu_id c_id group data
     def add_symbol_message(self):
+        pass
+
+    # /tuio2/skg s_id x_p0 y_p0 x_p1 y_p1 node ... x_pN y_pN
+    def add_skeleton_message(self):
+        pass
+
+    # /tuio2/dat s_id mime data
+    def add_data_message(self):
         pass
 
     ''' f_id ->   Frame ID (int32)
