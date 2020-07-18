@@ -1,17 +1,18 @@
-import sys
-from PyQt5 import uic
+
+
 import os
 from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QPoint, QEvent, QObject, QVariant, pyqtSlot
 from PyQt5.QtGui import QMouseEvent
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtWebEngineWidgets import *
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
 
 from pyQT5_experiments.demo_tuio_inteface import DataInterface
 
 from apps.vigitia_application import VIGITIAApplication
 
 # Communication between javascript and Python based on https://gist.github.com/mphuie/63e964e9ff8ae25d16a949389392e0d7
+# and https://doc.qt.io/qt-5/qtwebengine-webenginewidgets-contentmanipulation-example.html
+
 class CallHandler(QObject):
 
     @pyqtSlot(result=QVariant)
@@ -26,7 +27,7 @@ class CallHandler(QObject):
         return "ok"
 
 
-class BrowserWidget(QWidget, VIGITIAApplication):
+class BrowserWidget(QWebEngineView, VIGITIAApplication):
     def __init__(self):
         super().__init__()
 
@@ -37,24 +38,34 @@ class BrowserWidget(QWidget, VIGITIAApplication):
 
         self.setGeometry(self.left, self.top, self.width, self.height)
 
-        self.web = QWebEngineView()
 
-        self.web.channel = QWebChannel()
-        self.web.handler = CallHandler()
-        self.web.channel.registerObject('handler', self.web.handler)
-        self.web.page().setWebChannel(self.web.channel)
+        self.channel = QWebChannel()
+        self.handler = CallHandler()
+        self.channel.registerObject('handler', self.handler)
+        self.page().setWebChannel(self.channel)
+
+        self.loadFinished.connect(self.loadFinishedHandler)
 
         web_url = QUrl('https://youtube.com')
         local_html_url = QUrl.fromLocalFile(os.path.abspath(os.path.join(os.path.dirname(__file__), "index.html")))
 
-        self.web.load(local_html_url)
+        self.load(local_html_url)
 
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-        layout.addWidget(self.web)
+        #layout = QVBoxLayout()
+        #self.setLayout(layout)
+        #layout.addWidget(self.web)
 
         #data_interface = DataInterface()
         #data_interface.register_subscriber(self)
+
+    @pyqtSlot()
+    def loadFinishedHandler(self):
+        print("load finished")
+        js_code = 'pythonToJS("I am a message from python");'
+        self.page().runJavaScript(js_code, self.js_callback)
+
+    def js_callback(self, result):
+        print('Python called back:', result)
 
     def on_new_data(self, data):
         print('Data arrived:', data)

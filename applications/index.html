@@ -14,9 +14,17 @@
     <h1>Hi!</h1>
   </div>
   <script language="JavaScript">
+        function pythonToJS(message) {
+            console.error('In pythonToJS()');
+            console.error(message);
+
+            return JSON.stringify('Hi from Javascript');
+        };
+
         new QWebChannel(qt.webChannelTransport, function (channel) {
           window.handler = channel.objects.handler;
           handler.message_from_javascript('hello!');
+          handler.message_from_javascript('world!');
           handler.test(function(retVal) {
             // console.error as console.log message don't show up in the python console
             console.error(JSON.stringify(retVal));
