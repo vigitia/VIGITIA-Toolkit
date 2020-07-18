@@ -19,7 +19,7 @@ class MovementDetector:
         print('Movement Detector ready')
 
 
-# Check if movement was detected within the frame
+    # Check if movement was detected within the frame
     # Based on https://www.pyimagesearch.com/2015/05/25/basic-motion-detection-and-tracking-with-python-and-opencv/
     def detect_movement(self, frame):
 
