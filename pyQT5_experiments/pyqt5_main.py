@@ -10,11 +10,8 @@ from os.path import isfile, join
 from importlib import import_module
 import pyclbr
 
-#from pyQT5_experiments.qt_custom_transparent_widget_example import TransparentWidget
-#from pyQT5_experiments.pyqt_paint_example import PaintExample
-from pyQT5_experiments.pyQT5_browser import BrowserWidget
-
 APPLICATIONS_BASE_FOLDER = 'applications'
+
 
 class Window(QMainWindow):
     def __init__(self):
@@ -28,57 +25,47 @@ class Window(QMainWindow):
 
         print(QApplication.desktop().screenGeometry().width(), QApplication.desktop().screenGeometry().height())
 
-
     def initUI(self):
         self.setStyleSheet("background-color: black;")
 
-        # web = QWebEngineView()
-        # web.setMaximumWidth(500)
-        # web.load(QUrl('https://maps.google.com'))
-        #
-        # # web = BrowserWidget()
-        #
-        # web2 = QWebEngineView()
-        # web2.setMaximumHeight(1000)
-        # web2.setMaximumWidth(2000)
-        # web2.load(QUrl('https://google.com'))
-        # web2.setGeometry(1000, 1000, 300, 300)
-
-
-        web = QWebEngineView()
-        web.setMaximumWidth(1000)
-        web.load(QUrl('https://youtube.com'))
-
-        graphics_view = QGraphicsView()
-        scene = QGraphicsScene(graphics_view)
-        graphics_view.setScene(scene)
-
-        proxy = QGraphicsProxyWidget()
-        proxy.setWidget(web)
-        proxy.setTransformOriginPoint(proxy.boundingRect().center())
-        scene.addItem(proxy)
-
-        proxy.setRotation(45)
-
-        #paint = PaintExample()
-
-
         #transparent = TransparentWidget()
         #transparent.setMaximumWidth(1000)
-
 
         # Use a 1x1 Grid layout to allow free placement of the widgets
         layout = QGridLayout()
 
         applications = self.find_available_applications()
         for application in applications:
-            layout.addWidget(application, 0, 0, Qt.AlignLeft)
+            application.setStyleSheet("background-color: rgb(255,0,0); margin:5px; border:1px solid rgb(0, 255, 0); ")
+            print('Placing {} on canvas'.format(application.__class__.__name__))
+            if application.__class__.__name__ is not 'PaintExample':
+                rotated_application = self.rotate_applicaton(application, 0)
+                layout.addWidget(rotated_application, 0, 0, Qt.AlignLeft)
 
-        layout.addWidget(graphics_view, 0, 0, Qt.AlignLeft)
+        #layout.addWidget(graphics_view, 0, 0, Qt.AlignLeft)
 
         widget = QWidget()
         widget.setLayout(layout)
         self.setCentralWidget(widget)
+
+    # Based on https://stackoverflow.com/questions/58020983/rotate-the-widget-for-some-degree
+    def rotate_applicaton(self, application, angle):
+        graphics_view = QGraphicsView()
+        scene = QGraphicsScene(graphics_view)
+        graphics_view.setScene(scene)
+
+        proxy = QGraphicsProxyWidget()
+        proxy.setWidget(application)
+        proxy.setTransformOriginPoint(proxy.boundingRect().center())
+        scene.addItem(proxy)
+
+        proxy.setRotation(angle)
+
+        # TODO: Check if width/height of graphics_wiew > width/height of QMainWindow. If yes, scale down
+        # TODO: Notify application about new position, rotation and size
+        #
+
+        return graphics_view
 
     def find_available_applications(self):
         applications = []
