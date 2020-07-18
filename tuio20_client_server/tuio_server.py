@@ -15,17 +15,14 @@ from pythonosc import udp_client
 from pythonosc import osc_bundle_builder
 from pythonosc import osc_message_builder
 
-IP = "132.199.130.68"
-PORT = 8000
-
 
 class TUIOServer:
 
     current_tuio_frame_bundle = None
     current_frame_id = 0
 
-    def __init__(self):
-        self.udp_client = udp_client.SimpleUDPClient(IP, PORT)
+    def __init__(self, ip, port=8000):
+        self.udp_client = udp_client.SimpleUDPClient(ip, port)
         self.start_time_ms = int(round(time.time() * 1000))
 
     def init_tuio_frame(self):
@@ -67,24 +64,32 @@ class TUIOServer:
         self.current_tuio_frame_bundle.add_content(pointer_message.build())
 
     # /tuio2/ocg s_id x_p0 y_p0 ... x_pN y_pN
-    def add_outer_contour_geometry_message(self):
+    def add_outer_contour_geometry_message(self, s_id):
         pass
 
     # /tuio2/bnd s_id x_pos y_pos angle width height area
-    def add_bounding_box_message(self):
-        pass
+    def add_bounding_box_message(self, s_id, x_pos, y_pos, angle, width, height, area):
+        bounding_box_message = osc_message_builder.OscMessageBuilder(address="/tuio2/bnd")
+        bounding_box_message.add_arg(s_id)
+        bounding_box_message.add_arg(x_pos)
+        bounding_box_message.add_arg(y_pos)
+        bounding_box_message.add_arg(angle)
+        bounding_box_message.add_arg(width)
+        bounding_box_message.add_arg(height)
+        bounding_box_message.add_arg(area)
+        self.current_tuio_frame_bundle.add_content(bounding_box_message.build())
 
     # /tuio2/sym s_id tu_id c_id group data
-    def add_symbol_message(self):
-        pass
+    def add_symbol_message(self, s_id, tu_id, c_id, group, data):
+        symbol_message = osc_message_builder.OscMessageBuilder(address="/tuio2/sym")
 
     # /tuio2/skg s_id x_p0 y_p0 x_p1 y_p1 node ... x_pN y_pN
     def add_skeleton_message(self):
-        pass
+        skeleton_message = osc_message_builder.OscMessageBuilder(address="/tuio2/skg")
 
     # /tuio2/dat s_id mime data
     def add_data_message(self):
-        pass
+        data_message = osc_message_builder.OscMessageBuilder(address="/tuio2/data")
 
     ''' f_id ->   Frame ID (int32)
         time ->   OSC 64bit time tag (ttag)
