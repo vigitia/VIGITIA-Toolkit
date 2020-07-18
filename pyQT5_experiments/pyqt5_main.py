@@ -47,7 +47,7 @@ class Window(QMainWindow):
 
         web = QWebEngineView()
         web.setMaximumWidth(1000)
-        web.load(QUrl('https://maps.google.com'))
+        web.load(QUrl('https://youtube.com'))
 
         graphics_view = QGraphicsView()
         scene = QGraphicsScene(graphics_view)
@@ -72,7 +72,7 @@ class Window(QMainWindow):
 
         applications = self.find_available_applications()
         for application in applications:
-            layout.addWidget(application, 0, 0, Qt.AlignRight)
+            layout.addWidget(application, 0, 0, Qt.AlignLeft)
 
         layout.addWidget(graphics_view, 0, 0, Qt.AlignLeft)
 
@@ -83,25 +83,28 @@ class Window(QMainWindow):
     def find_available_applications(self):
         applications = []
 
+        # Searching for applications in the following directory
+        # TODO: Also allow for searching in subdirectories and add support for Git Repositories
         applications_path = os.path.join(Path(__file__).resolve().parent.parent, APPLICATIONS_BASE_FOLDER)
 
         # Inspired by https://stackoverflow.com/questions/1057431/how-to-load-all-modules-in-a-folder
         files = [f for f in listdir(applications_path) if isfile(join(applications_path, f)) and f != '__init__.py']
         for file in files:
-            module_name = f"{'applications'}.{file[:-3]}"
-            module_info = pyclbr.readmodule(module_name)
-            module = import_module(module_name)
+            file_type = os.path.splitext(file)[1]
+            if file_type == '.py':
+                module_name = f"{'applications'}.{file[:-3]}"
+                module_info = pyclbr.readmodule(module_name)
+                module = import_module(module_name)
 
-            for item in module_info.values():
-                class_name = item.name
-                my_class = getattr(module, class_name)
-                superclasses = my_class.mro()
-                for superclass in superclasses:
-                    if superclass.__name__ == 'VIGITIAApplication':
-                        print(class_name, '{} in Module {} is a VIGITIA Application'.format(class_name, module_name))
-                        application = my_class()
-
-                        applications.append(application)
+                for item in module_info.values():
+                    class_name = item.name
+                    my_class = getattr(module, class_name)
+                    superclasses = my_class.mro()
+                    for superclass in superclasses:
+                        if superclass.__name__ == 'VIGITIAApplication':
+                            print('"{}" in Module "{}" is a VIGITIA Application'.format(class_name, module_name))
+                            application = my_class()
+                            applications.append(application)
 
         return applications
 
