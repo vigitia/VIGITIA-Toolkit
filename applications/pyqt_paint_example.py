@@ -8,6 +8,7 @@ from PyQt5.QtGui import QMouseEvent
 
 from pyQT5_experiments.demo_tuio_inteface import DataInterface
 
+from apps.vigitia_application import VIGITIAApplication
 
 class Canvas(QtWidgets.QLabel):
 
@@ -24,7 +25,7 @@ class Canvas(QtWidgets.QLabel):
         self.pen_color = QtGui.QColor('#000000')
 
     def on_new_data(self, data):
-        #print('Data arrived:', data)
+        print('Data arrived:', data)
 
         global_pos = QPoint(int(data[4] / 1280 * 2560), int(data[5] / 720 * 1440))
         local_pos = self.mapFromGlobal(global_pos)
@@ -79,7 +80,7 @@ class QPaletteButton(QtWidgets.QPushButton):
         self.setStyleSheet("background-color: %s;" % color)
 
 
-class PaintExample(QtWidgets.QMainWindow):
+class PaintExample(QtWidgets.QMainWindow, VIGITIAApplication):
 
     def __init__(self):
         super().__init__()
@@ -97,6 +98,9 @@ class PaintExample(QtWidgets.QMainWindow):
 
         self.setCentralWidget(w)
 
+    def hello(self):
+        print('Hello from PaintExample')
+
 
     def add_palette_buttons(self, layout):
         for c in COLORS:
@@ -105,7 +109,8 @@ class PaintExample(QtWidgets.QMainWindow):
             layout.addWidget(b)
 
 
-# app = QtWidgets.QApplication(sys.argv)
-# window = PaintExample()
-# window.show()
-# app.exec_()
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    window = PaintExample()
+    window.show()
+    sys.exit(app.exec_())
