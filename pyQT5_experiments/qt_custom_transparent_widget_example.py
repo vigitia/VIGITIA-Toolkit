@@ -40,13 +40,13 @@ class TransparentWidget(QWidget):
         self.label_1.move(100, 100)
         self.label_1.setStyleSheet("background-color: lightgreen")
 
-        self.web = QWebEngineView()
-        self.web.setMaximumWidth(1000)
-        self.web.load(QUrl('https://maps.google.com'))
+        #self.web = QWebEngineView()
+        #self.web.setMaximumWidth(1000)
+        #self.web.load(QUrl('https://maps.google.com'))
 
         window_layout = QVBoxLayout()
         window_layout.addWidget(self.button)
-        window_layout.addWidget(self.web)
+        #window_layout.addWidget(self.web)
         self.setLayout(window_layout)
 
         self.show()
@@ -67,14 +67,15 @@ class TransparentWidget(QWidget):
             touch_y = self.cursor().pos().y()
 
             global_pos = QPoint(touch_x, touch_y)
-            local_pos = self.web.mapFromGlobal(global_pos)
+            # local_pos = self.web.mapFromGlobal(global_pos)
+            local_pos = self.button.mapFromGlobal(global_pos)
             print('global to local:', self.mapFromGlobal(global_pos))
 
-            target = self.web.focusProxy()
+            #target = self.web.focusProxy()
+            target = self.button
 
             self.emulate_mouse_event(QtCore.QEvent.MouseMove, local_pos, global_pos, target)
             self.emulate_mouse_event(QtCore.QEvent.MouseButtonPress, local_pos, global_pos, target)
-            self.emulate_mouse_event(QtCore.QEvent.MouseButtonRelease, local_pos, global_pos, target)
 
     def emulate_mouse_event(self, event_type, local_pos, global_pos, target):
         mouse_event = QMouseEvent(event_type, local_pos, global_pos, QtCore.Qt.LeftButton, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier)

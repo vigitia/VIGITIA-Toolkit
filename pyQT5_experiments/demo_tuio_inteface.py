@@ -28,12 +28,12 @@ class DataInterface:
     @staticmethod
     def getInstance():
         """ Static access method. """
-        if DataInterface.__instance == None:
+        if DataInterface.__instance is None:
             DataInterface()
         return DataInterface.__instance
 
     def __init__(self):
-        if DataInterface.__instance != None:
+        if DataInterface.__instance is not None:
             raise Exception("This class is a singleton!")
         else:
             print('Initialized DataInterface')
@@ -61,13 +61,11 @@ class DataInterface:
         server_thread = threading.Thread(target=osc_udp_server.serve_forever)
         server_thread.start()
 
-        # osc_udp_server.serve_forever()
-
         print('Initialized TUIO interface')
 
     def on_new_token_message(self, *messages):
         for subscriber in self.subscribers:
-            #print('Sending message to subscriber:', subscriber.__class__.__name__)
+            # print('Sending message to subscriber:', subscriber.__class__.__name__)
             subscriber.on_new_data(messages)
 
 
