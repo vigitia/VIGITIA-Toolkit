@@ -6,32 +6,47 @@ from PyQt5.QtGui import QPixmap, QRegion
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
 
+from PyQt5 import QtCore, QtGui, QtWidgets
+
+from applications.pyqt_paint_example import PaintExample
+from applications.VIGITIAWebView import BrowserWidget
+
+
 def main():
     import sys
 
     app = QtWidgets.QApplication(sys.argv)
 
-    web = QWebEngineView()
-    web.setMaximumWidth(1000)
-    web.load(QUrl('https://maps.google.com'))
+    graphicsview = QtWidgets.QGraphicsView()
+    scene = QtWidgets.QGraphicsScene(graphicsview)
+    graphicsview.setScene(scene)
 
-    graphics_view = QtWidgets.QGraphicsView()
-    scene = QtWidgets.QGraphicsScene(graphics_view)
-    graphics_view.setScene(scene)
+    application = BrowserWidget()
 
     proxy = QtWidgets.QGraphicsProxyWidget()
-    proxy.setWidget(web)
+    proxy.setWidget(application)
     proxy.setTransformOriginPoint(proxy.boundingRect().center())
     scene.addItem(proxy)
 
-    proxy.setRotation(45)
+    slider = QtWidgets.QSlider(minimum=0, maximum=359, orientation=QtCore.Qt.Horizontal)
+    slider.valueChanged.connect(proxy.setRotation)
 
-    widget = QtWidgets.QWidget()
-    layout = QtWidgets.QGridLayout(widget)
-    layout.addWidget(graphics_view, 0, 0)
-    widget.resize(1500, 1500)
-    widget.show()
+    label_text = QtWidgets.QLabel(
+        "{}°".format(slider.value()), alignment=QtCore.Qt.AlignCenter
+    )
+    slider.valueChanged.connect(
+        lambda value: label_text.setText("{}°".format(slider.value()))
+    )
 
+    slider.setValue(45)
+
+    w = QtWidgets.QWidget()
+    lay = QtWidgets.QVBoxLayout(w)
+    lay.addWidget(graphicsview)
+    lay.addWidget(slider)
+    lay.addWidget(label_text)
+    w.resize(1500, 1000)
+    w.show()
     sys.exit(app.exec_())
 
 
