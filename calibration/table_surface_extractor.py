@@ -57,3 +57,9 @@ class TableSurfaceExtractor:
         frame = cv2.warpPerspective(frame, matrix, (x, y))
 
         return frame
+
+    def get_table_border(self):
+        table_border = np.array([self.table_corner_top_left, self.table_corner_top_right,
+                                 self.table_corner_bottom_right, self.table_corner_bottom_left])
+
+        return table_border
