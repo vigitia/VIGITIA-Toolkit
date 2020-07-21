@@ -1,3 +1,5 @@
+import random
+
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
@@ -13,41 +15,43 @@ import pyclbr
 APPLICATIONS_BASE_FOLDER = 'applications'
 
 
-class Window(QMainWindow):
+class VIGITIARenderingManager(QMainWindow):
     def __init__(self):
         super().__init__()
-
         self.showFullScreen()
-
         self.initUI()
-
         self.show()
 
-        print(QApplication.desktop().screenGeometry().width(), QApplication.desktop().screenGeometry().height())
+        print('Main Window width:', QApplication.desktop().screenGeometry().width(),
+              'height: ', QApplication.desktop().screenGeometry().height())
 
     def initUI(self):
         self.setStyleSheet("background-color: black;")
 
-        #transparent = TransparentWidget()
-        #transparent.setMaximumWidth(1000)
+        widget = QWidget(self)
+        widget.setStyleSheet("background-color: transparent;")
+        widget.setFixedSize(QApplication.desktop().screenGeometry().width(),
+                            QApplication.desktop().screenGeometry().height())
 
-        # Use a 1x1 Grid layout to allow free placement of the widgets
-        layout = QGridLayout()
-
+        # Load applications and add them to the canvas
         applications = self.find_available_applications()
         for application in applications:
-            application.setStyleSheet("background-color: rgb(255,0,0); margin:5px; border:1px solid rgb(0, 255, 0); ")
-            print('Placing {} on canvas'.format(application.__class__.__name__))
-            if application.__class__.__name__ is not 'PaintExample':
-                rotated_application = self.rotate_applicaton(application, 0)
-                layout.addWidget(rotated_application, 0, 0, Qt.AlignLeft)
 
-        #layout.addWidget(graphics_view, 0, 0, Qt.AlignLeft)
+            # TEST
+            #application.setStyleSheet("background-color: rgb(255,0,0); border:1px solid rgb(0, 255, 0); ")
+            print('Placing {} on canvas.'.format(application.__class__.__name__))
 
-        widget = QWidget()
-        widget.setLayout(layout)
+            x = application.x
+            y = application.y
+            application = self.rotate_applicaton(application, 0)
+
+            application.move(x, y)
+
+            application.setParent(widget)
+
         self.setCentralWidget(widget)
 
+    # Allows the rotation of an application (A QT Widget)
     # Based on https://stackoverflow.com/questions/58020983/rotate-the-widget-for-some-degree
     def rotate_applicaton(self, application, angle):
         graphics_view = QGraphicsView()
@@ -65,8 +69,12 @@ class Window(QMainWindow):
         # TODO: Notify application about new position, rotation and size
         #
 
+        print('Graphics view width:', graphics_view.width(), graphics_view.height())
+
         return graphics_view
 
+    # Checking the folder APPLICATIONS_BASE_FOLDER for all classes that inherit from the superclass "VIGITIAApplication"
+    # These are the applications that are currently available for display
     def find_available_applications(self):
         applications = []
 
@@ -84,9 +92,10 @@ class Window(QMainWindow):
                 module = import_module(module_name)
 
                 for item in module_info.values():
-                    class_name = item.name
+                    class_name = item.name  # The name of the found class
                     my_class = getattr(module, class_name)
                     superclasses = my_class.mro()
+                    # Check if the class has the required superclass
                     for superclass in superclasses:
                         if superclass.__name__ == 'VIGITIAApplication':
                             print('"{}" in Module "{}" is a VIGITIA Application'.format(class_name, module_name))
@@ -95,7 +104,6 @@ class Window(QMainWindow):
 
         return applications
 
-
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
             self.close()
@@ -103,6 +111,6 @@ class Window(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = Window()
+    window = VIGITIARenderingManager()
     sys.exit(app.exec_())
 
