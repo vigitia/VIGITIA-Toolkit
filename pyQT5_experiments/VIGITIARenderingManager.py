@@ -56,8 +56,10 @@ class VIGITIARenderingManager(QMainWindow):
     # Based on https://stackoverflow.com/questions/58020983/rotate-the-widget-for-some-degree
     def rotate_applicaton(self, application, angle):
         graphics_view = QGraphicsView()
+        # Disable scrollbars
         graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
         scene = QGraphicsScene(graphics_view)
         graphics_view.setScene(scene)
 
@@ -72,7 +74,7 @@ class VIGITIARenderingManager(QMainWindow):
         # TODO: Notify application about new position, rotation and size
         #
 
-        print('Graphics view width:', graphics_view.width(), graphics_view.height())
+        #print('Graphics view width:', graphics_view.width(), graphics_view.height())
 
         return graphics_view
 
