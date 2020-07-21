@@ -14,6 +14,7 @@ import pyclbr
 
 APPLICATIONS_BASE_FOLDER = 'applications'
 
+DEBUG_MODE = False
 
 class VIGITIARenderingManager(QMainWindow):
     def __init__(self):
@@ -46,7 +47,8 @@ class VIGITIARenderingManager(QMainWindow):
             application = self.rotate_applicaton(application, 70)
 
             application.move(x, y)
-            application.setStyleSheet('border: 3px solid #FF0000')
+            if DEBUG_MODE:
+                application.setStyleSheet('border: 3px solid #FF0000')
 
             application.setParent(widget)
 
