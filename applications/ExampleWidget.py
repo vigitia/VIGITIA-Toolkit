@@ -1,19 +1,18 @@
 
 # Example for a custom Widget with a transparent background
+
 import random
 import sys
-import time
 
 from PyQt5 import QtCore
-from PyQt5.QtCore import QPoint, Qt, QUrl
+from PyQt5.QtCore import QPoint, Qt
 from PyQt5.QtGui import QMouseEvent, QPainter, QPen, QBrush
-from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
 
 from apps.vigitia_application import VIGITIAApplication
 
 
-class TransparentWidget(QWidget, VIGITIAApplication):
+class ExampleWidget(QWidget, VIGITIAApplication):
 
     def __init__(self):
         super().__init__()
@@ -42,13 +41,8 @@ class TransparentWidget(QWidget, VIGITIAApplication):
         self.label_1.move(100, 100)
         self.label_1.setStyleSheet("background-color: lightgreen")
 
-        #self.web = QWebEngineView()
-        #self.web.setMaximumWidth(1000)
-        #self.web.load(QUrl('https://maps.google.com'))
-
         window_layout = QVBoxLayout()
         window_layout.addWidget(self.button)
-        #window_layout.addWidget(self.web)
         self.setLayout(window_layout)
 
         self.show()
@@ -107,5 +101,5 @@ class TransparentWidget(QWidget, VIGITIAApplication):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ex = TransparentWidget()
+    ex = ExampleWidget()
     sys.exit(app.exec_())
