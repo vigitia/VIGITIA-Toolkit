@@ -43,9 +43,10 @@ class VIGITIARenderingManager(QMainWindow):
 
             x = application.x
             y = application.y
-            application = self.rotate_applicaton(application, 0)
+            application = self.rotate_applicaton(application, 70)
 
             application.move(x, y)
+            application.setStyleSheet('border: 3px solid #FF0000')
 
             application.setParent(widget)
 
@@ -55,6 +56,8 @@ class VIGITIARenderingManager(QMainWindow):
     # Based on https://stackoverflow.com/questions/58020983/rotate-the-widget-for-some-degree
     def rotate_applicaton(self, application, angle):
         graphics_view = QGraphicsView()
+        graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scene = QGraphicsScene(graphics_view)
         graphics_view.setScene(scene)
 
