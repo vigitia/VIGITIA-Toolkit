@@ -27,16 +27,17 @@ class CallHandler(QObject):
         return "ok"
 
 
+#class BrowserWidget(QWebEngineView):
 class BrowserWidget(QWebEngineView, VIGITIAApplication):
     def __init__(self):
         super().__init__()
 
-        self.left = 0
-        self.top = 0
-        self.width = 2000
-        self.height = 1000
+        self.x = 500
+        self.y = 600
+        self.width = 800
+        self.height = 600
 
-        self.setGeometry(self.left, self.top, self.width, self.height)
+        self.setGeometry(0, 0, self.width, self.height)
 
 
         self.channel = QWebChannel()
@@ -46,10 +47,10 @@ class BrowserWidget(QWebEngineView, VIGITIAApplication):
 
         self.loadFinished.connect(self.loadFinishedHandler)
 
-        web_url = QUrl('https://youtube.com')
-        local_html_url = QUrl.fromLocalFile(os.path.abspath(os.path.join(os.path.dirname(__file__), "index.html")))
+        web_url = QUrl('https://maps.google.com')
+        #local_html_url = QUrl.fromLocalFile(os.path.abspath(os.path.join(os.path.dirname(__file__), "index.html")))
 
-        self.load(local_html_url)
+        self.load(web_url)
 
         #layout = QVBoxLayout()
         #self.setLayout(layout)

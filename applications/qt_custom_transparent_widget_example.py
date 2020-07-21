@@ -10,16 +10,18 @@ from PyQt5.QtGui import QMouseEvent, QPainter, QPen, QBrush
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
 
+from apps.vigitia_application import VIGITIAApplication
 
-class TransparentWidget(QWidget):
+
+class TransparentWidget(QWidget, VIGITIAApplication):
 
     def __init__(self):
         super().__init__()
 
-        self.left = 0
-        self.top = 0
-        self.width = 2000
-        self.height = 1000
+        self.x = 1500
+        self.y = 100
+        self.width = 500
+        self.height = 400
 
         # Make window frameless
         # self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
@@ -31,7 +33,7 @@ class TransparentWidget(QWidget):
         self.initUI()
 
     def initUI(self):
-        self.setGeometry(self.left, self.top, self.width, self.height)
+        self.setGeometry(0, 0, self.width, self.height)
 
         self.button = QPushButton("Button1")
         self.button.clicked.connect(self.onButtonClicked)
