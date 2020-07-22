@@ -50,10 +50,10 @@ def tuio_send_fiducials():
 
             aruco_markers = fiducials_detector.detect_fiducials(color_image_table)
             movements = movement_detector.detect_movement(color_image_table)
-            #touch_points = touch_detector.get_touch_points_final(color_image, depth_image, table_border)
+            touch_points = touch_detector.get_touch_points(color_image, depth_image, table_border)
 
-            print(movements)
-            #print('Touch Points:', touch_points)
+            for touch_point in touch_points:
+                print(touch_point)
 
 
             if len(aruco_markers) > 0:
@@ -63,9 +63,9 @@ def tuio_send_fiducials():
             for movement in movements:
                 cv2.rectangle(color_image, (movement['bounding_rect_x'], movement['bounding_rect_y']), (movement['bounding_rect_x'] + movement['bounding_rect_width'], movement['bounding_rect_y'] + movement['bounding_rect_height']), (0, 255, 0), 2)
 
-            foreground_mask = foreground_mask_extractor.get_foreground_mask(color_image)
+            #foreground_mask = foreground_mask_extractor.get_foreground_mask(color_image)
 
-            cv2.imshow('frame', foreground_mask)
+            #cv2.imshow('frame', foreground_mask)
 
         key = cv2.waitKey(1)
         # Press esc or 'q' to close the image window
