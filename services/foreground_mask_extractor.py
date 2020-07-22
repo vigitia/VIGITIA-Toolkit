@@ -9,7 +9,8 @@ import cv2
 class ForegroundMaskExtractor:
 
     def __init__(self):
-        self.fgbg = cv2.createBackgroundSubtractorMOG2(history=1000, detectShadows=True)
+        self.fgbg = cv2.createBackgroundSubtractorMOG2(history=1000, detectShadows=1)
+        self.fgbg_basic = cv2.createBackgroundSubtractorMOG2(varThreshold=200, detectShadows=0)
         print('Foreground Mask Extractor ready')
 
     def get_foreground_mask(self, frame):
@@ -24,6 +25,20 @@ class ForegroundMaskExtractor:
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
         foreground_mask = cv2.morphologyEx(foreground_mask, cv2.MORPH_CLOSE, kernel, 2)
 
-        #foreground_mask = cv2.cvtColor(foreground_mask, cv2.COLOR_BGR2GRAY)
+        return foreground_mask
+
+
+    def get_foreground_mask_basic(self, frame):
+        # Use the Hue channel on the test background for good detection results
+        hsv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        hue, saturation, value = cv2.split(hsv_image)
+
+        blur = cv2.GaussianBlur(value, (7, 7), 0)
+        foreground_mask = self.fgbg_basic.apply(blur, learningRate=0)
+
+        # Get rid of the small black regions in our mask by applying morphological closing
+        # (dilation followed by erosion) with a small x by x pixel kernel
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
+        foreground_mask = cv2.morphologyEx(foreground_mask, cv2.MORPH_CLOSE, kernel, 2)
 
         return foreground_mask
