@@ -17,13 +17,13 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIAApplication):
         self.y = 100
         self.width = 800
         self.height = 400
+        self.rotation = 0
 
         # setting geometry to main window
         self.setGeometry(0, 0, self.width, self.height)
 
-        self.image = QImage(self.size(), QImage.Format_RGB32)
-        self.image.fill(Qt.transparent)  # making image color to white
-
+        self.image = QImage(self.size(), QImage.Format_ARGB32)
+        self.image.fill(Qt.transparent)
         # drawing flag
         self.drawing = False
 
