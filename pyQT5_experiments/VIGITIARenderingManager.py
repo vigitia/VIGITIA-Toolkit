@@ -23,36 +23,49 @@ class VIGITIARenderingManager(QMainWindow):
         self.initUI()
         self.show()
 
-        print('Main Window width:', QApplication.desktop().screenGeometry().width(),
-              'height: ', QApplication.desktop().screenGeometry().height())
+        self.width = QApplication.desktop().screenGeometry().width()
+        self.height = QApplication.desktop().screenGeometry().height()
+
+        print('Main Window width:',self.width, 'height: ', self.height)
 
     def initUI(self):
         self.setStyleSheet("background-color: black;")
 
-        widget = QWidget(self)
-        widget.setStyleSheet("background-color: transparent;")
-        widget.setFixedSize(QApplication.desktop().screenGeometry().width(),
+        parent_widget = QWidget(self)
+        parent_widget.setStyleSheet("background-color: transparent;")
+        parent_widget.setFixedSize(QApplication.desktop().screenGeometry().width(),
                             QApplication.desktop().screenGeometry().height())
 
         # Load applications and add them to the canvas
+        self.add_applications(parent_widget)
+
+        self.setCentralWidget(parent_widget)
+
+    def add_applications(self, parent_widget):
         applications = self.find_available_applications()
         for application in applications:
 
             # TEST
-            #application.setStyleSheet("background-color: rgb(255,0,0); border:1px solid rgb(0, 255, 0); ")
+            # application.setStyleSheet("background-color: rgb(255,0,0); border:1px solid rgb(0, 255, 0); ")
             print('Placing {} on canvas.'.format(application.__class__.__name__))
 
             x = application.x
             y = application.y
-            application = self.rotate_applicaton(application, 70)
+            if application.rotation != 0:
+                application = self.rotate_applicaton(application, application.rotation)
 
             application.move(x, y)
             if DEBUG_MODE:
                 application.setStyleSheet('border: 3px solid #FF0000')
 
-            application.setParent(widget)
+            application.setParent(parent_widget)
 
-        self.setCentralWidget(widget)
+        # TODO: Add unified system to define application position
+        # Test of raising an application to the top
+        for application in applications:
+            if application.__class__.__name__ == 'VIGITIAPaintingApp':
+                print('Bring painting app to front')
+                application.raise_()
 
     # Allows the rotation of an application (A QT Widget)
     # Based on https://stackoverflow.com/questions/58020983/rotate-the-widget-for-some-degree
