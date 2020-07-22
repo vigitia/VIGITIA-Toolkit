@@ -21,6 +21,7 @@ class ExampleWidget(QWidget, VIGITIAApplication):
         self.y = 100
         self.width = 500
         self.height = 400
+        self.rotation = 0
 
         # Make window frameless
         # self.setWindowFlags(QtCore.Qt.FramelessWindowHint)

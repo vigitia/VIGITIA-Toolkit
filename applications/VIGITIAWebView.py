@@ -13,6 +13,7 @@ from apps.vigitia_application import VIGITIAApplication
 # Communication between javascript and Python based on https://gist.github.com/mphuie/63e964e9ff8ae25d16a949389392e0d7
 # and https://doc.qt.io/qt-5/qtwebengine-webenginewidgets-contentmanipulation-example.html
 
+
 class CallHandler(QObject):
 
     @pyqtSlot(result=QVariant)
@@ -33,9 +34,10 @@ class BrowserWidget(QWebEngineView, VIGITIAApplication):
         super().__init__()
 
         self.x = 500
-        self.y = 600
+        self.y = 300
         self.width = 800
         self.height = 600
+        self.rotation = 90
 
         self.setGeometry(0, 0, self.width, self.height)
 
