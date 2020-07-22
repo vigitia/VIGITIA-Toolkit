@@ -24,18 +24,6 @@ MIN_DIST_TOUCH = 3  # mm
 DIST_HOVERING = 12  # mm
 MAX_DIST_TOUCH = 50  # mm
 
-# Camera Settings
-DEPTH_RES_X = 848
-DEPTH_RES_Y = 480
-RGB_RES_X = 848
-RGB_RES_Y = 480
-# DEPTH_RES_X = 512
-# DEPTH_RES_Y = 424
-# RGB_RES_X = 512
-# RGB_RES_Y = 424
-DEPTH_FPS = 60
-RGB_FPS = 60
-
 NUM_FRAMES_FOR_BACKGROUND_MODEL = 50
 
 COLOR_TOUCH = [113, 204, 46]
@@ -101,27 +89,27 @@ class TouchDetector:
 
         # TODO: Get dimensions from current frame
         if self.stored_background_values is None:
-            self.stored_background_values = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X, NUM_FRAMES_FOR_BACKGROUND_MODEL),
+            self.stored_background_values = np.zeros(shape=(depth_image.shape[1], depth_image.shape[0], NUM_FRAMES_FOR_BACKGROUND_MODEL),
                                                      dtype=np.int16)
-            self.background_average = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
-            self.background_standard_deviation = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X), dtype=np.int16)
+            self.background_average = np.zeros(shape=(depth_image.shape[1], depth_image.shape[0]), dtype=np.int16)
+            self.background_standard_deviation = np.zeros(shape=(depth_image.shape[1], depth_image.shape[0]), dtype=np.int16)
 
         self.store_depth_values(depth_image, pos)
 
         if pos == (NUM_FRAMES_FOR_BACKGROUND_MODEL - 1):
-            self.calculate_background_model_statistics()
+            self.calculate_background_model_statistics(depth_image.shape[0], depth_image.shape[1])
 
     def store_depth_values(self, depth_image, pos):
-        for y in range(DEPTH_RES_Y):
-            for x in range(DEPTH_RES_X):
+        for y in range(depth_image.shape[1]):
+            for x in range(depth_image.shape[0]):
                 current_depth_px = depth_image[y][x]
                 self.stored_background_values[y][x][pos] = current_depth_px
 
-    def calculate_background_model_statistics(self):
+    def calculate_background_model_statistics(self, depth_image_x, depth_image_y):
         print('Calculating background model statistics')
         # TODO: Improve performance
-        for y in range(DEPTH_RES_Y):
-            for x in range(DEPTH_RES_X):
+        for y in range(depth_image_y):
+            for x in range(depth_image_x):
                 stored_values_at_pixel = self.stored_background_values[y][x]
                 #stored_values_at_pixel = stored_values_at_pixel[stored_values_at_pixel != 0]
                 #if len(stored_values_at_pixel) == 0:
@@ -157,30 +145,6 @@ class TouchDetector:
         tuple_as_list[0] = int(tuple_as_list[0] / 848 * 1920)
         tuple_as_list[1] = int(tuple_as_list[1] / 480 * 1080)
         return tuple(tuple_as_list)
-
-    def display_mode_calibration(self, color_image):
-        print("In calibration mode")
-        # Show circles of previous coordinates
-
-        cv2.circle(color_image, self.table_corner_top_left, 2, (0, 0, 255), -1)
-        cv2.circle(color_image, self.table_corner_top_right, 2, (0, 0, 255), -1)
-        cv2.circle(color_image, self.table_corner_bottom_left, 2, (0, 0, 255), -1)
-        cv2.circle(color_image, self.table_corner_bottom_right, 2, (0, 0, 255), -1)
-
-        # Draw circles for clicks in a different color to mark the new points
-        for coordinate in self.last_mouse_click_coordinates:
-            cv2.circle(color_image, coordinate, 2, (0, 255, 0), -1)
-
-        cv2.putText(img=color_image, text='Calibration Mode - Press on each of the four corners of the table (' +
-                                          str(len(self.last_mouse_click_coordinates)) + '/4)',
-                    org=(int(color_image.shape[1] / 6), int(color_image.shape[0] / 2)),
-                    fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255))
-
-        if len(self.last_mouse_click_coordinates) == 4:
-            print('Calibrated')
-            self.update_table_corner_calibration()
-
-        cv2.imshow('realsense', color_image)
 
     def update_table_corner_calibration(self):
         # Order coordinates by x value
@@ -481,15 +445,13 @@ class TouchDetector:
         # List to be filled by this method:
         touch_points = []
 
-        black_image = np.zeros(shape=(DEPTH_RES_Y, DEPTH_RES_X, 3), dtype=np.uint8)
+        black_image = np.zeros(shape=(depth_image.shape[1], depth_image.shape[0], 3), dtype=np.uint8)
 
         foreground_mask = self.foreground_mask_extractor.get_foreground_mask(color_image)
-
         foreground_mask = self.remove_pixels_outside_table_border(foreground_mask)
 
         print(foreground_mask.shape)
 
-        return []
         black_image += np.dstack((foreground_mask, foreground_mask, foreground_mask))
 
 

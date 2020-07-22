@@ -8,6 +8,7 @@ from calibration.table_surface_extractor import TableSurfaceExtractor
 from services.fiducials_detector import FiducialsDetector
 from services.movement_detector import MovementDetector
 from services.foreground_mask_extractor import ForegroundMaskExtractor
+from services.touch_detector import TouchDetector
 
 
 def send_tuio_bundle(tuio_server, aruco_markers):
@@ -37,17 +38,22 @@ def tuio_send_fiducials():
     fiducials_detector = FiducialsDetector()
     movement_detector = MovementDetector()
     foreground_mask_extractor = ForegroundMaskExtractor()
+    touch_detector = TouchDetector()
+
+    table_border = table_surface_extractor.get_table_border()
 
     while True:
         color_image, depth_image = camera.get_frames()
 
         if color_image is not None:
-            color_image = table_surface_extractor.extract_table_area(color_image)
+            color_image_table = table_surface_extractor.extract_table_area(color_image)
 
-            aruco_markers = fiducials_detector.detect_fiducials(color_image)
-            movements = movement_detector.detect_movement(color_image)
+            aruco_markers = fiducials_detector.detect_fiducials(color_image_table)
+            movements = movement_detector.detect_movement(color_image_table)
+            #touch_points = touch_detector.get_touch_points_final(color_image, depth_image, table_border)
 
             print(movements)
+            #print('Touch Points:', touch_points)
 
 
             if len(aruco_markers) > 0:

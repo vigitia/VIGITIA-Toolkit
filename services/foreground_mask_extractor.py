@@ -24,4 +24,6 @@ class ForegroundMaskExtractor:
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
         foreground_mask = cv2.morphologyEx(foreground_mask, cv2.MORPH_CLOSE, kernel, 2)
 
+        #foreground_mask = cv2.cvtColor(foreground_mask, cv2.COLOR_BGR2GRAY)
+
         return foreground_mask
