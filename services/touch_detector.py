@@ -87,29 +87,40 @@ class TouchDetector:
         pos = self.num_frame - 1
         print('Storing frame ' + str(pos+1) + '/' + str(NUM_FRAMES_FOR_BACKGROUND_MODEL))
 
+        depth_res_x = depth_image.shape[1]
+        depth_res_y = depth_image.shape[0]
+        print('DEPTH_RES_Y', depth_res_y)
+        print('DEPTH_RES_X', depth_res_x)
+
         # TODO: Get dimensions from current frame
         if self.stored_background_values is None:
-            self.stored_background_values = np.zeros(shape=(depth_image.shape[1], depth_image.shape[0], NUM_FRAMES_FOR_BACKGROUND_MODEL),
-                                                     dtype=np.int16)
-            self.background_average = np.zeros(shape=(depth_image.shape[1], depth_image.shape[0]), dtype=np.int16)
-            self.background_standard_deviation = np.zeros(shape=(depth_image.shape[1], depth_image.shape[0]), dtype=np.int16)
+            self.stored_background_values = np.zeros(shape=(depth_res_y, depth_res_x, NUM_FRAMES_FOR_BACKGROUND_MODEL), dtype=np.int16)
+            self.background_average = np.zeros(shape=(depth_res_y, depth_res_x), dtype=np.int16)
+            self.background_standard_deviation = np.zeros(shape=(depth_res_y, depth_res_x), dtype=np.int16)
+
+            print("depth", depth_image.shape)
+            print("stored_background_values", self.stored_background_values.shape)
 
         self.store_depth_values(depth_image, pos)
 
         if pos == (NUM_FRAMES_FOR_BACKGROUND_MODEL - 1):
-            self.calculate_background_model_statistics(depth_image.shape[0], depth_image.shape[1])
+            self.calculate_background_model_statistics(depth_res_x, depth_res_y)
 
     def store_depth_values(self, depth_image, pos):
-        for y in range(depth_image.shape[1]):
-            for x in range(depth_image.shape[0]):
+        depth_res_x = depth_image.shape[1]
+        depth_res_y = depth_image.shape[0]
+        print('DEPTH_RES_Y', depth_res_y)
+        print('DEPTH_RES_X', depth_res_x)
+        for y in range(depth_res_y):
+            for x in range(depth_res_x):
                 current_depth_px = depth_image[y][x]
                 self.stored_background_values[y][x][pos] = current_depth_px
 
-    def calculate_background_model_statistics(self, depth_image_x, depth_image_y):
+    def calculate_background_model_statistics(self, depth_res_x, depth_res_y):
         print('Calculating background model statistics')
         # TODO: Improve performance
-        for y in range(depth_image_y):
-            for x in range(depth_image_x):
+        for y in range(depth_res_y):
+            for x in range(depth_res_x):
                 stored_values_at_pixel = self.stored_background_values[y][x]
                 #stored_values_at_pixel = stored_values_at_pixel[stored_values_at_pixel != 0]
                 #if len(stored_values_at_pixel) == 0:
@@ -129,7 +140,6 @@ class TouchDetector:
     def get_touch_points_final(self, color_image, depth_image, table_border):
         self.table_border = table_border
         self.num_frame += 1
-        print('Frame:', self.num_frame)
 
         if not self.background_model_available and self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL:
             self.create_background_model(depth_image)
@@ -445,14 +455,16 @@ class TouchDetector:
         # List to be filled by this method:
         touch_points = []
 
-        black_image = np.zeros(shape=(depth_image.shape[1], depth_image.shape[0], 3), dtype=np.uint8)
+        #black_image = np.zeros(shape=(depth_image.shape[1], depth_image.shape[0], 3), dtype=np.uint8)
 
         foreground_mask = self.foreground_mask_extractor.get_foreground_mask(color_image)
         foreground_mask = self.remove_pixels_outside_table_border(foreground_mask)
 
+        print(color_image.shape)
+        print(depth_image.shape)
         print(foreground_mask.shape)
 
-        black_image += np.dstack((foreground_mask, foreground_mask, foreground_mask))
+        black_image = np.dstack((foreground_mask, foreground_mask, foreground_mask))
 
 
         # TODO: Fill holes if needed
@@ -499,7 +511,7 @@ class TouchDetector:
 
                         # TODO: Check if distance between points is realistic
 
-        black_image = self.perspective_transformation(black_image)
+        black_image = self.table_surface_extractor.extract_table_area(black_image)
         #black_image = cv2.flip(black_image, -1)
         cv2.imshow('Detected hands', black_image)
 
@@ -593,13 +605,16 @@ class TouchDetector:
 
     # Inspired by https://webnautes.tistory.com/m/1378
     def get_finger_points(self, arm_candidate):
-        table_border = np.array([self.table_corner_top_left, self.table_corner_top_right,
-                                 self.table_corner_bottom_right, self.table_corner_bottom_left])
 
         arm_candidate = cv2.approxPolyDP(arm_candidate, 0.02 * cv2.arcLength(arm_candidate, True), True)
         hull = cv2.convexHull(arm_candidate, returnPoints=False)
         # https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_contours/py_contours_more_functions/py_contours_more_functions.html
-        defects = cv2.convexityDefects(arm_candidate, hull)
+
+        defects = None
+        try:
+            defects = cv2.convexityDefects(arm_candidate, hull)
+        except cv2.error as e:
+            print(e)
 
         inner_points = []
         starts = []
@@ -630,7 +645,7 @@ class TouchDetector:
             pass
 
         for point in hull:
-            distance_to_table_border = abs(cv2.pointPolygonTest(table_border, tuple(point[0]), True))
+            distance_to_table_border = abs(cv2.pointPolygonTest(self.table_border, tuple(point[0]), True))
             # TODO Remove points close to the table border
             MIN_FINGER_DISTANCE_FROM_TABLE_BORDER = 20
             if distance_to_table_border > MIN_FINGER_DISTANCE_FROM_TABLE_BORDER:
