@@ -52,8 +52,9 @@ class DataInterface:
 
     def init_tuio_interface(self):
         dispatcher = Dispatcher()
-        # dispatcher.map("/tuio2/*", self.dispatch)
+        dispatcher.map("/tuio2/ptr", self.on_new_pointer_message)
         dispatcher.map("/tuio2/tok", self.on_new_token_message)
+        dispatcher.map("/tuio2/bnd", self.on_new_bounding_box_message)
 
         osc_udp_server = ThreadingOSCUDPServer((IP, PORT), dispatcher)
         print("Listening on {}".format(osc_udp_server.server_address))
@@ -63,7 +64,14 @@ class DataInterface:
 
         print('Initialized TUIO interface')
 
+    def on_new_pointer_message(self, *messages):
+        print(messages)
+
+    def on_new_bounding_box_message(self, *messages):
+        print(messages)
+
     def on_new_token_message(self, *messages):
+        print(messages)
         for subscriber in self.subscribers:
             # print('Sending message to subscriber:', subscriber.__class__.__name__)
             subscriber.on_new_data(messages)
