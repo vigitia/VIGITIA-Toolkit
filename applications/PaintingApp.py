@@ -9,14 +9,16 @@ import sys
 
 from apps.vigitia_application import VIGITIAApplication
 
+from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterface
+
 
 class VIGITIAPaintingApp(QMainWindow, VIGITIAApplication):
     def __init__(self):
         super().__init__()
         self.x = 0
-        self.y = 100
-        self.width = 800
-        self.height = 400
+        self.y = 0
+        self.width = 2000
+        self.height = 1000
         self.rotation = 0
 
         # setting geometry to main window
@@ -32,6 +34,33 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIAApplication):
 
         # QPoint object to tract the point
         self.lastPoint = QPoint()
+
+        data_interface = VIGITIASensorDataInterface.Instance()
+        data_interface.register_subscriber(self)
+
+    def on_new_pointer_messages(self, data):
+        print(data)
+        print('Pointer:', data)
+        touch_x = data[4]
+        touch_y = data[5]
+        global_pos = QPoint(int(touch_x / 1280 * 2560), int(touch_y / 720 * 1440))
+        local_pos = self.mapFromGlobal(global_pos)
+
+        # target = self.focusProxy()
+        target = self
+
+        print(global_pos)
+
+        self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
+        self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
+
+    def emulate_mouse_event(self, event_type, local_pos, global_pos, target):
+        mouse_event = QMouseEvent(event_type, local_pos, global_pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
+        QCoreApplication.sendEvent(target, mouse_event)
+
+    def on_new_data(self, data):
+        pass
+        #print('Data arrived in Painting app:', data)
 
 
     def mousePressEvent(self, event):

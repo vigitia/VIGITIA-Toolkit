@@ -6,7 +6,7 @@ from PyQt5.QtGui import QMouseEvent
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtWebEngineWidgets import *
 
-from pyQT5_experiments.demo_tuio_inteface import DataInterface
+from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterface
 
 from apps.vigitia_application import VIGITIAApplication
 
@@ -58,8 +58,8 @@ class BrowserWidget(QWebEngineView, VIGITIAApplication):
         #self.setLayout(layout)
         #layout.addWidget(self.web)
 
-        #data_interface = DataInterface()
-        #data_interface.register_subscriber(self)
+        data_interface = VIGITIASensorDataInterface.Instance()
+        data_interface.register_subscriber(self)
 
     @pyqtSlot()
     def loadFinishedHandler(self):
@@ -70,18 +70,28 @@ class BrowserWidget(QWebEngineView, VIGITIAApplication):
     def js_callback(self, result):
         print('Python called back:', result)
 
-    def on_new_data(self, data):
-        print('Data arrived:', data)
-
-        global_pos = QPoint(int(data[4] / 1280 * 2560), int(data[5] / 720 * 1440))
+    def on_new_pointer_message(self, data):
+        print('Pointer:', data)
+        touch_x = data[4]
+        touch_y = data[5]
+        global_pos = QPoint(int(touch_x / 1280 * 2560), int(touch_y / 720 * 1440))
         local_pos = self.mapFromGlobal(global_pos)
 
-        target = self.focusProxy()
+        #target = self.focusProxy()
+        target = self
 
         print(global_pos)
 
-        #self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
-        #self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
+        self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
+        self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
+
+
+
+    def on_new_data(self, data):
+        pass
+        print('Data arrived in web view:', data)
+
+
 
     def emulate_mouse_event(self, event_type, local_pos, global_pos, target):
         mouse_event = QMouseEvent(event_type, local_pos, global_pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
