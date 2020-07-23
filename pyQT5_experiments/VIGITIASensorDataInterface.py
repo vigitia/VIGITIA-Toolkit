@@ -44,7 +44,7 @@ class Singleton:
 
 
 @Singleton
-class DataInterface:
+class VIGITIASensorDataInterface:
 
     def __init__(self):
         self.subscribers = set()
@@ -86,7 +86,7 @@ class DataInterface:
 
 
 def main():
-    data_interface = DataInterface.Instance()
+    data_interface = VIGITIASensorDataInterface.Instance()
     sys.exit()
 
 
