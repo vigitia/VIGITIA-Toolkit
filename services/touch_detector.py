@@ -39,6 +39,7 @@ class TouchPoint:
         self.distance_to_table_mm = distance_to_table_mm
         self.palm_center_x = palm_center_x
         self.palm_center_y = palm_center_y
+        self.is_touching = int(distance_to_table_mm <= DIST_HOVERING)
 
         self.missing = False
         self.num_frames_missing = 0
