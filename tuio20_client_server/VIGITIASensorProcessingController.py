@@ -6,8 +6,13 @@ import sys
 
 import cv2
 from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
+
+# Import TUIO Server
 from tuio20_client_server.tuio_server import TUIOServer
+
 from calibration.table_surface_extractor import TableSurfaceExtractor
+
+# Import Sensor data processing services
 from services.fiducials_detector import FiducialsDetector
 from services.movement_detector import MovementDetector
 from services.foreground_mask_extractor import ForegroundMaskExtractor
@@ -23,10 +28,8 @@ class VIGITIASensorProcessingController:
         self.camera.start()
 
         self.table_surface_extractor = TableSurfaceExtractor()
-        self.fiducials_detector = FiducialsDetector()
-        self.movement_detector = MovementDetector()
-        self.foreground_mask_extractor = ForegroundMaskExtractor()
-        self.touch_detector = TouchDetector()
+
+        self.init_sensor_data_processing_services()
 
         self.table_border = self.table_surface_extractor.get_table_border()
 
@@ -41,6 +44,12 @@ class VIGITIASensorProcessingController:
         # height
         self.dimension = 0
         self.source = os.uname()[1]
+
+    def init_sensor_data_processing_services(self):
+        self.fiducials_detector = FiducialsDetector()
+        self.movement_detector = MovementDetector()
+        self.foreground_mask_extractor = ForegroundMaskExtractor()
+        self.touch_detector = TouchDetector()
 
     def loop(self):
         while True:
@@ -60,15 +69,27 @@ class VIGITIASensorProcessingController:
                                                        x_pos=int(marker['centroid'][0]),
                                                        y_pos=int(marker['centroid'][1]),
                                                        angle=marker['angle'])
+                    # TODO: Fill out
+                    self.tuio_server.add_bounding_box_message(s_id=int(marker['id']), x_pos=0,
+                                                              y_pos=0, angle=0,
+                                                              width=0,
+                                                              height=0, area=0)
                     # TODO: SEND ALSO BOUNDING BOX
 
                 for movement in movements:
-                    cv2.rectangle(color_image, (movement['bounding_rect_x'], movement['bounding_rect_y']), (
-                    movement['bounding_rect_x'] + movement['bounding_rect_width'],
-                    movement['bounding_rect_y'] + movement['bounding_rect_height']), (0, 255, 0), 2)
+                    # TODO: Correct IDs
+                    # TODO: How to identify them as movement areas client side?
+                    self.tuio_server.add_bounding_box_message(s_id=0, x_pos=movement['bounding_rect_x'],
+                                                              y_pos=movement['bounding_rect_y'], angle=0,
+                                                              width=movement['bounding_rect_width'],
+                                                              height=movement['bounding_rect_height'], area=0)
 
                 for touch_point in touch_points:
                     print(touch_point)
+                    # TODO: Correct IDs
+                    self.tuio_server.add_pointer_message(s_id=touch_point.id, tu_id=0, c_id=0, x_pos=touch_point.x,
+                                                         y_pos=touch_point.y, angle=0, shear=0, radius=0,
+                                                         press=touch_point.is_touching)
 
                 self.tuio_server.send_tuio_bundle()
 
