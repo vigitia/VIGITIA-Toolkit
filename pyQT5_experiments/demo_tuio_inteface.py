@@ -10,7 +10,7 @@
 # http://www.tuio.org/?tuio20
 
 # Using the Observer Pattern
-# Using the Singleton Pattern (https://www.tutorialspoint.com/python_design_patterns/python_design_patterns_singleton.htm)
+# Using the Singleton Pattern ()
 
 import sys
 import threading
@@ -22,23 +22,31 @@ IP = "132.199.130.68"
 PORT = 8000
 
 
-class DataInterface:
-    __instance = None
+# The Singleton class is implemented like described here:
+# https://medium.com/better-programming/singleton-in-python-5eaa66618e3d
+class Singleton:
 
-    @staticmethod
-    def getInstance():
-        """ Static access method. """
-        if DataInterface.__instance is None:
-            DataInterface()
-        return DataInterface.__instance
+    def __init__(self, cls):
+        self._cls = cls
+
+    def Instance(self):
+        try:
+            return self._instance
+        except AttributeError:
+            self._instance = self._cls()
+            return self._instance
+
+    def __call__(self):
+        raise TypeError('Singletons must be accessed through `Instance()`.')
+
+    def __instancecheck__(self, inst):
+        return isinstance(inst, self._cls)
+
+
+@Singleton
+class DataInterface:
 
     def __init__(self):
-        if DataInterface.__instance is not None:
-            raise Exception("This class is a singleton!")
-        else:
-            print('Initialized DataInterface')
-            DataInterface.__instance = self
-
         self.subscribers = set()
 
         self.init_tuio_interface()
@@ -78,7 +86,7 @@ class DataInterface:
 
 
 def main():
-    data_interface = DataInterface()
+    data_interface = DataInterface.Instance()
     sys.exit()
 
 
