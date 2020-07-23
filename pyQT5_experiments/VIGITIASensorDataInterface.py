@@ -60,6 +60,7 @@ class VIGITIASensorDataInterface:
 
     def init_tuio_interface(self):
         dispatcher = Dispatcher()
+        dispatcher.map("/tuio2/frm", self.on_new_frame_message)
         dispatcher.map("/tuio2/ptr", self.on_new_pointer_message)
         dispatcher.map("/tuio2/tok", self.on_new_token_message)
         dispatcher.map("/tuio2/bnd", self.on_new_bounding_box_message)
@@ -72,14 +73,20 @@ class VIGITIASensorDataInterface:
 
         print('Initialized TUIO interface')
 
+    def on_new_frame_message(self, *message):
+        print('New frame arrived:', message)
+
     def on_new_pointer_message(self, *messages):
-        print(messages)
+        # print(messages)
+        for subscriber in self.subscribers:
+            subscriber.on_new_pointer_messages(messages)
 
     def on_new_bounding_box_message(self, *messages):
-        print(messages)
+        pass
+        # print(messages)
 
     def on_new_token_message(self, *messages):
-        print(messages)
+        # print(messages)
         for subscriber in self.subscribers:
             # print('Sending message to subscriber:', subscriber.__class__.__name__)
             subscriber.on_new_data(messages)
