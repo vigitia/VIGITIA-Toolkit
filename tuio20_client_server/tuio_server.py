@@ -25,12 +25,18 @@ class TUIOServer:
         self.udp_client = udp_client.SimpleUDPClient(ip, port)
         self.start_time_ms = int(round(time.time() * 1000))
 
-    def init_tuio_frame(self):
-        # frameTimeTag = TuioTime::getSystemTimeTag();
-        # currentFrameTime = TuioTime(ttime);
-        # currentFrame++;
-        # if (currentFrame==UINT_MAX) currentFrame = 1;
-        pass
+    def init_tuio_frame(self, dimension, source):
+        self.current_frame_id += 1
+        time_now_ms = int(round(time.time() * 1000))
+        frame_time_tag = time_now_ms - self.start_time_ms
+
+        frame_message = osc_message_builder.OscMessageBuilder(address="/tuio2/frm")
+        frame_message.add_arg(self.current_frame_id)  # f_id
+        frame_message.add_arg(frame_time_tag)
+        frame_message.add_arg(dimension)
+        frame_message.add_arg(source)
+
+        return frame_message
 
     # Commits the current frame.
     # Generates and sends TUIO messages of all currently active and updated TuioTokens and TuioPointers.
@@ -39,28 +45,28 @@ class TUIOServer:
 
     # /tuio2/tok {s_id} {tu_id} {c_id} {x_pos} {y_pos} {angle}
     def add_token_message(self, s_id, tu_id, c_id, x_pos, y_pos, angle):
-        pointer_message = osc_message_builder.OscMessageBuilder(address="/tuio2/tok")
-        pointer_message.add_arg(s_id)
-        pointer_message.add_arg(tu_id)  # tu_id refers to type/user and can be 0 for now
-        pointer_message.add_arg(c_id)  # c_id for touch points and hands refers to the individual finger (index, ring, thumb, …) or hand (left/right)
-        pointer_message.add_arg(x_pos)
-        pointer_message.add_arg(y_pos)
-        pointer_message.add_arg(angle)
-        self.current_tuio_frame_bundle.add_content(pointer_message.build())
+        token_message = osc_message_builder.OscMessageBuilder(address="/tuio2/tok")
+        token_message.add_arg(s_id)
+        token_message.add_arg(tu_id)  # tu_id refers to type/user and can be 0 for now
+        token_message.add_arg(c_id)  # c_id for touch points and hands refers to the individual finger (index, ring, thumb, …) or hand (left/right)
+        token_message.add_arg(x_pos)
+        token_message.add_arg(y_pos)
+        token_message.add_arg(angle)
+        self.current_tuio_frame_bundle.add_content(token_message.build())
 
     # /tuio2/ptr s_id tu_id c_id x_pos y_pos angle shear radius press [x_vel y_vel p_vel m_acc p_acc]
     # /tuio2/ptr int32 int32 int32 float float float float float [float float float float float]
     def add_pointer_message(self, s_id, tu_id, c_id, x_pos, y_pos, angle, shear, radius, press):
         pointer_message = osc_message_builder.OscMessageBuilder(address="/tuio2/ptr")
-        pointer_message.add_arg(s_id)
-        pointer_message.add_arg(tu_id)  # tu_id refers to type/user and can be 0 for now
-        pointer_message.add_arg(c_id)  # c_id for touch points and hands refers to the individual finger (index, ring, thumb, …) or hand (left/right)
-        pointer_message.add_arg(x_pos)
-        pointer_message.add_arg(y_pos)
-        pointer_message.add_arg(angle)
-        pointer_message.add_arg(shear)
-        pointer_message.add_arg(radius)
-        pointer_message.add_arg(press)
+        pointer_message.add_arg(int(s_id))
+        pointer_message.add_arg(int(tu_id))  # tu_id refers to type/user and can be 0 for now
+        pointer_message.add_arg(int(c_id))  # c_id for touch points and hands refers to the individual finger (index, ring, thumb, …) or hand (left/right)
+        pointer_message.add_arg(int(x_pos))
+        pointer_message.add_arg(int(y_pos))
+        pointer_message.add_arg(int(angle))
+        pointer_message.add_arg(int(shear))
+        pointer_message.add_arg(int(radius))
+        pointer_message.add_arg(int(press))
         self.current_tuio_frame_bundle.add_content(pointer_message.build())
 
     # /tuio2/ocg s_id x_p0 y_p0 ... x_pN y_pN
@@ -100,15 +106,8 @@ class TUIOServer:
     def start_tuio_bundle(self, dimension, source):
         self.current_tuio_frame_bundle = osc_bundle_builder.OscBundleBuilder(osc_bundle_builder.IMMEDIATELY)
 
-        self.current_frame_id += 1
-        time_now_ms = int(round(time.time() * 1000))
-        frame_time_tag = time_now_ms - self.start_time_ms
+        frame_message = self.init_tuio_frame(dimension, source)
 
-        frame_message = osc_message_builder.OscMessageBuilder(address="/tuio2/frm")
-        frame_message.add_arg(self.current_frame_id)  # f_id
-        frame_message.add_arg(frame_time_tag)
-        frame_message.add_arg(dimension)
-        frame_message.add_arg(source)
         self.current_tuio_frame_bundle.add_content(frame_message.build())
 
     def send_tuio_bundle(self):
@@ -120,12 +119,3 @@ class TUIOServer:
         self.udp_client.send(self.current_tuio_frame_bundle.build())
 
         self.current_tuio_frame_bundle = None
-
-
-# def main():
-#     tuioServer = TUIOServer()
-#     sys.exit()
-#
-#
-# if __name__ == '__main__':
-#     main()
