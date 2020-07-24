@@ -11,9 +11,11 @@
 
 # Using the Observer Pattern
 # Using the Singleton Pattern ()
-import socket
+
+
 import sys
 import threading
+from urllib import request, error
 
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
@@ -56,7 +58,6 @@ class VIGITIASensorDataInterface:
     def get_ip_address(self):
         try:
             # Try to get the public IP address of the computer
-            from urllib import request, error
             ip = request.urlopen('https://ident.me').read().decode('utf8')
             print(ip)
         except error.URLError as e:
