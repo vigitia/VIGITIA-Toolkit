@@ -11,14 +11,13 @@
 
 # Using the Observer Pattern
 # Using the Singleton Pattern ()
-
+import socket
 import sys
 import threading
 
-from pythonosc.osc_server import BlockingOSCUDPServer, ThreadingOSCUDPServer
+from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 
-IP = "132.199.130.68"
 PORT = 8000
 
 
@@ -47,9 +46,25 @@ class Singleton:
 class VIGITIASensorDataInterface:
 
     def __init__(self):
+        # IP needs to be always the IP of the computer
+        self.ip = self.get_ip_address()
+
         self.subscribers = set()
 
         self.init_tuio_interface()
+
+    def get_ip_address(self):
+        try:
+            # Try to get the public IP address of the computer
+            from urllib import request, error
+            ip = request.urlopen('https://ident.me').read().decode('utf8')
+            print(ip)
+        except error.URLError as e:
+            # If no Internet connection is available, use the local IP address instead
+            import socket
+            ip = socket.gethostbyname(socket.gethostname())
+
+        return ip
 
     def register_subscriber(self, new_subscriber):
         print('New Subscriber:', new_subscriber.__class__.__name__)
@@ -65,7 +80,8 @@ class VIGITIASensorDataInterface:
         dispatcher.map("/tuio2/tok", self.on_new_token_message)
         dispatcher.map("/tuio2/bnd", self.on_new_bounding_box_message)
 
-        osc_udp_server = ThreadingOSCUDPServer((IP, PORT), dispatcher)
+        osc_udp_server = ThreadingOSCUDPServer((self.ip, PORT), dispatcher)
+
         print("Listening on {}".format(osc_udp_server.server_address))
 
         server_thread = threading.Thread(target=osc_udp_server.serve_forever)
@@ -74,7 +90,8 @@ class VIGITIASensorDataInterface:
         print('Initialized TUIO interface')
 
     def on_new_frame_message(self, *message):
-        print('New frame arrived:', message)
+        #print('New frame arrived:', message)
+        pass
 
     def on_new_pointer_message(self, *messages):
         # print(messages)
@@ -86,7 +103,7 @@ class VIGITIASensorDataInterface:
         # print(messages)
 
     def on_new_token_message(self, *messages):
-        # print(messages)
+        print(messages)
         for subscriber in self.subscribers:
             # print('Sending message to subscriber:', subscriber.__class__.__name__)
             subscriber.on_new_data(messages)
