@@ -16,25 +16,28 @@ APPLICATIONS_BASE_FOLDER = 'applications'
 
 DEBUG_MODE = False
 
+
 class VIGITIARenderingManager(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.showFullScreen()
+
         self.initUI()
         self.show()
 
+    def initUI(self):
+        self.showFullScreen()
         self.width = QApplication.desktop().screenGeometry().width()
         self.height = QApplication.desktop().screenGeometry().height()
 
+        # TODO: Take into consideration that the window resolution might not be the same as the screen resolution
+        # Screen scaling can influence the resolution
         print('Main Window width:', self.width, 'height: ', self.height)
 
-    def initUI(self):
         self.setStyleSheet("background-color: black;")
 
         parent_widget = QWidget(self)
         parent_widget.setStyleSheet("background-color: transparent;")
-        parent_widget.setFixedSize(QApplication.desktop().screenGeometry().width(),
-                            QApplication.desktop().screenGeometry().height())
+        parent_widget.setFixedSize(self.width, self.height)
 
         # Load applications and add them to the canvas
         self.add_applications(parent_widget)
@@ -50,7 +53,8 @@ class VIGITIARenderingManager(QMainWindow):
             x = application['instance'].x
             y = application['instance'].y
             if application['instance'].rotation != 0:
-                application['parent'] = self.rotate_applicaton(application['instance'], application['instance'].rotation)
+                application['parent'] = self.rotate_applicaton(application['instance'],
+                                                               application['instance'].rotation)
 
             if application['parent'] is None:
                 if DEBUG_MODE:
@@ -94,8 +98,24 @@ class VIGITIARenderingManager(QMainWindow):
         # TODO: Check if width/height of graphics_wiew > width/height of QMainWindow. If yes, scale down
         # TODO: Notify application about new position, rotation and size
         #
-
         #print('Graphics view width:', graphics_view.width(), graphics_view.height())
+
+        #pts1 = np.float32([[100, 100], [200, 10], [10, 200], [200, 200]])
+        #pts2 = np.float32([[10, 10], [100, 110], [10, 100], [100, 100]])
+
+        #matrix = cv2.getPerspectiveTransform(pts1, pts2)
+
+        #print(matrix)
+
+        # matrix = [[0, 0,  0],
+        #           [0, 0,  0],
+        #           [0, 0,  0]]
+        #
+        # transform = QTransform()
+        # transform.setMatrix(matrix[0][0], matrix[0][1], matrix[0][2],
+        #                     matrix[1][0], matrix[1][1], matrix[1][2],
+        #                     matrix[2][0], matrix[2][1], matrix[2][2])
+        #graphics_view.setTransform(transform)
 
         return graphics_view
 
@@ -124,7 +144,7 @@ class VIGITIARenderingManager(QMainWindow):
                     # Check if the class has the required superclass
                     for superclass in superclasses:
                         if superclass.__name__ == 'VIGITIAApplication':
-                            print('"{}" in Module "{}" is a VIGITIA Application'.format(class_name, module_name))
+                            # print('"{}" in Module "{}" is a VIGITIA Application'.format(class_name, module_name))
                             # application = my_class()
                             application = {
                                 'name': class_name,
