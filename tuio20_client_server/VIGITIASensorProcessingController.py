@@ -8,9 +8,11 @@ import cv2
 from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
 
 # Import TUIO Server
-from tuio20_client_server.tuio_server import TUIOServer
+from tuio20_client_server.TUIOServer import TUIOServer
 
 from calibration.table_surface_extractor import TableSurfaceExtractor
+
+from gstreamer.VIGITIAVideoStreamer import VIGITIAVideoStreamer
 
 # Import Sensor data processing services
 from services.fiducials_detector import FiducialsDetector
@@ -18,6 +20,8 @@ from services.movement_detector import MovementDetector
 from services.foreground_mask_extractor import ForegroundMaskExtractor
 from services.touch_detector import TouchDetector
 
+TARGET_COMPUTER_IP = '132.199.130.68'
+TARGET_COMPUTER_PORT = 8000
 
 class VIGITIASensorProcessingController:
 
@@ -26,6 +30,8 @@ class VIGITIASensorProcessingController:
 
         self.camera = RealsenseD435Camera()
         self.camera.start()
+
+        self.video_streamer = VIGITIAVideoStreamer()
 
         self.table_surface_extractor = TableSurfaceExtractor()
 
@@ -36,8 +42,8 @@ class VIGITIASensorProcessingController:
         self.loop()
 
     def init_tuio_server(self):
-        target_computer_ip = '132.199.130.68'  # '132.199.117.19'
-        self.tuio_server = TUIOServer(target_computer_ip)
+
+        self.tuio_server = TUIOServer(TARGET_COMPUTER_IP, TARGET_COMPUTER_PORT)
 
         # The dimension attribute encodes the sensor dimension with two 16bit unsigned integer values embedded into a 32bit
         # integer value. The first two bytes represent the sensor width, while the final two bytes represent the sensor
@@ -56,6 +62,9 @@ class VIGITIASensorProcessingController:
             color_image, depth_image = self.camera.get_frames()
 
             if color_image is not None:
+
+                self.video_streamer.stream_frame(color_image)
+
                 self.tuio_server.start_tuio_bundle(dimension=self.dimension, source=self.source)
 
                 color_image_table = self.table_surface_extractor.extract_table_area(color_image)
