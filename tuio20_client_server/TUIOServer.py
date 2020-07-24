@@ -25,6 +25,12 @@ class TUIOServer:
         self.udp_client = udp_client.SimpleUDPClient(ip, port)
         self.start_time_ms = int(round(time.time() * 1000))
 
+    ''' f_id ->   Frame ID (int32)
+            time ->   OSC 64bit time tag (ttag)
+            dim  ->   Dimension encodes the sensor dimension with two 16bit unsigned integer values embedded into a 32bit
+                      integer value. The first two bytes represent the sensor width, while the final two bytes represent
+                      the sensor height. (int32)
+            source -> e.g. 'REAC' (string) '''
     def init_tuio_frame(self, dimension, source):
         self.current_frame_id += 1
         time_now_ms = int(round(time.time() * 1000))
@@ -37,11 +43,6 @@ class TUIOServer:
         frame_message.add_arg(source)
 
         return frame_message
-
-    # Commits the current frame.
-    # Generates and sends TUIO messages of all currently active and updated TuioTokens and TuioPointers.
-    def commit_tuio_frame(self):
-        pass
 
     # /tuio2/tok {s_id} {tu_id} {c_id} {x_pos} {y_pos} {angle}
     def add_token_message(self, s_id, tu_id, c_id, x_pos, y_pos, angle):
@@ -97,12 +98,6 @@ class TUIOServer:
     def add_data_message(self):
         data_message = osc_message_builder.OscMessageBuilder(address="/tuio2/data")
 
-    ''' f_id ->   Frame ID (int32)
-        time ->   OSC 64bit time tag (ttag)
-        dim  ->   Dimension encodes the sensor dimension with two 16bit unsigned integer values embedded into a 32bit
-                  integer value. The first two bytes represent the sensor width, while the final two bytes represent
-                  the sensor height. (int32)
-        source -> e.g. 'REAC' (string) '''
     def start_tuio_bundle(self, dimension, source):
         self.current_tuio_frame_bundle = osc_bundle_builder.OscBundleBuilder(osc_bundle_builder.IMMEDIATELY)
 
