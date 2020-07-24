@@ -1,3 +1,6 @@
+
+# Based on https://answers.opencv.org/question/202017/how-to-use-gstreamer-pipeline-in-opencv/
+
 import cv2
 
 
