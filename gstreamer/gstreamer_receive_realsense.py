@@ -1,30 +1,42 @@
 
 # Based on https://answers.opencv.org/question/202017/how-to-use-gstreamer-pipeline-in-opencv/
+import sys
 
 import cv2
 
 
-def receive():
-    print('Start')
-    cap_receive = cv2.VideoCapture('udpsrc port=5000 caps = "application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96" ! rtph264depay ! decodebin ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
+class VIGITIAVideoStreamReceiver:
 
-    if not cap_receive.isOpened():
-        print('VideoCapture not opened')
-        exit(0)
+    def __init__(self, port=5000):
+        pipeline = 'udpsrc port={} caps = "application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96" ! rtph264depay ! decodebin ! videoconvert ! appsink'.format(str(port))
+        self.capture_receive = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
 
-    while True:
-        ret,frame = cap_receive.read()
+        self.receive()
 
-        if not ret:
-            print('empty frame')
-            break
+    def receive(self):
 
-        print('Frame')
-        cv2.imshow('receive', frame)
-        if cv2.waitKey(1)&0xFF == ord('q'):
-            break
+        if not self.capture_receive.isOpened():
+            print('VideoCapture not opened')
+            exit(0)
 
-    cap_receive.release()
+        while True:
+            ret, frame = self.capture_receive.read()
+
+            if not ret:
+                print('empty frame')
+                break
+
+            cv2.imshow('receive', frame)
+            if cv2.waitKey(1)&0xFF == ord('q'):
+                break
+
+        self.capture_receive.release()
 
 
-receive()
+def main():
+    VIGITIAVideoStreamReceiver()
+    sys.exit()
+
+
+if __name__ == '__main__':
+    main()
