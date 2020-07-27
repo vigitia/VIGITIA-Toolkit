@@ -31,6 +31,7 @@ class VIGITIASensorProcessingController:
         self.camera = RealsenseD435Camera()
         self.camera.start()
 
+        #self.video_streamer = VIGITIAVideoStreamer('132.199.199.67', 5000)
         self.video_streamer = VIGITIAVideoStreamer('132.199.130.68', 5000)
 
         self.table_surface_extractor = TableSurfaceExtractor()
