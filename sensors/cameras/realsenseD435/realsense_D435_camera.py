@@ -49,6 +49,8 @@ class RealsenseD435Camera:
         config = rs.config()
         config.enable_stream(rs.stream.depth, DEPTH_RES_X, DEPTH_RES_Y, rs.format.z16, DEPTH_FPS)
         config.enable_stream(rs.stream.color, RGB_RES_X, RGB_RES_Y, rs.format.bgr8, RGB_FPS)
+        # config.enable_stream(rs.stream.infrared, 1, DEPTH_RES_X, DEPTH_RES_Y, rs.format.y8, DEPTH_FPS)
+        # config.enable_stream(rs.stream.infrared, 2, DEPTH_RES_X, DEPTH_RES_Y, rs.format.y8, DEPTH_FPS)
 
         # Start streaming
         profile = self.pipeline.start(config)
@@ -117,6 +119,8 @@ class RealsenseD435Camera:
             # Get aligned frames
             aligned_depth_frame = aligned_frames.get_depth_frame()
             color_frame = aligned_frames.get_color_frame()
+            # ir_left_frame = frames.get_infrared_frame(1)
+            # ir_right_frame = frames.get_infrared_frame(2)
 
             # Validate that both frames are valid
             if not aligned_depth_frame or not color_frame:
@@ -136,6 +140,9 @@ class RealsenseD435Camera:
             depth_image = np.array(aligned_depth_frame.get_data(), dtype=np.uint16)
             depth_image = self.get_depth_image_mm(depth_image)
             depth_colormap = np.asanyarray(self.colorizer.colorize(aligned_depth_frame).get_data())
+
+            # ir_left_frame = np.asanyarray(ir_left_frame.get_data())
+            # ir_right_frame = np.asanyarray(ir_right_frame.get_data())
 
             with self.read_lock:
                 self.color_image = color_image
