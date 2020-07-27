@@ -8,12 +8,9 @@ from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Cam
 
 class VIGITIAVideoStreamer:
 
-    def __init__(self):
+    def __init__(self, ip, port):
 
-        host_ip = '132.199.130.68'
-        port = 5000
-
-        pipeline = 'appsrc ! videoconvert ! x264enc tune=zerolatency bitrate=500 speed-preset=superfast ! rtph264pay ! udpsink host={} port={}'.format(host_ip, port)
+        pipeline = 'appsrc ! videoconvert ! x264enc tune=zerolatency bitrate=500 speed-preset=superfast ! rtph264pay ! udpsink host={} port={}'.format(ip, port)
         fps = 30
         res_x = 1280
         res_y = 720
