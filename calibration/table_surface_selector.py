@@ -131,6 +131,11 @@ class TableSurfaceSelector:
         sys.exit(0)
 
 
+    def project_targets_on_table(self):
+        # TODO: Project Targets on table and let a user click them. Then we have points that lie for sure on the table surface
+        pass
+
+
 def main():
     TableSurfaceSelector()
     sys.exit()
