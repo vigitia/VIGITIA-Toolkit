@@ -19,6 +19,6 @@ class VIGITIAVideoStreamer:
 
     def stream_frame(self, frame):
         if not self.video_writer.isOpened():
-            print('VideoWriter to opened')
+            print('VideoWriter not opened')
         else:
             self.video_writer.write(frame)

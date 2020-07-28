@@ -48,24 +48,27 @@ class VIGITIARenderingManager(QMainWindow):
         self.applications = self.find_available_applications()
 
         for application in self.applications:
-            print('Placing {} on canvas.'.format(application['name']))
-
-            x = application['instance'].x
-            y = application['instance'].y
-            if application['instance'].rotation != 0:
-                application['parent'] = self.rotate_applicaton(application['instance'],
-                                                               application['instance'].rotation)
-
-            if application['parent'] is None:
-                if DEBUG_MODE:
-                    application['instance'].setStyleSheet('border: 3px solid #FF0000')
-                application['instance'].move(x, y)
-                application['instance'].setParent(parent_widget)
+            if application['name'] == 'VIGITIAPaintingApp' or application['name'] == 'BrowserWidget':
+                print('Test. Not adding', application['name'])
             else:
-                if DEBUG_MODE:
-                    application['parent'].setStyleSheet('border: 3px solid #FF0000')
-                application['parent'].move(x, y)
-                application['parent'].setParent(parent_widget)
+                print('Placing {} on canvas.'.format(application['name']))
+
+                x = application['instance'].get_x()
+                y = application['instance'].get_y()
+                if application['instance'].get_rotation() != 0:
+                    application['parent'] = self.rotate_applicaton(application['instance'],
+                                                                   application['instance'].rotation)
+
+                if application['parent'] is None:
+                    if DEBUG_MODE:
+                        application['instance'].setStyleSheet('border: 3px solid #FF0000')
+                    application['instance'].move(x, y)
+                    application['instance'].setParent(parent_widget)
+                else:
+                    if DEBUG_MODE:
+                        application['parent'].setStyleSheet('border: 3px solid #FF0000')
+                    application['parent'].move(x, y)
+                    application['parent'].setParent(parent_widget)
 
         # TODO: Add unified system to define application position
         # Test of raising an application to the top
