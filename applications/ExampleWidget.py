@@ -17,11 +17,11 @@ class ExampleWidget(QWidget, VIGITIAApplication):
     def __init__(self):
         super().__init__()
 
-        self.x = 1500
+        self.x = 300
         self.y = 100
-        self.width = 500
-        self.height = 400
-        self.rotation = 0
+        #self.width = 500
+        #self.height = 400
+        #self.rotation = 0
 
         # Make window frameless
         # self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
@@ -33,10 +33,11 @@ class ExampleWidget(QWidget, VIGITIAApplication):
         self.initUI()
 
     def initUI(self):
-        self.setGeometry(0, 0, self.width, self.height)
+        self.setGeometry(0, 0, self.get_width(), self.get_height())
 
         self.button = QPushButton("Button1")
         self.button.clicked.connect(self.onButtonClicked)
+        self.button.setStyleSheet("background-color: blue")
 
         self.label_1 = QLabel('Light green', self)
         self.label_1.move(100, 100)
@@ -46,7 +47,7 @@ class ExampleWidget(QWidget, VIGITIAApplication):
         window_layout.addWidget(self.button)
         self.setLayout(window_layout)
 
-        self.show()
+        #self.show()
 
         #self.grab().save('test.jpg')
 
@@ -81,6 +82,10 @@ class ExampleWidget(QWidget, VIGITIAApplication):
     # handler for the signal aka slot
     def onButtonClicked(self):
         print('Button clicked')
+        colors = ['blue', 'green', 'red', 'yellow', 'orange', 'brown']
+        color = random.choice(colors)
+
+        self.button.setStyleSheet("background-color: " + color)
 
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
@@ -91,7 +96,7 @@ class ExampleWidget(QWidget, VIGITIAApplication):
             if self.label_1.pos().x() <= event.x() <= self.label_1.pos().x() + self.label_1.width():
                 if self.label_1.pos().y() <= event.y() <= self.label_1.pos().y() + self.label_1.height():
 
-                    colors = ['blue', 'green', 'red']
+                    colors = ['blue', 'green', 'red', 'yellow', 'orange', 'brown']
                     color = random.choice(colors)
 
                     self.label_1.setStyleSheet("background-color: " + color)
