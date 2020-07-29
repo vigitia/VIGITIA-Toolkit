@@ -5,6 +5,7 @@ import os
 import sys
 
 import cv2
+import numpy as np
 from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
 
 # Import TUIO Server
@@ -19,6 +20,8 @@ from services.fiducials_detector import FiducialsDetector
 from services.movement_detector import MovementDetector
 from services.foreground_mask_extractor import ForegroundMaskExtractor
 from services.touch_detector import TouchDetector
+from services.table_detector import TableDetector
+from services.generic_object_detector import GenericObjectDetector
 
 TARGET_COMPUTER_IP = '132.199.130.68'
 TARGET_COMPUTER_PORT = 8000
@@ -57,6 +60,8 @@ class VIGITIASensorProcessingController:
         self.movement_detector = MovementDetector()
         self.foreground_mask_extractor = ForegroundMaskExtractor()
         self.touch_detector = TouchDetector()
+        self.table_detector = TableDetector()
+        # self.generic_object_detector = GenericObjectDetector()
 
     def loop(self):
         while True:
@@ -64,11 +69,21 @@ class VIGITIASensorProcessingController:
 
             if color_image is not None:
 
-                self.video_streamer.stream_frame(color_image)
+                #depth_filtered = cv2.convertScaleAbs(depth_image, alpha=(255/2000))
+                #depth_foreground = self.foreground_mask_extractor.get_foreground_mask_depth(depth_filtered)
+
+                table = self.table_detector.get_table_border(color_image, depth_image)
+                cv2.imshow('table', table)
+
+                #self.video_streamer.stream_frame(color_image)
 
                 self.tuio_server.start_tuio_bundle(dimension=self.dimension, source=self.source)
 
                 color_image_table = self.table_surface_extractor.extract_table_area(color_image)
+
+                # detected_objects, detected_objects_dict = self.generic_object_detector.detect_generic_objects(color_image)
+                #cv2.imshow('objects', detected_objects)
+                #print(detected_objects_dict)
 
                 aruco_markers, movements, touch_points = self.process_sensor_data(color_image, color_image_table,
                                                                                   depth_image)
