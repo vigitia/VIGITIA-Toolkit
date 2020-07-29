@@ -44,3 +44,9 @@ class VIGITIAApplication:
 
     def set_rotation(self, rotation):
         self.rotation = rotation
+
+    def on_new_pointer_messages(self, data):
+        pass
+
+    def on_new_token_messages(self, data):
+        pass
