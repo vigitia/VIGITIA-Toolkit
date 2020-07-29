@@ -89,6 +89,12 @@ class TUIOServer:
     # /tuio2/sym s_id tu_id c_id group data
     def add_symbol_message(self, s_id, tu_id, c_id, group, data):
         symbol_message = osc_message_builder.OscMessageBuilder(address="/tuio2/sym")
+        symbol_message.add_arg(s_id)
+        symbol_message.add_arg(tu_id)
+        symbol_message.add_arg(c_id)
+        symbol_message.add_arg(group)
+        symbol_message.add_arg(data)
+        self.current_tuio_frame_bundle.add_content(symbol_message.build())
 
     # /tuio2/skg s_id x_p0 y_p0 x_p1 y_p1 node ... x_pN y_pN
     def add_skeleton_message(self):
