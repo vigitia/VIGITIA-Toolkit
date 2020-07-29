@@ -54,6 +54,10 @@ class VIGITIASensorDataInterface:
         self.subscribers = set()
 
         self.tokens = []
+        self.pointers = []
+        self.outer_contour_geometries = []
+        self.bounding_boxes = []
+        self.symbols = []
 
         self.init_tuio_interface()
 
