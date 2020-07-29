@@ -27,6 +27,17 @@ class ForegroundMaskExtractor:
 
         return foreground_mask
 
+    def get_foreground_mask_depth(self, depth_frame):
+        blur = cv2.GaussianBlur(depth_frame, (7, 7), 0)
+        foreground_mask = self.fgbg_basic.apply(blur, learningRate=0)
+
+        # Get rid of the small black regions in our mask by applying morphological closing
+        # (dilation followed by erosion) with a small x by x pixel kernel
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
+        foreground_mask = cv2.morphologyEx(foreground_mask, cv2.MORPH_CLOSE, kernel, 2)
+
+        return foreground_mask
+
 
     def get_foreground_mask_basic(self, frame):
         # Use the Hue channel on the test background for good detection results
