@@ -48,7 +48,9 @@ class VIGITIARenderingManager(QMainWindow):
         self.applications = self.find_available_applications()
 
         for application in self.applications:
-            if application['name'] == 'VIGITIAPaintingApp' or application['name'] == 'BrowserWidget':
+            hidden_applications = ['BrowserWidget', 'ExampleWidget']
+            # if application['name'] == 'VIGITIAPaintingApp' or application['name'] == 'BrowserWidget':
+            if application['name'] in hidden_applications:
                 print('Test. Not adding', application['name'])
             else:
                 print('Placing {} on canvas.'.format(application['name']))
@@ -73,7 +75,7 @@ class VIGITIARenderingManager(QMainWindow):
         # TODO: Add unified system to define application position
         # Test of raising an application to the top
         for application in self.applications:
-            if application['name'] == 'VIGITIAPaintingApp':
+            if application['name'] == 'BrowserWidget':
                 print('Bring painting app to front')
                 if application['parent'] is None:
                     application['instance'].raise_()

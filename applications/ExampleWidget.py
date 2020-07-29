@@ -11,17 +11,19 @@ from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLa
 
 from apps.vigitia_application import VIGITIAApplication
 
+from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterface
+
 
 class ExampleWidget(QWidget, VIGITIAApplication):
 
     def __init__(self):
         super().__init__()
 
-        self.x = 300
-        self.y = 100
-        #self.width = 500
+        self.x = 1500
+        self.y = 400
+        # self.width = 500
         #self.height = 400
-        #self.rotation = 0
+        self.rotation = 300
 
         # Make window frameless
         # self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
@@ -31,6 +33,9 @@ class ExampleWidget(QWidget, VIGITIAApplication):
         self.setStyleSheet("background-color:transparent;")
 
         self.initUI()
+
+        data_interface = VIGITIASensorDataInterface.Instance()
+        data_interface.register_subscriber(self)
 
     def initUI(self):
         self.setGeometry(0, 0, self.get_width(), self.get_height())
@@ -56,6 +61,10 @@ class ExampleWidget(QWidget, VIGITIAApplication):
         painter.setPen(QPen(Qt.black, 10, Qt.SolidLine))
         painter.setBrush(QBrush(Qt.yellow, Qt.SolidPattern))
         painter.drawRect(40, 40, 400, 200)
+
+    def on_new_data(self, data):
+        pass
+        #print('Fiducial in ExampleWidget:', data)
 
     def keyPressEvent(self, event):
 

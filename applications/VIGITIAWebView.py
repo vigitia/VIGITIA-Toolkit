@@ -28,19 +28,18 @@ class CallHandler(QObject):
         return "ok"
 
 
-#class BrowserWidget(QWebEngineView):
+# class BrowserWidget(QWebEngineView):
 class BrowserWidget(QWebEngineView, VIGITIAApplication):
     def __init__(self):
         super().__init__()
 
-        self.x = 500
-        self.y = 300
-        self.width = 800
+        self.x = 1550
+        self.y = 50
+        self.width = 900
         self.height = 600
-        self.rotation = 90
+        self.rotation = 240
 
         self.setGeometry(0, 0, self.width, self.height)
-
 
         self.channel = QWebChannel()
         self.handler = CallHandler()
@@ -70,8 +69,8 @@ class BrowserWidget(QWebEngineView, VIGITIAApplication):
     def js_callback(self, result):
         print('Python called back:', result)
 
-    def on_new_pointer_message(self, data):
-        print('Pointer:', data)
+    def on_new_pointer_messages(self, data):
+        print('Pointer in Webview:', data)
         touch_x = data[4]
         touch_y = data[5]
         global_pos = QPoint(int(touch_x / 1280 * 2560), int(touch_y / 720 * 1440))
@@ -87,15 +86,20 @@ class BrowserWidget(QWebEngineView, VIGITIAApplication):
 
 
 
+
+
     def on_new_data(self, data):
         pass
-        print('Data arrived in web view:', data)
+        # print('Data arrived in web view:', data)
 
 
 
     def emulate_mouse_event(self, event_type, local_pos, global_pos, target):
         mouse_event = QMouseEvent(event_type, local_pos, global_pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
-        QCoreApplication.sendEvent(target, mouse_event)
+        try:
+            QCoreApplication.sendEvent(target, mouse_event)
+        except:
+            print('Touch in Webview not working')
 
     # def keyPressEvent(self, event):
     #     if event.key() == Qt.Key_Escape:
