@@ -15,7 +15,8 @@
 
 import sys
 import threading
-from urllib import request, error
+
+from utility.get_ip import get_ip_address
 
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
@@ -49,7 +50,7 @@ class VIGITIASensorDataInterface:
 
     def __init__(self):
         # IP needs to be always the IP of the computer
-        self.ip = self.get_ip_address()
+        self.ip = get_ip_address()
 
         self.subscribers = set()
 
@@ -60,17 +61,6 @@ class VIGITIASensorDataInterface:
         self.symbols = []
 
         self.init_tuio_interface()
-
-    def get_ip_address(self):
-        try:
-            # Try to get the public IP address of the computer
-            ip = request.urlopen('https://ident.me').read().decode('utf8')
-        except error.URLError as e:
-            # If no Internet connection is available, use the local IP address instead
-            import socket
-            ip = socket.gethostbyname(socket.gethostname())
-
-        return ip
 
     def register_subscriber(self, new_subscriber):
         print('New Subscriber:', new_subscriber.__class__.__name__)
@@ -83,8 +73,8 @@ class VIGITIASensorDataInterface:
         dispatcher = Dispatcher()
         dispatcher.map("/tuio2/frm", self.on_new_frame_message)
         dispatcher.map("/tuio2/ptr", self.on_new_pointer_message)
-        dispatcher.map("/tuio2/tok", self.on_new_token_message)
         dispatcher.map("/tuio2/bnd", self.on_new_bounding_box_message)
+        dispatcher.map("/tuio2/tok", self.on_new_token_message)
         dispatcher.map("/tuio2/alv", self.on_new_alive_message)
 
         osc_udp_server = ThreadingOSCUDPServer((self.ip, PORT), dispatcher)
@@ -114,14 +104,12 @@ class VIGITIASensorDataInterface:
         self.tokens.append(messages)
         # print(messages)
         # for subscriber in self.subscribers:
-        #     # print('Sending message to subscriber:', subscriber.__class__.__name__)
         #     subscriber.on_new_token_message(messages)
 
     def on_new_alive_message(self, *messages):
         #print(messages)
 
         for subscriber in self.subscribers:
-            # print('Sending message to subscriber:', subscriber.__class__.__name__)
             subscriber.on_new_token_messages(self.tokens)
 
 
