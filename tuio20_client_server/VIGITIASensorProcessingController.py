@@ -15,6 +15,8 @@ from calibration.table_surface_extractor import TableSurfaceExtractor
 
 from gstreamer.VIGITIAVideoStreamer import VIGITIAVideoStreamer
 
+from utility.get_ip import get_ip_address
+
 # Import Sensor data processing services
 from services.fiducials_detector import FiducialsDetector
 from services.movement_detector import MovementDetector
@@ -22,8 +24,8 @@ from services.foreground_mask_extractor import ForegroundMaskExtractor
 from services.touch_detector import TouchDetector
 from services.table_detector import TableDetector
 from services.generic_object_detector import GenericObjectDetector
+from services.hand_tracker import HandTracker
 
-TARGET_COMPUTER_IP = '132.199.130.68'
 TARGET_COMPUTER_PORT = 8000
 
 class VIGITIASensorProcessingController:
@@ -35,7 +37,7 @@ class VIGITIASensorProcessingController:
         self.camera.start()
 
         #self.video_streamer = VIGITIAVideoStreamer('132.199.199.67', 5000)
-        self.video_streamer = VIGITIAVideoStreamer('132.199.130.68', 5000)
+        self.video_streamer = VIGITIAVideoStreamer(get_ip_address(), 5000)
 
         self.table_surface_extractor = TableSurfaceExtractor()
 
@@ -47,7 +49,7 @@ class VIGITIASensorProcessingController:
 
     def init_tuio_server(self):
 
-        self.tuio_server = TUIOServer(TARGET_COMPUTER_IP, TARGET_COMPUTER_PORT)
+        self.tuio_server = TUIOServer(get_ip_address(), TARGET_COMPUTER_PORT)
 
         # The dimension attribute encodes the sensor dimension with two 16bit unsigned integer values embedded into a 32bit
         # integer value. The first two bytes represent the sensor width, while the final two bytes represent the sensor
@@ -61,7 +63,8 @@ class VIGITIASensorProcessingController:
         self.foreground_mask_extractor = ForegroundMaskExtractor()
         self.touch_detector = TouchDetector()
         self.table_detector = TableDetector()
-        # self.generic_object_detector = GenericObjectDetector()
+        self.generic_object_detector = GenericObjectDetector()
+        self.hand_tracker = HandTracker()
 
     def loop(self):
         while True:
@@ -69,24 +72,13 @@ class VIGITIASensorProcessingController:
 
             if color_image is not None:
 
-                #depth_filtered = cv2.convertScaleAbs(depth_image, alpha=(255/2000))
-                #depth_foreground = self.foreground_mask_extractor.get_foreground_mask_depth(depth_filtered)
-
-                table = self.table_detector.get_table_border(color_image, depth_image)
-                cv2.imshow('table', table)
-
-                #self.video_streamer.stream_frame(color_image)
-
-                self.tuio_server.start_tuio_bundle(dimension=self.dimension, source=self.source)
-
                 color_image_table = self.table_surface_extractor.extract_table_area(color_image)
-
-                # detected_objects, detected_objects_dict = self.generic_object_detector.detect_generic_objects(color_image)
-                #cv2.imshow('objects', detected_objects)
-                #print(detected_objects_dict)
+                self.experiments(color_image, color_image_table, depth_image)
 
                 aruco_markers, movements, touch_points = self.process_sensor_data(color_image, color_image_table,
                                                                                   depth_image)
+
+                self.tuio_server.start_tuio_bundle(dimension=self.dimension, source=self.source)
 
                 for marker in aruco_markers:
                     # TODO: Correct IDs
@@ -123,6 +115,27 @@ class VIGITIASensorProcessingController:
             if key & 0xFF == ord('q') or key == 27:
                 cv2.destroyAllWindows()
                 break
+
+    def experiments(self, color_image, color_image_table, depth_image):
+        # depth_filtered = cv2.convertScaleAbs(depth_image, alpha=(255/2000))
+        # depth_foreground = self.foreground_mask_extractor.get_foreground_mask_depth(depth_filtered)
+
+        table = self.table_detector.get_table_border(color_image, depth_image)
+        cv2.imshow('table', table)
+
+        # TODO: Find solution for this temporary fix of ghost hands
+        self.hand_tracker.reset()
+        detected_hands = self.hand_tracker(cv2.cvtColor(color_image_table, cv2.COLOR_BGR2RGB))
+        hands = self.hand_tracker.add_hand_tracking_points(color_image_table, detected_hands)
+        cv2.imshow('hands', hands)
+
+        # self.video_streamer.stream_frame(color_image)
+
+        detected_objects, detected_objects_dict = self.generic_object_detector.detect_generic_objects(color_image_table)
+        cv2.imshow('objects', detected_objects)
+
+        if len(detected_objects_dict) > 0:
+            print(detected_objects_dict)
                 
     def process_sensor_data(self, color_image, color_image_table, depth_image):
         aruco_markers = self.fiducials_detector.detect_fiducials(color_image_table)
