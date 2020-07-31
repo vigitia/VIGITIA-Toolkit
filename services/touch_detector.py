@@ -93,7 +93,7 @@ class TouchDetector:
             self.background_standard_deviation = deviation_temp
             self.background_model_available = True
 
-    def get_touch_points(self, color_image, depth_image, table_border):
+    def get_touch_points(self, color_image, depth_image, table_border, hand_regions):
         self.table_border = table_border
         self.num_frame += 1
 
@@ -105,11 +105,40 @@ class TouchDetector:
             return []
         else:
             new_touch_points = self.find_touch_points(color_image, depth_image)
+            new_touch_points = self.compare_with_cnn_points(new_touch_points, hand_regions)
             self.active_touch_points = self.merge_touch_points(new_touch_points)
 
-            self.draw_touch_points(color_image, self.active_touch_points)
+            self.draw_touch_points(color_image, self.active_touch_points, hand_regions)
+
+            # Experiment
+            # self.extract_arms_in_depth_image(depth_image)
 
             return self.active_touch_points
+
+    def compare_with_cnn_points(self, new_touch_points, hand_regions):
+        points_inside = []
+
+        if len(hand_regions) > 0:
+            print(hand_regions)
+            #print(new_touch_points)
+
+
+            for point in new_touch_points:
+                point_inside = False
+                print('Point:', point.x, point.y)
+                for hand_region in hand_regions:
+                    if hand_region[0][0] <= point.x <= hand_region[1][0]:
+                        if hand_region[0][1] <= point.y <= hand_region[1][1]:
+                            point_inside = True
+                            print('Found point inside')
+
+                if point_inside:
+                    points_inside.append(point)
+
+        return points_inside
+
+
+
 
     def create_background_model(self, depth_image):
         pos = self.num_frame - 1
@@ -159,7 +188,8 @@ class TouchDetector:
         # List to be filled by this method:
         touch_points = []
 
-        foreground_mask = self.foreground_mask_extractor.get_foreground_mask_basic(color_image)
+        # foreground_mask = self.foreground_mask_extractor.get_foreground_mask_basic(color_image)
+        foreground_mask = self.foreground_mask_extractor.get_foreground_mask(color_image)
 
         cv2.imshow('mask', foreground_mask)
 
@@ -406,10 +436,13 @@ class TouchDetector:
 
         return final_touch_points
 
-    def draw_touch_points(self, color_image, touch_points):
+    def draw_touch_points(self, color_image, touch_points, hand_regions):
 
         #black_image = np.zeros(shape=(self.depth_res_y, self.depth_res_x, 3), dtype=np.uint8)
         black_image = color_image
+
+        for region in hand_regions:
+            cv2.rectangle(black_image, region[0], region[1], (0, 255, 0), 3)
 
         for touch_point in touch_points:
             cv2.circle(black_image, touch_point.get_touch_coordinates(), 8,
@@ -452,28 +485,29 @@ class TouchDetector:
         #         self.stored_depth_frame = image
         #         return averaged_image
 
-    def extract_arms_old(self, depth_image, color_image):
+    def extract_arms_in_depth_image(self, depth_image):
 
         #hand_area = self.get_touch_points(color_image, depth_image)
         #return None
 
-        # if DEBUG_MODE and self.num_frame == 200:
-        #     print("Writing files")
-        #     cv2.imwrite('depth_image.png', depth_image)
-        #     cv2.imwrite('color_image.png', color_image)
+        depth_image_table = self.table_surface_extractor.extract_table_area(depth_image)
+        background_average_table = self.table_surface_extractor.extract_table_area(self.background_average)
+        background_standard_deviation_table = self.table_surface_extractor.extract_table_area(self.background_standard_deviation)
 
         # Compare the current depth image with the stored average of the background
-        difference_to_background = self.background_average - depth_image
+        #difference_to_background = background_average_table - depth_image_table
+        difference_to_background = background_average_table - depth_image_table
+
         # Make sure that there are no negative values in the array
         difference_to_background = np.where(difference_to_background < 0, 0, difference_to_background)
 
         # Ignore pixels that are too close to the table surface
-        remove_uncertain_pixels = difference_to_background - self.background_standard_deviation
+        remove_uncertain_pixels = difference_to_background - background_standard_deviation_table
         remove_uncertain_pixels = np.where(remove_uncertain_pixels < 0, 0, difference_to_background)
         remove_uncertain_pixels = np.where((remove_uncertain_pixels < MIN_DIST_TOUCH), 0, remove_uncertain_pixels)
 
-        depth_holes = np.where(depth_image == 0, 0, 65535)
-        remove_uncertain_pixels = np.where(depth_holes == 0, 0, remove_uncertain_pixels)
+        #depth_holes = np.where(depth_image_table == 0, 0, 65535)
+        #remove_uncertain_pixels = np.where(depth_holes == 0, 0, remove_uncertain_pixels)
 
         # Arm pixels are pixels at least MAX_DIST_TOUCH away from the the background mean
         mark_arm_pixels = np.where((remove_uncertain_pixels > MAX_DIST_TOUCH), 65535, 0)
@@ -483,22 +517,11 @@ class TouchDetector:
         mark_touch_pixels = np.where(mark_touch_pixels != 0, 65535, 0)
         mark_touch_pixels = cv2.convertScaleAbs(mark_touch_pixels, alpha=(255.0 / 65535.0))
 
-        #if self.num_frame == 200:
-        #    print("Writing files")
-        #    cv2.imwrite('mark_arm_pixels.png', mark_arm_pixels)
-        #    cv2.imwrite('mark_touch_pixels.png', mark_touch_pixels)
-
         remove_uncertain_pixels = np.where((remove_uncertain_pixels >= MIN_DIST_TOUCH), 65535, 0)
         remove_uncertain_pixels = cv2.convertScaleAbs(remove_uncertain_pixels, alpha=(255.0/65535.0))
 
         small_regions = self.remove_small_connected_regions(remove_uncertain_pixels, 10000, True)
-
-        #if self.num_frame == 200:
-        #    print("Writing files")
-        #    cv2.imwrite('remove_uncertain_pixels.png', remove_uncertain_pixels)
-        #    cv2.imwrite('small_regions.png', small_regions)
-
-        remove_uncertain_pixels -=small_regions
+        remove_uncertain_pixels -= small_regions
         mark_arm_pixels -= small_regions
         mark_touch_pixels -= small_regions
 
@@ -509,15 +532,15 @@ class TouchDetector:
         significant_pixels[np.where((mark_touch_pixels == [255, 255, 255]).all(axis=2))] = [0, 0, 255]
         significant_pixels[np.where((mark_arm_pixels == [255, 255, 255]).all(axis=2))] = [0, 255, 0]
 
-        if DEBUG_MODE:
-            cv2.imshow('hands_depth', significant_pixels)
+        cv2.imshow('hands_depth', significant_pixels)
+
 
         #unique, counts = np.unique(significant_pixels, return_counts=True)
         #print(dict(zip(unique, counts)))
 
         #significant_pixels_color = cv2.cvtColor(significant_pixels, cv2.COLOR_GRAY2BGR)
 
-        hand_area = self.get_touch_points(color_image, depth_image)
+        #hand_area = self.get_touch_points(color_image, depth_image)
 
         #hand_area = cv2.cvtColor(hand_area, cv2.COLOR_GRAY2BGR)
         #significant_pixels[np.where((hand_area == [0, 0, 0]).all(axis=2))] = [0, 0, 0]
@@ -541,7 +564,7 @@ class TouchDetector:
         sizes = stats[1:, -1]
         nb_components = nb_components - 1
 
-        output_image = np.zeros(shape=(self.depth_res_y, self.depth_res_x), dtype=np.uint8)
+        output_image = np.zeros(shape=image.shape, dtype=np.uint8)
         # for every component in the image, you keep it only if it's above min_size
         for i in range(0, nb_components):
             if get_only_regions_to_remove:
