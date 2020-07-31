@@ -356,18 +356,36 @@ class HandTracker:
     # Draw circles on the frame for all detected coordinates of the hand
     def add_hand_tracking_points(self, frame, detected_hands):
         # print("Num Hands here:", len(detected_hands))
+
+        black_image = np.zeros(shape=frame.shape, dtype=np.uint8)
+
+        hand_regions = []
+
         for hand in detected_hands:
+            print(hand)
+            black_image = np.zeros(shape=frame.shape, dtype=np.uint8)
+
             # Only look at the joints right now
             # TODO: Check bounding boxes, etc later
             points = hand['joints']
             point_id = 0
+
             for point in points:
                 x, y = point
+
                 if point_id == 8:  # Id of index finger -> draw in different color
                     cv2.circle(frame, (int(x), int(y)), THICKNESS * 2, (255, 0, 0), -1)
+                    cv2.circle(black_image, (int(x), int(y)), THICKNESS * 2, (255, 0, 0), -1)
                 else:
                     cv2.circle(frame, (int(x), int(y)), THICKNESS * 2, POINT_COLOR, -1)
+                    cv2.circle(black_image, (int(x), int(y)), THICKNESS * 2, POINT_COLOR, -1)
                 point_id += 1
+
+            if len(points) > 0:
+
+                top_left_corner, bottom_right_corner = self.get_bounding_box_of_points(points)
+                hand_regions.append([top_left_corner, bottom_right_corner])
+                cv2.rectangle(frame, top_left_corner, bottom_right_corner, (0, 255, 0), 3)
 
             # frame, distance_fingertip_table = self.calculate_distance_fingertip_table(hand, frame, aligned_depth_frame)
 
@@ -376,4 +394,33 @@ class HandTracker:
                 x1, y1 = points[connection[1]]
                 cv2.line(frame, (int(x0), int(y0)), (int(x1), int(y1)), CONNECTION_COLOR, THICKNESS)
 
-        return frame
+        return frame, black_image
+
+    def get_bounding_box_of_points(self, points, extend_px=50):
+        min_x = None
+        min_y = None
+        max_x = None
+        max_y = None
+
+        for point in points:
+            x, y = point
+
+            if min_x is None:
+                min_x = x
+                min_y = y
+                max_x = x
+                max_y = y
+
+            if x < min_x:
+                min_x = x
+            if x > max_x:
+                max_x = x
+            if y < min_y:
+                min_y = y
+            if y > max_y:
+                max_y = y
+
+        top_left_corner = (int(min_x) - extend_px, int(min_y) - extend_px)
+        bottom_right_corner = (int(max_x) + extend_px, int(max_y) + extend_px)
+
+        return top_left_corner, bottom_right_corner
