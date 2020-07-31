@@ -357,12 +357,9 @@ class HandTracker:
     def add_hand_tracking_points(self, frame, detected_hands):
         # print("Num Hands here:", len(detected_hands))
 
-        black_image = np.zeros(shape=frame.shape, dtype=np.uint8)
-
         hand_regions = []
 
         for hand in detected_hands:
-            print(hand)
             black_image = np.zeros(shape=frame.shape, dtype=np.uint8)
 
             # Only look at the joints right now
@@ -375,14 +372,11 @@ class HandTracker:
 
                 if point_id == 8:  # Id of index finger -> draw in different color
                     cv2.circle(frame, (int(x), int(y)), THICKNESS * 2, (255, 0, 0), -1)
-                    cv2.circle(black_image, (int(x), int(y)), THICKNESS * 2, (255, 0, 0), -1)
                 else:
                     cv2.circle(frame, (int(x), int(y)), THICKNESS * 2, POINT_COLOR, -1)
-                    cv2.circle(black_image, (int(x), int(y)), THICKNESS * 2, POINT_COLOR, -1)
                 point_id += 1
 
             if len(points) > 0:
-
                 top_left_corner, bottom_right_corner = self.get_bounding_box_of_points(points)
                 hand_regions.append([top_left_corner, bottom_right_corner])
                 cv2.rectangle(frame, top_left_corner, bottom_right_corner, (0, 255, 0), 3)
@@ -394,7 +388,7 @@ class HandTracker:
                 x1, y1 = points[connection[1]]
                 cv2.line(frame, (int(x0), int(y0)), (int(x1), int(y1)), CONNECTION_COLOR, THICKNESS)
 
-        return frame, black_image
+        return frame, hand_regions
 
     def get_bounding_box_of_points(self, points, extend_px=50):
         min_x = None
