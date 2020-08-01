@@ -1,7 +1,6 @@
 
 # Based on https://answers.opencv.org/question/202017/how-to-use-gstreamer-pipeline-in-opencv/
 
-
 import cv2
 import threading
 
@@ -12,13 +11,11 @@ class VIGITIAVideoStreamReceiver:
 
     def __init__(self, name, port=5000):
         self.name = name
-        pipeline = 'udpsrc port={} caps = "application/x-rtp, media=(string)video, clock-rate=(int)90000, ' \
+        self.pipeline = 'udpsrc port={} caps = "application/x-rtp, media=(string)video, clock-rate=(int)90000, ' \
                    'encoding-name=(string)H264, payload=(int)96" ! rtph264depay ! decodebin ! videoconvert ! ' \
                    'appsink'.format(str(port))
 
         self.subscribers = set()
-
-        self.capture_receive = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
 
         self.started = False
 
@@ -40,6 +37,7 @@ class VIGITIAVideoStreamReceiver:
             return self
 
     def update(self):
+        self.capture_receive = cv2.VideoCapture(self.pipeline, cv2.CAP_GSTREAMER)
 
         if not self.capture_receive.isOpened():
             print('[VIGITIAVideoStreamReceiver]: Error: VideoCapture not opened')
