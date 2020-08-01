@@ -15,7 +15,7 @@ import pyclbr
 APPLICATIONS_BASE_FOLDER = 'applications'
 APPLICATION_PARENT_CLASS = 'VIGITIABaseApplication'
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 
 class VIGITIARenderingManager(QMainWindow):
@@ -70,16 +70,23 @@ class VIGITIARenderingManager(QMainWindow):
                 else:
                     if DEBUG_MODE:
                         application['parent'].setStyleSheet('border: 3px solid #FF0000')
+                    application['parent'].setParent(parent_widget)
+
+                    # Set parent of rotated widget to fullscreen to make sure that the rotated widget fits
                     application['parent'].setGeometry(0, 0, self.width, self.height)
 
-                    print('Canvas:', self.width/2, self.height/2)
-                    print('Widget:', application['instance'].frameGeometry().width(), application['instance'].frameGeometry().width())
-                    a = self.width/2 - application['instance'].frameGeometry().width()/2
-                    b = self.height/2 - application['instance'].frameGeometry().height()/2
-                    print('Origin from center:', a, b)
-                    #application['instance'].move(-self.width/2 - a, -self.height/2 - 2*b)
+                    # Since the rotated widget is now placed in the center of the parent instead of at the origin,
+                    # we move the entire parent so that the rotated widget is back at 0,0
+                    origin_x = self.width/2 - application['instance'].frameGeometry().width()/2
+                    origin_y = self.height/2 - application['instance'].frameGeometry().height()/2
 
-                    application['parent'].setParent(parent_widget)
+                    application['parent'].move(-origin_x,
+                                               -origin_y)
+
+                    # Now we move the rotated widget inluding its parent to the desired position
+                    application['parent'].move(application['parent'].geometry().x() + x,
+                                               application['parent'].geometry().y() + y)
+
 
         # TODO: Add unified system to define application position
         # Test of raising an application to the top
@@ -96,13 +103,13 @@ class VIGITIARenderingManager(QMainWindow):
     def rotate_applicaton(self, application, angle):
         graphics_view = QGraphicsView()
 
-        graphics_view.setFrameShape(0)
-        graphics_view.setStyleSheet('background: #cccccccc')
+        #graphics_view.setFrameShape(0)
+        #graphics_view.setStyleSheet('background: #cccccccc')
 
         # Disable scrollbars
         graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        graphics_view.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        #graphics_view.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
 
         scene = QGraphicsScene(graphics_view)
         graphics_view.setScene(scene)
