@@ -3,7 +3,6 @@
 
 
 class VIGITIAApplication:
-    print('Main class')
 
     def __init__(self):
         self.x = 0
@@ -12,12 +11,22 @@ class VIGITIAApplication:
         self.height = 1000
         self.rotation = 0
 
+        # TODO: Flags to implement
+        self.fullscreen = False
+        self.force_aspect_ratio = False
+
+    """
+    Getter Functions
+    """
+
     def get_x(self):
-        print('Get X')
         return self.x
 
     def get_y(self):
         return self.y
+
+    def get_position(self):
+        return (self.x, self.y)
 
     def get_width(self):
         return self.width
@@ -27,6 +36,10 @@ class VIGITIAApplication:
 
     def get_rotation(self):
         return self.rotation
+
+    """
+    Setter Functions
+    """
 
     def set_position(self, x, y):
         self.x = x
@@ -44,6 +57,13 @@ class VIGITIAApplication:
 
     def set_rotation(self, rotation):
         self.rotation = rotation
+
+    """
+    Functions for receiving data from the VIGITIA Sensor Data Interface
+    """
+
+    def on_new_bounding_box_message(self, data):
+        pass
 
     def on_new_pointer_messages(self, data):
         pass
