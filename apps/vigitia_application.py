@@ -8,8 +8,8 @@ class VIGITIAApplication:
     def __init__(self):
         self.x = 0
         self.y = 0
-        self.width = 500
-        self.height = 500
+        self.width = 1500
+        self.height = 1000
         self.rotation = 0
 
     def get_x(self):
@@ -49,4 +49,7 @@ class VIGITIAApplication:
         pass
 
     def on_new_token_messages(self, data):
+        pass
+
+    def on_new_video_frame(self, frame, name):
         pass
