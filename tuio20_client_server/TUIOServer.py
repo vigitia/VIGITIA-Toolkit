@@ -99,10 +99,59 @@ class TUIOServer:
     # /tuio2/skg s_id x_p0 y_p0 x_p1 y_p1 node ... x_pN y_pN
     def add_skeleton_message(self):
         skeleton_message = osc_message_builder.OscMessageBuilder(address="/tuio2/skg")
+        self.current_tuio_frame_bundle.add_content(skeleton_message.build())
 
-    # /tuio2/dat s_id mime data
-    def add_data_message(self):
+    """ DAT (data message)
+    
+    /tuio2/dat s_id mime data
+    /tuio2/dat s_id string string/blob
+
+    The DAT message allows the association of arbitrary data content to any present TUIO component. Apart from the 
+    common session ID, this message only contains an initial OSC string that defines the MIME type of the following 
+    data attribute, which can be either transmitted using an OSC string or OSC blob data type. Therefore this message 
+    is capable of encoding and transmitting textural or binary data such as business cards, XML data, images or sounds 
+    etc. The DAT message can be for example also used to transmit the actual data content of an RFID tag that has been 
+    referenced within a previous SYM message. Due to the likely limited bandwidth resources of the used OSC channel, 
+    this infrastructure is not suitable for the transmission of larger data sets. In this case the use of alternative 
+    transport methods is recommended.
+    
+    (Source: http://www.tuio.org/?tuio20)
+    
+    """
+    def add_data_message(self, s_id, mime, *data):
         data_message = osc_message_builder.OscMessageBuilder(address="/tuio2/data")
+        data_message.add_arg(s_id)
+        data_message.add_arg(mime)
+        for arg in data:
+            data_message.add_arg(arg)
+
+        self.current_tuio_frame_bundle.add_content(data_message.build())
+
+    """ CTL (control message)
+    
+    /tuio2/ctl s_id c0 ... cN
+    /tuio2/ctl int32 bool/float ... bool/float
+    
+    The CTL message can be used to transmit additional control dimensions that can be associated to an existing 
+    component instance, such as a token with an incorporated pressure sensor or for example. This (open length) 
+    list of variable float or boolean values, encodes each individual control dimension as discrete 0/1 bool or 
+    continuous floats in the normalized range from -1.0f ... 1.0f. A simple 3-button wheel mouse for example could be 
+    encoded using a CTL message with three boolean values for the discrete buttons and one additional float value for 
+    the continuous wheel after the initial session ID.
+    
+    An array of 12 float attributes can for example encode the keys of a full octave in a small piano keyboard 
+    including key velocity. The association of the according CTL message to a previous TKN consequently allows the 
+    identification and localization of that physical keyboard component.
+    
+    (Source: http://www.tuio.org/?tuio20)
+    """
+    def add_control_message(self, s_id, *cN):
+        control_message = osc_message_builder.OscMessageBuilder(address="/tuio2/ctl")
+        control_message.add_arg(s_id)
+        for arg in cN:
+            control_message.add_arg(arg)
+
+        self.current_tuio_frame_bundle.add_content(control_message.build())
 
     def start_tuio_bundle(self, dimension, source):
         self.current_tuio_frame_bundle = osc_bundle_builder.OscBundleBuilder(osc_bundle_builder.IMMEDIATELY)
