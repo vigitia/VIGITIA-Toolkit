@@ -9,12 +9,12 @@ from PyQt5.QtCore import QPoint, Qt
 from PyQt5.QtGui import QMouseEvent, QPainter, QPen, QBrush
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
 
-from apps.vigitia_application import VIGITIAApplication
+from apps.VIGITIABaseApplication import VIGITIABaseApplication
 
 from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterface
 
 
-class ExampleWidget(QWidget, VIGITIAApplication):
+class ExampleWidget(QWidget, VIGITIABaseApplication):
 
     def __init__(self):
         super().__init__()

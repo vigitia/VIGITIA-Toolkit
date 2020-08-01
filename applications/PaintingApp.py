@@ -7,13 +7,13 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import sys
 
-from apps.vigitia_application import VIGITIAApplication
+from apps.VIGITIABaseApplication import VIGITIABaseApplication
 
 from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterface
 
 
 # class VIGITIAPaintingApp(QMainWindow):
-class VIGITIAPaintingApp(QMainWindow, VIGITIAApplication):
+class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
     def __init__(self):
         super().__init__()
         self.x = 0

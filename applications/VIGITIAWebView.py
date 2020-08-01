@@ -8,7 +8,7 @@ from PyQt5.QtWebEngineWidgets import *
 
 from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterface
 
-from apps.vigitia_application import VIGITIAApplication
+from apps.VIGITIABaseApplication import VIGITIABaseApplication
 
 # Communication between javascript and Python based on https://gist.github.com/mphuie/63e964e9ff8ae25d16a949389392e0d7
 # and https://doc.qt.io/qt-5/qtwebengine-webenginewidgets-contentmanipulation-example.html
@@ -29,7 +29,7 @@ class CallHandler(QObject):
 
 
 # class BrowserWidget(QWebEngineView):
-class BrowserWidget(QWebEngineView, VIGITIAApplication):
+class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
     def __init__(self):
         super().__init__()
 
