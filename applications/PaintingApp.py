@@ -78,16 +78,33 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
     def on_new_pointer_messages(self, data):
         touch_x = data[4]
         touch_y = data[5]
-        global_pos = QPoint(int(touch_x / 1280 * 2560), int(touch_y / 720 * 1440))
+
+        print('drawing on canvas')
+
+        painter = QPainter(self.image)
+        painter.setPen(QPen(Qt.red, 30, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        painter.drawPoint(self.get_pos(touch_x, touch_y))
+        self.update()
+
+        # global_pos = QPoint(int(touch_x / 1280 * 2560), int(touch_y / 720 * 1440))
+        # local_pos = self.mapFromGlobal(global_pos)
+        #
+        # # target = self.focusProxy()
+        # target = self
+        #
+        # print(global_pos)
+        # self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
+        # self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
+
+    def get_pos(self, x, y):
+        CAMERA_RES_X = 1280
+        CAMERA_RES_Y = 720
+        CANVAS_RES_X = 2560
+        CANVAS_RES_Y = 1440
+        global_pos = QPoint(int(x / CAMERA_RES_X * CANVAS_RES_X), int(y / CAMERA_RES_Y * CANVAS_RES_Y))
         local_pos = self.mapFromGlobal(global_pos)
 
-        # target = self.focusProxy()
-        target = self
-
-        print(global_pos)
-
-        #self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
-        #self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
+        return local_pos
 
     def emulate_mouse_event(self, event_type, local_pos, global_pos, target):
         #print('Emulating MouseEvent')
