@@ -13,8 +13,9 @@ from importlib import import_module
 import pyclbr
 
 APPLICATIONS_BASE_FOLDER = 'applications'
+APPLICATION_PARENT_CLASS = 'VIGITIABaseApplication'
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 
 class VIGITIARenderingManager(QMainWindow):
@@ -31,7 +32,7 @@ class VIGITIARenderingManager(QMainWindow):
 
         # TODO: Take into consideration that the window resolution might not be the same as the screen resolution
         # Screen scaling can influence the resolution
-        print('Main Window width:', self.width, 'height: ', self.height)
+        print('Main Window width:', self.width, 'height:', self.height)
 
         self.setStyleSheet("background-color: black;")
 
@@ -69,13 +70,21 @@ class VIGITIARenderingManager(QMainWindow):
                 else:
                     if DEBUG_MODE:
                         application['parent'].setStyleSheet('border: 3px solid #FF0000')
-                    application['parent'].move(x, y)
+                    application['parent'].setGeometry(0, 0, self.width, self.height)
+
+                    print('Canvas:', self.width/2, self.height/2)
+                    print('Widget:', application['instance'].frameGeometry().width(), application['instance'].frameGeometry().width())
+                    a = self.width/2 - application['instance'].frameGeometry().width()/2
+                    b = self.height/2 - application['instance'].frameGeometry().height()/2
+                    print('Origin from center:', a, b)
+                    #application['instance'].move(-self.width/2 - a, -self.height/2 - 2*b)
+
                     application['parent'].setParent(parent_widget)
 
         # TODO: Add unified system to define application position
         # Test of raising an application to the top
         for application in self.applications:
-            if application['name'] == 'BrowserWidget':
+            if application['name'] == 'VideoWidget':
                 print('Bring painting app to front')
                 if application['parent'] is None:
                     application['instance'].raise_()
@@ -86,9 +95,14 @@ class VIGITIARenderingManager(QMainWindow):
     # Based on https://stackoverflow.com/questions/58020983/rotate-the-widget-for-some-degree
     def rotate_applicaton(self, application, angle):
         graphics_view = QGraphicsView()
+
+        graphics_view.setFrameShape(0)
+        graphics_view.setStyleSheet('background: #cccccccc')
+
         # Disable scrollbars
         graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        graphics_view.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
 
         scene = QGraphicsScene(graphics_view)
         graphics_view.setScene(scene)
@@ -98,7 +112,9 @@ class VIGITIARenderingManager(QMainWindow):
         proxy.setTransformOriginPoint(proxy.boundingRect().center())
         scene.addItem(proxy)
 
-        proxy.setRotation(angle)
+        proxy.setTransform(QTransform().rotate(angle))
+
+        graphics_view.adjustSize()
 
         # TODO: Check if width/height of graphics_wiew > width/height of QMainWindow. If yes, scale down
         # TODO: Notify application about new position, rotation and size
@@ -148,7 +164,7 @@ class VIGITIARenderingManager(QMainWindow):
                     superclasses = my_class.mro()
                     # Check if the class has the required superclass
                     for superclass in superclasses:
-                        if superclass.__name__ == 'VIGITIAApplication':
+                        if superclass.__name__ == APPLICATION_PARENT_CLASS:
                             # print('"{}" in Module "{}" is a VIGITIA Application'.format(class_name, module_name))
                             # application = my_class()
                             application = {
