@@ -25,12 +25,15 @@ class TUIOServer:
         self.udp_client = udp_client.SimpleUDPClient(ip, port)
         self.start_time_ms = int(round(time.time() * 1000))
 
-    ''' f_id ->   Frame ID (int32)
-            time ->   OSC 64bit time tag (ttag)
-            dim  ->   Dimension encodes the sensor dimension with two 16bit unsigned integer values embedded into a 32bit
-                      integer value. The first two bytes represent the sensor width, while the final two bytes represent
-                      the sensor height. (int32)
-            source -> e.g. 'REAC' (string) '''
+    """ FRM (frame message)
+        
+        f_id ->   Frame ID (int32)
+        time ->   OSC 64bit time tag (ttag)
+        dim  ->   Dimension encodes the sensor dimension with two 16bit unsigned integer values embedded into a 32bit
+                  integer value. The first two bytes represent the sensor width, while the final two bytes represent
+                  the sensor height. (int32)
+        source -> e.g. 'REAC' (string) 
+    """
     def init_tuio_frame(self, dimension, source):
         self.current_frame_id += 1
         time_now_ms = int(round(time.time() * 1000))
