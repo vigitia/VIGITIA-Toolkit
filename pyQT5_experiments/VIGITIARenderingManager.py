@@ -19,6 +19,9 @@ DEBUG_MODE = False
 
 
 class VIGITIARenderingManager(QMainWindow):
+
+    applications = []
+
     def __init__(self):
         super().__init__()
 
@@ -39,10 +42,55 @@ class VIGITIARenderingManager(QMainWindow):
         parent_widget.setStyleSheet("background-color: transparent;")
         parent_widget.setFixedSize(self.width, self.height)
 
+        self.setCentralWidget(parent_widget)
+
         # Load applications and add them to the canvas
         self.add_applications(parent_widget)
 
-        self.setCentralWidget(parent_widget)
+    def on_application_position_changed(self, position, application_name):
+        print(application_name, 'has been moved to', position)
+        self.update_application(application_name)
+
+    def update_application(self, application_name):
+        if self.applications is not None:
+            for application in self.applications:
+                if application['name'] == application_name:
+                    if application['parent'] is None:
+                        if DEBUG_MODE:
+                            application['instance'].setStyleSheet('border: 3px solid #FF0000')
+                        application['instance'].move(application['instance'].get_x(), application['instance'].get_y())
+                        #application['instance'].setParent(parent_widget)
+                    else:
+                        if DEBUG_MODE:
+                            application['parent'].setStyleSheet('border: 3px solid #FF0000')
+                        #application['parent'].setParent(parent_widget)
+
+                        # Set parent of rotated widget to fullscreen to make sure that the rotated widget fits
+                        application['parent'].setGeometry(0, 0, self.width, self.height)
+
+                        # Since the rotated widget is now placed in the center of the parent instead of at the origin,
+                        # we move the entire parent so that the rotated widget is back at 0,0
+                        origin_x = self.width / 2 - application['instance'].frameGeometry().width() / 2
+                        origin_y = self.height / 2 - application['instance'].frameGeometry().height() / 2
+
+                        # application['parent'].move(-origin_x, -origin_y)
+
+                        # Now we move the rotated widget inluding its parent to the desired position
+                        application['parent'].move(
+                            -origin_x + application['parent'].geometry().x() + application['instance'].get_x(),
+                            -origin_y + application['parent'].geometry().y() + application['instance'].get_y())
+
+    def get_screen_resolution(self):
+        return self.width, self.height
+
+    def check_if_set_to_fullscreen(self, application):
+        # If width or height is set to 0, make the application fullscreen. Also handle value <0 or larger than canvas
+        if application.get_width() <= 0 or application.get_width() > self.width:
+            application.set_width(self.width)
+        if application.get_height() <= 0 or application.get_height() > self.height:
+            application.set_height(self.height)
+
+        print('AAA', application.get_width(), application.get_height())
 
     def add_applications(self, parent_widget):
         self.applications = self.find_available_applications()
@@ -55,10 +103,8 @@ class VIGITIARenderingManager(QMainWindow):
             else:
                 print('Placing {} on canvas.'.format(application['name']))
 
-                application['instance'].set_rendering_manager(self)
+                self.check_if_set_to_fullscreen(application['instance'])
 
-                x = application['instance'].get_x()
-                y = application['instance'].get_y()
                 if application['instance'].get_rotation() != 0:
                     application['parent'] = self.rotate_applicaton(application['instance'],
                                                                    application['instance'].rotation)
@@ -66,7 +112,7 @@ class VIGITIARenderingManager(QMainWindow):
                 if application['parent'] is None:
                     if DEBUG_MODE:
                         application['instance'].setStyleSheet('border: 3px solid #FF0000')
-                    application['instance'].move(x, y)
+                    application['instance'].move(application['instance'].get_x(), application['instance'].get_y())
                     application['instance'].setParent(parent_widget)
                 else:
                     if DEBUG_MODE:
@@ -81,12 +127,11 @@ class VIGITIARenderingManager(QMainWindow):
                     origin_x = self.width/2 - application['instance'].frameGeometry().width()/2
                     origin_y = self.height/2 - application['instance'].frameGeometry().height()/2
 
-                    application['parent'].move(-origin_x,
-                                               -origin_y)
+                    # application['parent'].move(-origin_x, -origin_y)
 
                     # Now we move the rotated widget inluding its parent to the desired position
-                    application['parent'].move(application['parent'].geometry().x() + x,
-                                               application['parent'].geometry().y() + y)
+                    application['parent'].move(-origin_x + application['parent'].geometry().x() + application['instance'].get_x(),
+                                               -origin_y + application['parent'].geometry().y() + application['instance'].get_y())
 
 
         # TODO: Add unified system to define application position
@@ -177,9 +222,10 @@ class VIGITIARenderingManager(QMainWindow):
                             # application = my_class()
                             application = {
                                 'name': class_name,
-                                'instance': my_class(),
+                                'instance': my_class(self),
                                 'parent': None
                             }
+
                             applications.append(application)
 
         return applications
