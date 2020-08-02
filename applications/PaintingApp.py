@@ -18,11 +18,6 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         super().__init__()
         self.set_name(self.__class__.__name__)
         self.set_rendering_manager(rendering_manager)
-        self.x = 0
-        self.y = 0
-        #self.width = 2560
-        #self.height = 1440
-        self.rotation = 0
 
         self.brushes = []
         self.present_markers = []

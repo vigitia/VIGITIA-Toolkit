@@ -15,8 +15,8 @@ class VideoWidget(QWidget, VIGITIABaseApplication):
 
         self.x = 1000
         self.y = 300
-        self.width = 1280
-        self.height = 720
+        self.width = self.get_screen_resolution()[0]/2
+        self.height = self.get_screen_resolution()[1]/2
         self.rotation = 150
 
         self.initUI()
