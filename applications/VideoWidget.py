@@ -8,8 +8,10 @@ from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterf
 
 
 class VideoWidget(QWidget, VIGITIABaseApplication):
-    def __init__(self):
+    def __init__(self, rendering_manager):
         super().__init__()
+        self.set_name(self.__class__.__name__)
+        self.set_rendering_manager(rendering_manager)
 
         self.x = 1000
         self.y = 300

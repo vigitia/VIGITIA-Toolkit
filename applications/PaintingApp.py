@@ -14,23 +14,23 @@ from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterf
 
 # class VIGITIAPaintingApp(QMainWindow):
 class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
-    def __init__(self):
+    def __init__(self, rendering_manager):
         super().__init__()
+        self.set_name(self.__class__.__name__)
+        self.set_rendering_manager(rendering_manager)
         self.x = 0
         self.y = 0
-        self.width = 2560
-        self.height = 1440
+        #self.width = 2560
+        #self.height = 1440
         self.rotation = 0
 
         self.brushes = []
-
         self.present_markers = []
 
-        # setting geometry to main window
-        self.setGeometry(0, 0, self.width, self.height)
+        print('Resolution in Rendering manager:', self.get_width(), self.get_height())
 
-        self.image = QImage(self.size(), QImage.Format_ARGB32)
-        self.image.fill(Qt.transparent)
+        self.initUI()
+
         # drawing flag
         self.drawing = False
 
@@ -42,6 +42,13 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
 
         data_interface = VIGITIASensorDataInterface.Instance()
         data_interface.register_subscriber(self)
+
+    def initUI(self):
+        # setting geometry to main window
+        self.setGeometry(0, 0, self.get_width(), self.get_height())
+
+        self.image = QImage(self.size(), QImage.Format_ARGB32)
+        self.image.fill(Qt.transparent)
 
     def on_new_token_messages(self, messages):
         self.update_touch_points(messages)

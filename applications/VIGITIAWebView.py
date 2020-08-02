@@ -30,8 +30,10 @@ class CallHandler(QObject):
 
 # class BrowserWidget(QWebEngineView):
 class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
-    def __init__(self):
+    def __init__(self, rendering_manager):
         super().__init__()
+        self.set_name(self.__class__.__name__)
+        self.set_rendering_manager(rendering_manager)
 
         self.x = 1550
         self.y = 50
@@ -83,10 +85,6 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
 
         self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
         self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
-
-
-
-
 
     def on_new_data(self, data):
         pass
