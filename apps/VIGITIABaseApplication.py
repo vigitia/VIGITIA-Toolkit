@@ -68,7 +68,7 @@ class VIGITIABaseApplication:
 
     def set_x(self, x):
         self.x = x
-        self.rendering_manager.on_application_position_changed(self.get_position(), self.get_name())
+        self.rendering_manager.on_application_updated(self.get_name())
 
     def set_y(self, y):
         self.y = y

@@ -47,8 +47,8 @@ class VIGITIARenderingManager(QMainWindow):
         # Load applications and add them to the canvas
         self.add_applications(parent_widget)
 
-    def on_application_position_changed(self, position, application_name):
-        print(application_name, 'has been moved to', position)
+    def on_application_updated(self, application_name):
+        print(application_name, 'has been updated')
         self.update_application(application_name)
 
     def update_application(self, application_name):
@@ -83,15 +83,6 @@ class VIGITIARenderingManager(QMainWindow):
     def get_screen_resolution(self):
         return self.width, self.height
 
-    def check_if_set_to_fullscreen(self, application):
-        # If width or height is set to 0, make the application fullscreen. Also handle value <0 or larger than canvas
-        if application.get_width() <= 0 or application.get_width() > self.width:
-            application.set_width(self.width)
-        if application.get_height() <= 0 or application.get_height() > self.height:
-            application.set_height(self.height)
-
-        print('AAA', application.get_width(), application.get_height())
-
     def add_applications(self, parent_widget):
         self.applications = self.find_available_applications()
 
@@ -102,8 +93,6 @@ class VIGITIARenderingManager(QMainWindow):
                 print('Test. Not adding', application['name'])
             else:
                 print('Placing {} on canvas.'.format(application['name']))
-
-                self.check_if_set_to_fullscreen(application['instance'])
 
                 if application['instance'].get_rotation() != 0:
                     application['parent'] = self.rotate_applicaton(application['instance'],
