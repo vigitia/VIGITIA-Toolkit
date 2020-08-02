@@ -6,6 +6,7 @@
 
 # Code parts for the RealSense Camera taken from
 # https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/align-depth2color.py
+import sys
 
 import pyrealsense2 as rs
 import numpy as np
@@ -41,38 +42,45 @@ class RealsenseD435Camera:
 
     def __init__(self):
 
-        # Create a pipeline
-        self.pipeline = rs.pipeline()
+        try:
+            # Create a pipeline
+            self.pipeline = rs.pipeline()
 
-        # Create a config and configure the pipeline to stream
-        #  different resolutions of color and depth streams
-        config = rs.config()
-        config.enable_stream(rs.stream.depth, DEPTH_RES_X, DEPTH_RES_Y, rs.format.z16, DEPTH_FPS)
-        config.enable_stream(rs.stream.color, RGB_RES_X, RGB_RES_Y, rs.format.bgr8, RGB_FPS)
-        # config.enable_stream(rs.stream.infrared, 1, DEPTH_RES_X, DEPTH_RES_Y, rs.format.y8, DEPTH_FPS)
-        # config.enable_stream(rs.stream.infrared, 2, DEPTH_RES_X, DEPTH_RES_Y, rs.format.y8, DEPTH_FPS)
+            # Create a config and configure the pipeline to stream
+            #  different resolutions of color and depth streams
+            config = rs.config()
+            config.enable_stream(rs.stream.depth, DEPTH_RES_X, DEPTH_RES_Y, rs.format.z16, DEPTH_FPS)
+            config.enable_stream(rs.stream.color, RGB_RES_X, RGB_RES_Y, rs.format.bgr8, RGB_FPS)
+            # config.enable_stream(rs.stream.infrared, 1, DEPTH_RES_X, DEPTH_RES_Y, rs.format.y8, DEPTH_FPS)
+            # config.enable_stream(rs.stream.infrared, 2, DEPTH_RES_X, DEPTH_RES_Y, rs.format.y8, DEPTH_FPS)
 
-        # Start streaming
-        profile = self.pipeline.start(config)
+            # Start streaming
+            profile = self.pipeline.start(config)
 
-        # Getting the depth sensor's depth scale (see rs-align example for explanation)
-        depth_sensor = profile.get_device().first_depth_sensor()
-        self.depth_scale = depth_sensor.get_depth_scale()
-        print("Depth scale", self.depth_scale)
+            # Getting the depth sensor's depth scale (see rs-align example for explanation)
+            depth_sensor = profile.get_device().first_depth_sensor()
+            self.depth_scale = depth_sensor.get_depth_scale()
+            print("Depth scale", self.depth_scale)
 
-        # TODO: Allow settings to be changed on initializing the function
-        depth_sensor.set_option(rs.option.laser_power, 360)  # 0 - 360
-        depth_sensor.set_option(rs.option.depth_units, 0.001)  # Number of meters represented by a single depth unit
+            # TODO: Allow settings to be changed on initializing the function
+            depth_sensor.set_option(rs.option.laser_power, 360)  # 0 - 360
+            depth_sensor.set_option(rs.option.depth_units, 0.001)  # Number of meters represented by a single depth unit
 
-        # Create an align object
-        # rs.align allows us to perform alignment of depth frames to others frames
-        # The "align_to" is the stream type to which we plan to align depth frames.
-        align_to = rs.stream.color
-        self.align = rs.align(align_to)
+            # Create an align object
+            # rs.align allows us to perform alignment of depth frames to others frames
+            # The "align_to" is the stream type to which we plan to align depth frames.
+            align_to = rs.stream.color
+            self.align = rs.align(align_to)
 
-        self.hole_filling_filter = rs.hole_filling_filter()
-        self.decimation_filter = rs.decimation_filter()
-        self.temporal_filter = rs.temporal_filter()
+            self.hole_filling_filter = rs.hole_filling_filter()
+            self.decimation_filter = rs.decimation_filter()
+            self.temporal_filter = rs.temporal_filter()
+        except Exception as e:
+            print('[RealSense D435] ERROR:', e, file=sys.stderr)
+            print('[RealSense D435]: Could not initialize camera. If the resource is busy, check if any other script '
+                  'is currently accessing the camera. If this is not the case, replug the camera and try again.',
+                  file=sys.stderr)
+            sys.exit(0)
 
         self.init_colorizer()
 
