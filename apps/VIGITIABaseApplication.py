@@ -6,27 +6,34 @@ class VIGITIABaseApplication:
 
     def __init__(self):
 
-        self.x = 0
-        self.y = 0
-        self.width = 0
-        self.height = 0
-        self.rotation = 0
+        self.name = ''
+        self.x = 0  # x-pos of top-left corner on canvas
+        self.y = 0  # y-pos of top-left corner in canvas
+        self.width = 0  # If set to 0, the application will be shown fullscreen
+        self.height = 0  # If set to 0, the application will be shown fullscreen
+        self.rotation = 0  # 0 - 360
 
         self.rendering_manager = None
 
         # TODO: Flags to implement
-        self.force_fullscreen = False
         self.force_aspect_ratio = False
+        self.z_index = 0
 
     """
     Getter Functions
     """
+
+    def get_name(self):
+        return self.name
 
     def get_x(self):
         return self.x
 
     def get_y(self):
         return self.y
+
+    def get_screen_resolution(self):
+        return self.rendering_manager.get_screen_resolution()
 
     def get_position(self):
         return self.x, self.y
@@ -47,9 +54,24 @@ class VIGITIABaseApplication:
     Setter Functions
     """
 
+    def set_name(self, name):
+        self.name = name
+
     def set_rendering_manager(self, rendering_manager):
         self.rendering_manager = rendering_manager
-        print('Rendering Manager set')
+
+        # If width or height is set to 0, make the application fullscreen. Also handle value <0 or larger than canvas
+        if self.get_width() <= 0 or self.get_width() > self.rendering_manager.get_screen_resolution()[0]:
+            self.set_width(self.rendering_manager.get_screen_resolution()[0])
+        if self.get_height() <= 0 or self.get_height() > self.rendering_manager.get_screen_resolution()[1]:
+            self.set_height(self.rendering_manager.get_screen_resolution()[1])
+
+    def set_x(self, x):
+        self.x = x
+        self.rendering_manager.on_application_position_changed(self.get_position(), self.get_name())
+
+    def set_y(self, y):
+        self.y = y
 
     def set_position(self, x, y):
         self.x = x
