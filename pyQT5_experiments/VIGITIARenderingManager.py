@@ -23,7 +23,6 @@ class VIGITIARenderingManager(QMainWindow):
         super().__init__()
 
         self.initUI()
-        self.show()
 
     def initUI(self):
         self.showFullScreen()
@@ -55,6 +54,8 @@ class VIGITIARenderingManager(QMainWindow):
                 print('Test. Not adding', application['name'])
             else:
                 print('Placing {} on canvas.'.format(application['name']))
+
+                application['instance'].set_rendering_manager(self)
 
                 x = application['instance'].get_x()
                 y = application['instance'].get_y()
@@ -91,7 +92,7 @@ class VIGITIARenderingManager(QMainWindow):
         # TODO: Add unified system to define application position
         # Test of raising an application to the top
         for application in self.applications:
-            if application['name'] == 'VideoWidget':
+            if application['name'] == 'VIGITIAPaintingApp':
                 print('Bring painting app to front')
                 if application['parent'] is None:
                     application['instance'].raise_()

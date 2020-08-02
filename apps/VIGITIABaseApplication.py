@@ -8,12 +8,14 @@ class VIGITIABaseApplication:
 
         self.x = 0
         self.y = 0
-        self.width = 1500
-        self.height = 1000
+        self.width = 0
+        self.height = 0
         self.rotation = 0
 
+        self.rendering_manager = None
+
         # TODO: Flags to implement
-        self.fullscreen = False
+        self.force_fullscreen = False
         self.force_aspect_ratio = False
 
     """
@@ -38,9 +40,16 @@ class VIGITIABaseApplication:
     def get_rotation(self):
         return self.rotation
 
+    def get_force_fullscreen(self):
+        return self.force_fullscreen
+
     """
     Setter Functions
     """
+
+    def set_rendering_manager(self, rendering_manager):
+        self.rendering_manager = rendering_manager
+        print('Rendering Manager set')
 
     def set_position(self, x, y):
         self.x = x
