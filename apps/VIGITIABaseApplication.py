@@ -97,13 +97,13 @@ class VIGITIABaseApplication:
     def on_new_tuio_bundle(self, data):
         pass
 
-    def on_new_bounding_box_message(self, data):
+    def on_new_token_messages(self, data):
         pass
 
     def on_new_pointer_messages(self, data):
         pass
 
-    def on_new_token_messages(self, data):
+    def on_new_bounding_box_messages(self, data):
         pass
 
     def on_new_video_frame(self, frame, name):
