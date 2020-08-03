@@ -106,6 +106,7 @@ class VIGITIASensorDataInterface:
         origin_ip = messages[0][0]
 
         self.bundles[origin_ip] = {
+            'origin_ip': origin_ip,
             'frame_id': messages[2],
             'time_tag': messages[3],
             'dimension': messages[4],
@@ -154,9 +155,15 @@ class VIGITIASensorDataInterface:
 
         print(self.bundles[origin_ip])
 
-        # Send bundle to all subscribers
+        # Send new data to all subscribers
         for subscriber in self.subscribers:
+            # The entire bundle
             subscriber.on_new_tuio_bundle(self.bundles[origin_ip])
+
+            # Just certain components for quicker data access
+            subscriber.on_new_token_messages(self.bundles[origin_ip]['tokens'])
+            subscriber.on_new_pointer_messages(self.bundles[origin_ip]['pointers'])
+            subscriber.on_new_bounding_box_messages(self.bundles[origin_ip]['bounding_boxes'])
 
     # Applications can call this function to ask what video streams are available
     def get_available_video_streams(self):
