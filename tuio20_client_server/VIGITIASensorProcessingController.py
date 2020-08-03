@@ -3,6 +3,7 @@
 
 import os
 import sys
+import time
 
 import cv2
 import numpy as np
@@ -26,19 +27,28 @@ from services.table_detector import TableDetector
 from services.generic_object_detector import GenericObjectDetector
 from services.hand_tracker import HandTracker
 
+# TODO: Allow multiple
+TARGET_COMPUTER_IP = get_ip_address()
+# TARGET_COMPUTER_IP = '132.199.199.67'
+
 TARGET_COMPUTER_PORT = 8000
+
+DEBUG_MODE = True
 
 class VIGITIASensorProcessingController:
 
     def __init__(self):
         self.init_tuio_server()
 
+        self.frame_id = 0
+
+        # TODO: Select camera via GUI
         self.camera = RealsenseD435Camera()
         self.camera.start()
 
-        #self.video_streamer = VIGITIAVideoStreamer('132.199.199.67', 5000)
-        self.video_streamer = VIGITIAVideoStreamer(get_ip_address(), 5000)
-        self.video_streamer_two = VIGITIAVideoStreamer(get_ip_address(), 5001)
+        # TODO: Let user select in GUI what video should be streamed
+        self.video_streamer = VIGITIAVideoStreamer(TARGET_COMPUTER_IP, 5000)
+        self.video_streamer_two = VIGITIAVideoStreamer(TARGET_COMPUTER_IP, 5001)
 
         self.table_surface_extractor = TableSurfaceExtractor()
 
@@ -50,13 +60,10 @@ class VIGITIASensorProcessingController:
 
     def init_tuio_server(self):
 
-        self.tuio_server = TUIOServer(get_ip_address(), TARGET_COMPUTER_PORT)
+        self.tuio_server = TUIOServer(TARGET_COMPUTER_IP, TARGET_COMPUTER_PORT)
 
-        # The dimension attribute encodes the sensor dimension with two 16bit unsigned integer values embedded into a 32bit
-        # integer value. The first two bytes represent the sensor width, while the final two bytes represent the sensor
-        # height
-        self.dimension = '1280x720'
-        self.source = os.uname()[1]
+        self.dimension = '1280x720'  # TODO: Get data from sensor
+        self.source = os.uname()[1]  # TODO: Not working on windows
 
     def init_sensor_data_processing_services(self):
         self.fiducials_detector = FiducialsDetector()
@@ -67,11 +74,18 @@ class VIGITIASensorProcessingController:
         self.generic_object_detector = GenericObjectDetector()
         self.hand_tracker = HandTracker()
 
+    # The main application loop. Code parts for fps counter from
+    # https://stackoverflow.com/questions/43761004/fps-how-to-divide-count-by-time-function-to-determine-fps
     def loop(self):
+        start_time = 0
+        x = 1  # displays the frame rate every 1 second
+        counter = 0
+
         while True:
             color_image, depth_image = self.camera.get_frames()
 
             if color_image is not None:
+                self.frame_id += 1
 
                 color_image_table = self.table_surface_extractor.extract_table_area(color_image)
 
@@ -116,6 +130,14 @@ class VIGITIASensorProcessingController:
                                                          press=touch_point.is_touching)
 
                 self.tuio_server.send_tuio_bundle()
+
+                # FPS Counter
+                counter += 1
+                if (time.time() - start_time) > x:
+                    if DEBUG_MODE:
+                        print("FPS: ", round(counter / (time.time() - start_time), 1))
+                    counter = 0
+                    start_time = time.time()
 
             key = cv2.waitKey(1)
             # Press esc or 'q' to close the image window
