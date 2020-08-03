@@ -13,6 +13,8 @@ import numpy as np
 import threading
 
 # Camera Settings
+from apps.VIGITIACameraBase import VIGITIACameraBase
+
 DEPTH_RES_X = 1280
 DEPTH_RES_Y = 720
 RGB_RES_X = 1280
@@ -29,7 +31,7 @@ DEBUG_MODE = False
 # TODO: Add Debug mode
 
 
-class RealsenseD435Camera:
+class RealsenseD435Camera(VIGITIACameraBase):
 
     num_frame = 0
 
@@ -41,6 +43,12 @@ class RealsenseD435Camera:
     depth_image = None
 
     def __init__(self):
+
+        self.add_video_stream('color', 'bgr8', RGB_RES_X, RGB_RES_Y, RGB_FPS,
+                              'Color Stream of the Intel RealSense D435 camera')
+        self.add_video_stream('depth', 'z16', DEPTH_RES_X, DEPTH_RES_Y, DEPTH_FPS,
+                              'Depth Stream of the Intel RealSense D435 camera. Each pixel corresponds to the measured '
+                              'distance in mm.')
 
         try:
             # Create a pipeline
