@@ -28,20 +28,23 @@ class VIGITIARenderingManager(QMainWindow):
         self.initUI()
 
     def initUI(self):
-        self.showFullScreen()
+        self.showFullScreen()  # Application should run in Fullscreen
+
+        # Define width and height as global variables
         self.width = QApplication.desktop().screenGeometry().width()
         self.height = QApplication.desktop().screenGeometry().height()
 
-        # TODO: Take into consideration that the window resolution might not be the same as the screen resolution
+        # Attention: The window resolution might not be the same as the screen resolution
         # Screen scaling can influence the resolution
         print('Main Window width:', self.width, 'height:', self.height)
 
+        # The QMainWindow should have a black background so that no light will be projected if no application is shown
         self.setStyleSheet("background-color: black;")
 
+        # Define a parent widget that will contain all applications
         parent_widget = QWidget(self)
         parent_widget.setStyleSheet("background-color: transparent;")
         parent_widget.setFixedSize(self.width, self.height)
-
         self.setCentralWidget(parent_widget)
 
         # Load applications and add them to the canvas
@@ -80,9 +83,11 @@ class VIGITIARenderingManager(QMainWindow):
                             -origin_x + application['parent'].geometry().x() + application['instance'].get_x(),
                             -origin_y + application['parent'].geometry().y() + application['instance'].get_y())
 
+    # Return the resolution of the QMainWindow
     def get_screen_resolution(self):
         return self.width, self.height
 
+    # Add all desired applications to the canvas
     def add_applications(self, parent_widget):
         self.applications = self.find_available_applications()
 
@@ -116,14 +121,10 @@ class VIGITIARenderingManager(QMainWindow):
                     origin_x = self.width/2 - application['instance'].frameGeometry().width()/2
                     origin_y = self.height/2 - application['instance'].frameGeometry().height()/2
 
-                    # application['parent'].move(-origin_x, -origin_y)
-
                     # Now we move the rotated widget inluding its parent to the desired position
                     application['parent'].move(-origin_x + application['parent'].geometry().x() + application['instance'].get_x(),
                                                -origin_y + application['parent'].geometry().y() + application['instance'].get_y())
 
-
-        # TODO: Add unified system to define application position
         # Test of raising an application to the top
         for application in self.applications:
             if application['name'] == 'VIGITIAPaintingApp':
@@ -133,18 +134,16 @@ class VIGITIARenderingManager(QMainWindow):
                 else:
                     application['parent'].raise_()
 
-    # Allows the rotation of an application (A QT Widget)
+    # Allows the rotation of an application (a QT Widget)
     # Based on https://stackoverflow.com/questions/58020983/rotate-the-widget-for-some-degree
     def rotate_applicaton(self, application, angle):
         graphics_view = QGraphicsView()
 
         #graphics_view.setFrameShape(0)
-        #graphics_view.setStyleSheet('background: #cccccccc')
 
         # Disable scrollbars
         graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        #graphics_view.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
 
         scene = QGraphicsScene(graphics_view)
         graphics_view.setScene(scene)
@@ -208,10 +207,9 @@ class VIGITIARenderingManager(QMainWindow):
                     for superclass in superclasses:
                         if superclass.__name__ == APPLICATION_PARENT_CLASS:
                             # print('"{}" in Module "{}" is a VIGITIA Application'.format(class_name, module_name))
-                            # application = my_class()
                             application = {
                                 'name': class_name,
-                                'instance': my_class(self),
+                                'instance': my_class(self),  # Pass the RenderingManager on to the class
                                 'parent': None
                             }
 
@@ -219,9 +217,12 @@ class VIGITIARenderingManager(QMainWindow):
 
         return applications
 
+    # Handle Key-press events
     def keyPressEvent(self, event):
+        # Close the application if the ESC button is pressed
         if event.key() == Qt.Key_Escape:
             self.close()
+            sys.exit(0)
 
 
 if __name__ == "__main__":
