@@ -122,7 +122,7 @@ class TUIOServer:
     
     """
     def add_data_message(self, s_id, mime, *data):
-        data_message = osc_message_builder.OscMessageBuilder(address="/tuio2/data")
+        data_message = osc_message_builder.OscMessageBuilder(address="/tuio2/dat")
         data_message.add_arg(s_id)
         data_message.add_arg(mime)
         for arg in data:
