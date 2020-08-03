@@ -72,12 +72,12 @@ class VIGITIASensorDataInterface:
 
     def init_tuio_interface(self):
         dispatcher = Dispatcher()
-        dispatcher.map("/tuio2/frm", self.on_new_frame_message)
-        dispatcher.map("/tuio2/ptr", self.on_new_pointer_message)
-        dispatcher.map("/tuio2/bnd", self.on_new_bounding_box_message)
-        dispatcher.map("/tuio2/tok", self.on_new_token_message)
-        dispatcher.map("/tuio2/dat", self.on_new_data_message)
-        dispatcher.map("/tuio2/alv", self.on_new_alive_message)
+        dispatcher.map("/tuio2/frm", self.on_new_frame_message, needs_reply_address=True)  # Also pass on the IP of the data origin
+        dispatcher.map("/tuio2/ptr", self.on_new_pointer_message, needs_reply_address=True)
+        dispatcher.map("/tuio2/bnd", self.on_new_bounding_box_message, needs_reply_address=True)
+        dispatcher.map("/tuio2/tok", self.on_new_token_message, needs_reply_address=True)
+        dispatcher.map("/tuio2/dat", self.on_new_data_message, needs_reply_address=True)
+        dispatcher.map("/tuio2/alv", self.on_new_alive_message, needs_reply_address=True)
 
         osc_udp_server = ThreadingOSCUDPServer((self.ip, PORT), dispatcher)
 
@@ -99,21 +99,24 @@ class VIGITIASensorDataInterface:
         for subscriber in self.subscribers:
             subscriber.on_new_video_frame(frame, name)
 
-    def on_new_frame_message(self, *message):
+    def on_new_frame_message(self, *messages):
         #print('New frame arrived:', message)
+        origin_ip = messages[0][0]
         self.tokens = []
         pass
 
     def on_new_pointer_message(self, *messages):
         # print(messages)
         for subscriber in self.subscribers:
-            subscriber.on_new_pointer_messages(messages)
+            subscriber.on_new_pointer_messages(messages[1:])
 
     def on_new_bounding_box_message(self, *messages):
         pass
         # print(messages)
 
     def on_new_token_message(self, *messages):
+        print('Token message', messages[1:])
+        origin_ip = messages[0][0]
         self.tokens.append(messages)
         # print(messages)
         # for subscriber in self.subscribers:
@@ -121,6 +124,8 @@ class VIGITIASensorDataInterface:
 
     def on_new_data_message(self, *messages):
         # print(messages)
+        origin_ip = messages[0][0]
+        messages = messages[1:]
         message_type = messages[2]
         if message_type == 'video':
             session_id = messages[1]
@@ -136,6 +141,7 @@ class VIGITIASensorDataInterface:
 
     def on_new_alive_message(self, *messages):
         #print(messages)
+        origin_ip = messages[0][0]
 
         for subscriber in self.subscribers:
             subscriber.on_new_token_messages(self.tokens)
