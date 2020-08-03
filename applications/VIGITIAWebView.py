@@ -71,26 +71,23 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
     def js_callback(self, result):
         print('Python called back:', result)
 
-    def on_new_pointer_messages(self, data):
-        print('Pointer in Webview:', data)
-        touch_x = data[4]
-        touch_y = data[5]
-        global_pos = QPoint(int(touch_x / 1280 * 2560), int(touch_y / 720 * 1440))
-        local_pos = self.mapFromGlobal(global_pos)
+    def on_new_pointer_messages(self, messages):
 
-        #target = self.focusProxy()
-        target = self
+        for message in messages:
+            print('Pointer in Webview:', message)
 
-        print(global_pos)
+            touch_x = message[3]
+            touch_y = message[4]
+            global_pos = QPoint(int(touch_x / 1280 * 2560), int(touch_y / 720 * 1440))
+            local_pos = self.mapFromGlobal(global_pos)
 
-        self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
-        self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
+            #target = self.focusProxy()
+            target = self
 
-    def on_new_data(self, data):
-        pass
-        # print('Data arrived in web view:', data)
+            print(global_pos)
 
-
+            # self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
+            # self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
 
     def emulate_mouse_event(self, event_type, local_pos, global_pos, target):
         mouse_event = QMouseEvent(event_type, local_pos, global_pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)

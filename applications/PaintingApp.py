@@ -77,26 +77,28 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         #     self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
         #     self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
 
-    def on_new_pointer_messages(self, data):
-        touch_x = data[4]
-        touch_y = data[5]
+    def on_new_pointer_messages(self, messages):
 
-        print('drawing on canvas')
+        for message in messages:
+            touch_x = message[3]
+            touch_y = message[4]
 
-        painter = QPainter(self.image)
-        painter.setPen(QPen(Qt.red, 30, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-        painter.drawPoint(self.get_pos(touch_x, touch_y))
-        self.update()
+            print('drawing on canvas')
 
-        # global_pos = QPoint(int(touch_x / 1280 * 2560), int(touch_y / 720 * 1440))
-        # local_pos = self.mapFromGlobal(global_pos)
-        #
-        # # target = self.focusProxy()
-        # target = self
-        #
-        # print(global_pos)
-        # self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
-        # self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
+            painter = QPainter(self.image)
+            painter.setPen(QPen(Qt.red, 30, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            painter.drawPoint(self.get_pos(touch_x, touch_y))
+            self.update()
+
+            # global_pos = QPoint(int(touch_x / 1280 * 2560), int(touch_y / 720 * 1440))
+            # local_pos = self.mapFromGlobal(global_pos)
+            #
+            # # target = self.focusProxy()
+            # target = self
+            #
+            # print(global_pos)
+            # self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
+            # self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
 
     def get_pos(self, x, y):
         CAMERA_RES_X = 1280
@@ -112,10 +114,6 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         #print('Emulating MouseEvent')
         mouse_event = QMouseEvent(event_type, local_pos, global_pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
         QCoreApplication.sendEvent(target, mouse_event)
-
-    def on_new_data(self, data):
-        #print('Data arrived in Painting app:', data)
-        pass
 
     def mousePressEvent(self, event):
         # if left mouse button is pressed
@@ -164,9 +162,9 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         new_touch_point_ids = []
 
         for message in messages:
-            marker_id = message[1]
-            touch_x = message[4]
-            touch_y = message[5]
+            marker_id = message[0]
+            touch_x = message[3]
+            touch_y = message[4]
             new_touch_point_ids.append(marker_id)
 
             found_brush = False
@@ -220,10 +218,3 @@ class PaintBrush:
 
     def __repr__(self):
         return 'PaintBrush: ' + str(self.marker_id)
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = VIGITIAPaintingApp()
-    window.show()
-    sys.exit(app.exec_())
