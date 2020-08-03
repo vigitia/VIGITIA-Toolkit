@@ -59,6 +59,9 @@ class VIGITIARenderingManager(QMainWindow):
             for application in self.applications:
                 if application['name'] == application_name:
 
+                    application['instance'].setGeometry(0, 0, application['instance'].get_width(),
+                                                        application['instance'].get_height())
+
                     # Rotate application
                     if application['instance'].get_rotation() != 0:
                         application = self.rotate_applicaton(application)
@@ -96,6 +99,9 @@ class VIGITIARenderingManager(QMainWindow):
                 print('Test. Not adding', application['name'])
             else:
                 print('Placing {} on canvas.'.format(application['name']))
+
+                application['instance'].setGeometry(0, 0, application['instance'].get_width(),
+                                                    application['instance'].get_height())
 
                 # Rotate applications
                 if application['instance'].get_rotation() != 0:
