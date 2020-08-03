@@ -15,7 +15,7 @@ import pyclbr
 APPLICATIONS_BASE_FOLDER = 'applications'
 APPLICATION_PARENT_CLASS = 'VIGITIABaseApplication'
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 
 class VIGITIARenderingManager(QMainWindow):
@@ -92,13 +92,15 @@ class VIGITIARenderingManager(QMainWindow):
         self.applications = self.find_available_applications()
 
         for application in self.applications:
+            # TODO: Add a convenient way to select wanted applications (a GUI)
             hidden_applications = ['BrowserWidget', 'ExampleWidget']
-            # if application['name'] == 'VIGITIAPaintingApp' or application['name'] == 'BrowserWidget':
+
             if application['name'] in hidden_applications:
                 print('Test. Not adding', application['name'])
             else:
                 print('Placing {} on canvas.'.format(application['name']))
 
+                # Rotate applications
                 if application['instance'].get_rotation() != 0:
                     application['parent'] = self.rotate_applicaton(application['instance'],
                                                                    application['instance'].rotation)
@@ -169,15 +171,20 @@ class VIGITIARenderingManager(QMainWindow):
 
         #print(matrix)
 
-        # matrix = [[0, 0,  0],
-        #           [0, 0,  0],
-        #           [0, 0,  0]]
-        #
-        # transform = QTransform()
-        # transform.setMatrix(matrix[0][0], matrix[0][1], matrix[0][2],
-        #                     matrix[1][0], matrix[1][1], matrix[1][2],
-        #                     matrix[2][0], matrix[2][1], matrix[2][2])
-        #graphics_view.setTransform(transform)
+        #matrix = [[1, 1,  1],
+        #          [1, 10,  1],
+        #          [1, 1,  1]]
+
+        #transform = QTransform()
+        #transform.setMatrix(matrix[0][0], matrix[0][1], matrix[0][2],
+        #                    matrix[1][0], matrix[1][1], matrix[1][2],
+        #                    matrix[2][0], matrix[2][1], matrix[2][2])
+        #proxy.setTransform(transform)
+
+        # Prove that transform works
+        #proxy.setTransform(QTransform().shear(2.0, 0))
+
+        #print('GW:', proxy.width(), proxy.height(), proxy.x(), proxy.y())
 
         return graphics_view
 
