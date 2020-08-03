@@ -95,7 +95,7 @@ class VIGITIASensorDataInterface:
             receiver.start()
 
     def on_new_video_frame(self, frame, name):
-        print('New frame received of type', name)
+        #print('New frame received of type', name)
 
         for subscriber in self.subscribers:
             subscriber.on_new_video_frame(frame, name)
