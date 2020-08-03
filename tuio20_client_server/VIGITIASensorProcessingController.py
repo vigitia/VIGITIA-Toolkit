@@ -38,6 +38,7 @@ class VIGITIASensorProcessingController:
 
         #self.video_streamer = VIGITIAVideoStreamer('132.199.199.67', 5000)
         self.video_streamer = VIGITIAVideoStreamer(get_ip_address(), 5000)
+        self.video_streamer_two = VIGITIAVideoStreamer(get_ip_address(), 5001)
 
         self.table_surface_extractor = TableSurfaceExtractor()
 
@@ -54,7 +55,7 @@ class VIGITIASensorProcessingController:
         # The dimension attribute encodes the sensor dimension with two 16bit unsigned integer values embedded into a 32bit
         # integer value. The first two bytes represent the sensor width, while the final two bytes represent the sensor
         # height
-        self.dimension = 0
+        self.dimension = '1280x720'
         self.source = os.uname()[1]
 
     def init_sensor_data_processing_services(self):
@@ -73,12 +74,18 @@ class VIGITIASensorProcessingController:
             if color_image is not None:
 
                 color_image_table = self.table_surface_extractor.extract_table_area(color_image)
+
                 self.experiments(color_image, color_image_table, depth_image)
 
                 aruco_markers, movements, touch_points = self.process_sensor_data(color_image, color_image_table,
                                                                                   depth_image)
 
                 self.tuio_server.start_tuio_bundle(dimension=self.dimension, source=self.source)
+
+                # Send a message for every video stream
+                # TODO: Automate, count up ID, ...
+                self.tuio_server.add_data_message(0, 'video', 'Intel Realsense D435 RGB', 1280, 720, 5000)
+                self.tuio_server.add_data_message(1, 'video', 'Intel Realsense D435 Depth', 1280, 720, 5001)
 
                 for marker in aruco_markers:
                     # TODO: Correct IDs
@@ -102,7 +109,7 @@ class VIGITIASensorProcessingController:
                                                               height=movement['bounding_rect_height'], area=0)
 
                 for touch_point in touch_points:
-                    print(touch_point)
+                    #print(touch_point)
                     # TODO: Correct IDs
                     self.tuio_server.add_pointer_message(s_id=touch_point.id, tu_id=0, c_id=0, x_pos=touch_point.x,
                                                          y_pos=touch_point.y, angle=0, shear=0, radius=0,
@@ -117,30 +124,33 @@ class VIGITIASensorProcessingController:
                 break
 
     def experiments(self, color_image, color_image_table, depth_image):
+        pass
         # depth_filtered = cv2.convertScaleAbs(depth_image, alpha=(255/2000))
         # depth_foreground = self.foreground_mask_extractor.get_foreground_mask_depth(depth_filtered)
 
-        table = self.table_detector.get_table_border(color_image, depth_image)
-        cv2.imshow('table', table)
+        #table = self.table_detector.get_table_border(color_image, depth_image)
+        #cv2.imshow('table', table)
 
-        # TODO: Find solution for this temporary fix of ghost hands
-        self.hand_tracker.reset()
-        detected_hands = self.hand_tracker(cv2.cvtColor(color_image_table, cv2.COLOR_BGR2RGB))
-        hands = self.hand_tracker.add_hand_tracking_points(color_image_table, detected_hands)
-        cv2.imshow('hands', hands)
+        self.video_streamer.stream_frame(color_image_table)
+        self.video_streamer_two.stream_frame(color_image)
 
-        # self.video_streamer.stream_frame(color_image)
+        #detected_objects, detected_objects_dict = self.generic_object_detector.detect_generic_objects(color_image_table)
+        #cv2.imshow('objects', detected_objects)
 
-        detected_objects, detected_objects_dict = self.generic_object_detector.detect_generic_objects(color_image_table)
-        cv2.imshow('objects', detected_objects)
-
-        if len(detected_objects_dict) > 0:
-            print(detected_objects_dict)
+        #if len(detected_objects_dict) > 0:
+        #    print(detected_objects_dict)
                 
     def process_sensor_data(self, color_image, color_image_table, depth_image):
         aruco_markers = self.fiducials_detector.detect_fiducials(color_image_table)
         movements = self.movement_detector.detect_movement(color_image_table)
-        touch_points = self.touch_detector.get_touch_points(color_image, depth_image, self.table_border)
+
+        # TODO: Find solution for this temporary fix of ghost hands
+        self.hand_tracker.reset()
+        detected_hands = self.hand_tracker(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
+        hands, hand_regions = self.hand_tracker.add_hand_tracking_points(color_image.copy(), detected_hands)
+        cv2.imshow('hands', hands)
+
+        touch_points = self.touch_detector.get_touch_points(color_image, depth_image, self.table_border, hand_regions)
 
         return aruco_markers, movements, touch_points
 
