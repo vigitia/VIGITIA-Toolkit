@@ -53,6 +53,8 @@ class VIGITIASensorDataInterface:
         # Using the Observer pattern
         self.subscribers = set()
 
+        self.bundles = {}
+
         self.tokens = []
         self.pointers = []
         self.outer_contour_geometries = []
@@ -87,64 +89,74 @@ class VIGITIASensorDataInterface:
         server_thread.start()
 
     # Init a new video stream receiver and subscribe to it to receive new video streams
-    def init_video_stream_receiver(self, name, port):
-        receiver = VIGITIAVideoStreamReceiver(name, port=port)
+    def init_video_stream_receiver(self, name, origin_ip, port):
+        receiver = VIGITIAVideoStreamReceiver(name, origin_ip, port=port)
         receiver.register_subscriber(self)
         receiver.start()
 
     # Forward a received video frame to all subscribers
-    def on_new_video_frame(self, frame, name):
+    def on_new_video_frame(self, frame, name, origin_ip, port):
         # print('New frame received of type', name)
 
         for subscriber in self.subscribers:
             subscriber.on_new_video_frame(frame, name)
 
     def on_new_frame_message(self, *messages):
-        #print('New frame arrived:', message)
+        #print('New frame arrived:', messages)
         origin_ip = messages[0][0]
-        self.tokens = []
-        pass
 
-    def on_new_pointer_message(self, *messages):
-        # print(messages)
-        for subscriber in self.subscribers:
-            subscriber.on_new_pointer_messages(messages[1:])
-
-    def on_new_bounding_box_message(self, *messages):
-        pass
-        # print(messages)
+        self.bundles[origin_ip] = {
+            'frame_id': messages[2],
+            'time_tag': messages[3],
+            'dimension': messages[4],
+            'source': messages[5],
+            'tokens': [],
+            'pointers': [],
+            'bounding_boxes': [],
+            'outer_contour_geometries': [],
+            'symbols': [],
+            'data': [],
+            'active_session_ids': []
+        }
 
     def on_new_token_message(self, *messages):
-        print('Token message', messages[1:])
         origin_ip = messages[0][0]
-        self.tokens.append(messages)
-        # print(messages)
-        # for subscriber in self.subscribers:
-        #     subscriber.on_new_token_message(messages)
+        self.bundles[origin_ip]['tokens'].append(messages[2:])
+
+    def on_new_pointer_message(self, *messages):
+        origin_ip = messages[0][0]
+        self.bundles[origin_ip]['pointers'].append(messages[2:])
+
+    def on_new_bounding_box_message(self, *messages):
+        origin_ip = messages[0][0]
+        self.bundles[origin_ip]['bounding_boxes'].append(messages[2:])
 
     def on_new_data_message(self, *messages):
-        # print(messages)
         origin_ip = messages[0][0]
-        messages = messages[1:]
-        message_type = messages[2]
+        self.bundles[origin_ip]['data'].append(messages[2:])
+
+        message_type = messages[3]
         if message_type == 'video':
-            session_id = messages[1]
+            session_id = messages[2]
             if len(self.available_video_streams) > session_id:
                 pass
             else:
                 print('New video stream')
-                stream_name = messages[3]
-                stream_port = messages[6]
-                #self.available_video_streams.append(messages[3:])
+                stream_name = messages[4]
+                stream_port = messages[7]
                 self.available_video_streams.append(stream_name)
-                self.init_video_stream_receiver(stream_name, stream_port)
+                self.init_video_stream_receiver(stream_name, origin_ip, stream_port)
 
     def on_new_alive_message(self, *messages):
-        #print(messages)
         origin_ip = messages[0][0]
+        active_session_ids = messages[2:]
+        self.bundles[origin_ip]['active_session_ids'].append(active_session_ids)
 
+        print(self.bundles[origin_ip])
+
+        # Send bundle to all subscribers
         for subscriber in self.subscribers:
-            subscriber.on_new_token_messages(self.tokens)
+            subscriber.on_new_tuio_bundle(self.bundles[origin_ip])
 
     # Applications can call this function to ask what video streams are available
     def get_available_video_streams(self):
