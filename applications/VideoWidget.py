@@ -21,17 +21,20 @@ class VideoWidget(QWidget, VIGITIABaseApplication):
 
         self.initUI()
 
-        data_interface = VIGITIASensorDataInterface.Instance()
-        data_interface.register_subscriber(self)
+        self.data_interface = VIGITIASensorDataInterface.Instance()
+        self.data_interface.register_subscriber(self)
 
     def initUI(self):
         self.setGeometry(0, 0, self.get_width(), self.get_height())
+        self.setStyleSheet("background-color: transparent;")
 
         self.label = QLabel(self)
         self.label.resize(self.get_width(), self.get_height())
 
     def on_new_video_frame(self, frame, name):
-        if frame is not None:
+        available_video_streams = self.data_interface.get_available_video_streams()
+
+        if name == 'Intel Realsense D435 RGB' and frame is not None:
             # print('New FRAME:', name)
             image = self.opencv_imge_to_pyqt_image(frame)
             self.label.setPixmap(QPixmap.fromImage(image))
