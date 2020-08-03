@@ -22,7 +22,8 @@ class Thread(QThread):
 
     def run(self):
         for i in range(1000):
-            sleep(0.5)
+            sleep(1)
+            self.widget.set_rotation(self.widget.get_rotation() + 1)
             self.widget.set_x(self.widget.get_x() + i)
             print('Move widget to {}'.format(self.widget.get_x()))
 

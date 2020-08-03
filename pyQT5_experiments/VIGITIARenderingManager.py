@@ -58,15 +58,14 @@ class VIGITIARenderingManager(QMainWindow):
         if self.applications is not None:
             for application in self.applications:
                 if application['name'] == application_name:
+
+                    # Rotate application
+                    if application['instance'].get_rotation() != 0:
+                        application = self.rotate_applicaton(application)
+
                     if application['parent'] is None:
-                        if DEBUG_MODE:
-                            application['instance'].setStyleSheet('border: 3px solid #FF0000')
                         application['instance'].move(application['instance'].get_x(), application['instance'].get_y())
-                        #application['instance'].setParent(parent_widget)
                     else:
-                        if DEBUG_MODE:
-                            application['parent'].setStyleSheet('border: 3px solid #FF0000')
-                        #application['parent'].setParent(parent_widget)
 
                         # Set parent of rotated widget to fullscreen to make sure that the rotated widget fits
                         application['parent'].setGeometry(0, 0, self.width, self.height)
@@ -75,8 +74,6 @@ class VIGITIARenderingManager(QMainWindow):
                         # we move the entire parent so that the rotated widget is back at 0,0
                         origin_x = self.width / 2 - application['instance'].frameGeometry().width() / 2
                         origin_y = self.height / 2 - application['instance'].frameGeometry().height() / 2
-
-                        # application['parent'].move(-origin_x, -origin_y)
 
                         # Now we move the rotated widget inluding its parent to the desired position
                         application['parent'].move(
@@ -102,8 +99,7 @@ class VIGITIARenderingManager(QMainWindow):
 
                 # Rotate applications
                 if application['instance'].get_rotation() != 0:
-                    application['parent'] = self.rotate_applicaton(application['instance'],
-                                                                   application['instance'].rotation)
+                    application = self.rotate_applicaton(application)
 
                 if application['parent'] is None:
                     if DEBUG_MODE:
@@ -138,26 +134,33 @@ class VIGITIARenderingManager(QMainWindow):
 
     # Allows the rotation of an application (a QT Widget)
     # Based on https://stackoverflow.com/questions/58020983/rotate-the-widget-for-some-degree
-    def rotate_applicaton(self, application, angle):
-        graphics_view = QGraphicsView()
+    def rotate_applicaton(self, application):
 
-        #graphics_view.setFrameShape(0)
+        angle = application['instance'].rotation
+        if application['proxy'] is None:
+            graphics_view = QGraphicsView()
+            scene = QGraphicsScene(graphics_view)
 
-        # Disable scrollbars
-        graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            # Disable scrollbars
+            graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
-        scene = QGraphicsScene(graphics_view)
-        graphics_view.setScene(scene)
+            graphics_view.setScene(scene)
 
-        proxy = QGraphicsProxyWidget()
-        proxy.setWidget(application)
-        proxy.setTransformOriginPoint(proxy.boundingRect().center())
-        scene.addItem(proxy)
+            proxy = QGraphicsProxyWidget()
+            proxy.setWidget(application['instance'])
+            proxy.setTransformOriginPoint(proxy.boundingRect().center())
+            scene.addItem(proxy)
 
-        proxy.setTransform(QTransform().rotate(angle))
+            proxy.setTransform(QTransform().rotate(angle))
 
-        graphics_view.adjustSize()
+            graphics_view.adjustSize()
+
+            application['parent'] = graphics_view
+            application['proxy'] = proxy
+        else:
+            proxy = application['proxy']
+            proxy.setTransform(QTransform().rotate(angle))
 
         # TODO: Check if width/height of graphics_wiew > width/height of QMainWindow. If yes, scale down
         # TODO: Notify application about new position, rotation and size
@@ -186,7 +189,7 @@ class VIGITIARenderingManager(QMainWindow):
 
         #print('GW:', proxy.width(), proxy.height(), proxy.x(), proxy.y())
 
-        return graphics_view
+        return application
 
     # Checking the folder APPLICATIONS_BASE_FOLDER for all classes that inherit from the superclass "VIGITIAApplication"
     # These are the applications that are currently available for display
@@ -217,7 +220,8 @@ class VIGITIARenderingManager(QMainWindow):
                             application = {
                                 'name': class_name,
                                 'instance': my_class(self),  # Pass the RenderingManager on to the class
-                                'parent': None
+                                'parent': None,
+                                'proxy': None
                             }
 
                             applications.append(application)
