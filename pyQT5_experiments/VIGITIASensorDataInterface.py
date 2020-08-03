@@ -59,8 +59,9 @@ class VIGITIASensorDataInterface:
         self.bounding_boxes = []
         self.symbols = []
 
+        self.available_video_streams = []
+
         self.init_tuio_interface()
-        self.init_video_stream_receivers()
 
     def register_subscriber(self, new_subscriber):
         print('New Subscriber:', new_subscriber.__class__.__name__)
@@ -75,6 +76,7 @@ class VIGITIASensorDataInterface:
         dispatcher.map("/tuio2/ptr", self.on_new_pointer_message)
         dispatcher.map("/tuio2/bnd", self.on_new_bounding_box_message)
         dispatcher.map("/tuio2/tok", self.on_new_token_message)
+        dispatcher.map("/tuio2/dat", self.on_new_data_message)
         dispatcher.map("/tuio2/alv", self.on_new_alive_message)
 
         osc_udp_server = ThreadingOSCUDPServer((self.ip, PORT), dispatcher)
@@ -84,18 +86,15 @@ class VIGITIASensorDataInterface:
         server_thread = threading.Thread(target=osc_udp_server.serve_forever)
         server_thread.start()
 
-    #
-    def init_video_stream_receivers(self):
+    # Init a new video stream receiver and subscribe to it to receive new video streams
+    def init_video_stream_receiver(self, name, port):
+        receiver = VIGITIAVideoStreamReceiver(name, port=port)
+        receiver.register_subscriber(self)
+        receiver.start()
 
-        ports = [5000]
-
-        for port in ports:
-            receiver = VIGITIAVideoStreamReceiver('RealSense D435 RGB', port=port)
-            receiver.register_subscriber(self)
-            receiver.start()
-
+    # Forward a received video frame to all subscribers
     def on_new_video_frame(self, frame, name):
-        #print('New frame received of type', name)
+        # print('New frame received of type', name)
 
         for subscriber in self.subscribers:
             subscriber.on_new_video_frame(frame, name)
@@ -120,11 +119,30 @@ class VIGITIASensorDataInterface:
         # for subscriber in self.subscribers:
         #     subscriber.on_new_token_message(messages)
 
+    def on_new_data_message(self, *messages):
+        # print(messages)
+        message_type = messages[2]
+        if message_type == 'video':
+            session_id = messages[1]
+            if len(self.available_video_streams) > session_id:
+                pass
+            else:
+                print('New video stream')
+                stream_name = messages[3]
+                stream_port = messages[6]
+                #self.available_video_streams.append(messages[3:])
+                self.available_video_streams.append(stream_name)
+                self.init_video_stream_receiver(stream_name, stream_port)
+
     def on_new_alive_message(self, *messages):
         #print(messages)
 
         for subscriber in self.subscribers:
             subscriber.on_new_token_messages(self.tokens)
+
+    # Applications can call this function to ask what video streams are available
+    def get_available_video_streams(self):
+        return self.available_video_streams
 
 
 def main():
