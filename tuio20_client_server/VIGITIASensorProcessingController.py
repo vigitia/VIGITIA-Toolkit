@@ -6,8 +6,7 @@ import sys
 import time
 
 import cv2
-import numpy as np
-from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
+from sensors.cameras.realsense_D435_camera import RealsenseD435Camera
 
 # Import TUIO Server
 from tuio20_client_server.TUIOServer import TUIOServer

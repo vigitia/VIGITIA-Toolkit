@@ -3,8 +3,6 @@
 
 import cv2
 
-from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
-
 
 class VIGITIAVideoStreamer:
 

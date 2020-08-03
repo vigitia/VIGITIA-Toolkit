@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import pyrealsense2 as rs
 import numpy as np
 import cv2
 import imutils
@@ -11,7 +10,7 @@ import configparser
 from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
 from scipy.spatial import distance
 
-from sensors.cameras.realsenseD435.realsense_D435_camera import RealsenseD435Camera
+from sensors.cameras.realsense_D435_camera import RealsenseD435Camera
 #from sensors.cameras.kinect2.kinectV2_camera import KinectV2Camera
 
 # TODO: Calculate in calibration phase
