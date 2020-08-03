@@ -119,7 +119,7 @@ class TouchDetector:
         points_inside = []
 
         if len(hand_regions) > 0:
-            print(hand_regions)
+            # print(hand_regions)
             #print(new_touch_points)
 
 
@@ -308,7 +308,8 @@ class TouchDetector:
         try:
             defects = cv2.convexityDefects(arm_candidate, hull)
         except cv2.error as e:
-            print(e)
+            # print(e)
+            pass
 
         inner_points = []
         starts = []

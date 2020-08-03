@@ -25,7 +25,9 @@ class Thread(QThread):
             sleep(1)
             self.widget.set_rotation(self.widget.get_rotation() + 1)
             self.widget.set_x(self.widget.get_x() + i)
+            #self.widget.set_width(self.widget.get_width() - 25)
             print('Move widget to {}'.format(self.widget.get_x()))
+
 
 class ImageWidget(QWidget, VIGITIABaseApplication):
 
@@ -45,6 +47,7 @@ class ImageWidget(QWidget, VIGITIABaseApplication):
 
     def initUI(self):
         self.setGeometry(0, 0, self.get_width(), self.get_height())
+        self.setStyleSheet("background-color: transparent;")
 
         label = QLabel(self)
         pixmap = QPixmap(os.path.abspath(os.path.join(os.path.dirname(__file__), 'image.jpg')))
