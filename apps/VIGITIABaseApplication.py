@@ -94,6 +94,9 @@ class VIGITIABaseApplication:
     Functions for receiving data from the VIGITIA Sensor Data Interface
     """
 
+    def on_new_tuio_bundle(self, data):
+        pass
+
     def on_new_bounding_box_message(self, data):
         pass
 
