@@ -43,6 +43,7 @@ class VIGITIASensorProcessingController:
 
         # TODO: Select camera via GUI
         self.camera = RealsenseD435Camera()
+        self.camera.init_video_capture()
         self.camera.start()
 
         # TODO: Let user select in GUI what video should be streamed
@@ -76,8 +77,8 @@ class VIGITIASensorProcessingController:
     # The main application loop. Code parts for fps counter from
     # https://stackoverflow.com/questions/43761004/fps-how-to-divide-count-by-time-function-to-determine-fps
     def loop(self):
+        # Variables for fps counter
         start_time = 0
-        x = 1  # displays the frame rate every 1 second
         counter = 0
 
         while True:
@@ -132,7 +133,7 @@ class VIGITIASensorProcessingController:
 
                 # FPS Counter
                 counter += 1
-                if (time.time() - start_time) > x:
+                if (time.time() - start_time) > 1:  # displays the frame rate every 1 second
                     if DEBUG_MODE:
                         print("FPS: ", round(counter / (time.time() - start_time), 1))
                     counter = 0

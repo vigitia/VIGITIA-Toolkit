@@ -7,18 +7,28 @@
 import cv2
 import threading
 
+from apps.VIGITIACameraBase import VIGITIACameraBase
 
-class GenericWebcam:
+CAMERA_ID = 0
+RES_X = 1920
+RES_Y = 720
+FPS = 30
+
+
+class GenericWebcam(VIGITIACameraBase):
 
     frame = None
 
-    def __init__(self, camera_id=0, resolution_x=1920, resolution_y=720, fps=30):
-        self.init_opencv_video_capture(camera_id, resolution_x, resolution_y, fps)
+    def __init__(self, ):
+        super().__init__('Generic Webcam')
+
+        self.add_video_stream('color', 'bgr8', RES_X, RES_Y, FPS,
+                              'Color Stream')
 
         self.started = False
         self.read_lock = threading.Lock()
 
-    def init_opencv_video_capture(self, camera_id, resolution_x, resolution_y, fps):
+    def init_video_capture(self, camera_id=CAMERA_ID, resolution_x=RES_X, resolution_y=RES_Y, fps=FPS):
         self.capture = cv2.VideoCapture(camera_id)
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, resolution_x)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, resolution_y)

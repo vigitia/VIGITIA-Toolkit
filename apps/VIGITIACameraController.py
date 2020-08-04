@@ -11,7 +11,7 @@ import pyclbr
 
 CAMERA_FOLDER = 'cameras'
 BASE_FOLDER = 'sensors'
-CAMERA_BASE_CLASS = 'VIGITIACAMERABASE'
+CAMERA_BASE_CLASS = 'VIGITIACameraBase'
 
 
 class VIGITIACameraController:
@@ -36,19 +36,21 @@ class VIGITIACameraController:
                 module_name = f"{BASE_FOLDER}.{CAMERA_FOLDER}.{file[:-3]}"
                 module_info = pyclbr.readmodule(module_name)
                 module = import_module(module_name)
-                print(module_name, module_info, module)
 
                 for item in module_info.values():
                     class_name = item.name  # The name of the found class
-                    print(class_name)
                     my_class = getattr(module, class_name)
                     superclasses = my_class.mro()
                     # Check if the class has the required superclass
                     for superclass in superclasses:
                         if superclass.__name__ == CAMERA_BASE_CLASS:
+                            available_cameras.append(my_class())
                             print('"{}" in Module "{}" is a known camera'.format(class_name, module_name))
 
         print(available_cameras)
+        for camera in available_cameras:
+            print(camera.get_name())
+            print(camera.get_available_video_streams())
 
         return available_cameras
 

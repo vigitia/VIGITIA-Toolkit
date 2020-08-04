@@ -21,5 +21,8 @@ class VIGITIACameraBase:
         """
         self.available_video_streams.append([type, format, res_x, res_y, fps, description])
 
+    def get_name(self):
+        return self.camera_name
+
     def get_available_video_streams(self):
         return self.available_video_streams
