@@ -79,6 +79,7 @@ class VIGITIASensorDataInterface:
         dispatcher.map("/tuio2/bnd", self.on_new_bounding_box_message, needs_reply_address=True)
         dispatcher.map("/tuio2/tok", self.on_new_token_message, needs_reply_address=True)
         dispatcher.map("/tuio2/dat", self.on_new_data_message, needs_reply_address=True)
+        dispatcher.map("/tuio2/ctl", self.on_new_control_message, needs_reply_address=True)
         dispatcher.map("/tuio2/alv", self.on_new_alive_message, needs_reply_address=True)
 
         osc_udp_server = ThreadingOSCUDPServer((self.ip, PORT), dispatcher)
@@ -122,7 +123,15 @@ class VIGITIASensorDataInterface:
 
     def on_new_token_message(self, *messages):
         origin_ip = messages[0][0]
-        self.bundles[origin_ip]['tokens'].append(messages[2:])
+        token_message = {
+            'session_id': messages[2],
+            'tuio_id': messages[3],
+            'component_id': messages[4],
+            'x_pos': messages[5],
+            'y_pos': messages[6],
+            'angle': messages[7]
+        }
+        self.bundles[origin_ip]['tokens'].append(token_message)
 
     def on_new_pointer_message(self, *messages):
         origin_ip = messages[0][0]
@@ -133,6 +142,7 @@ class VIGITIASensorDataInterface:
         self.bundles[origin_ip]['bounding_boxes'].append(messages[2:])
 
     def on_new_data_message(self, *messages):
+        print(messages)
         origin_ip = messages[0][0]
         self.bundles[origin_ip]['data'].append(messages[2:])
 
@@ -148,12 +158,15 @@ class VIGITIASensorDataInterface:
                 self.available_video_streams.append(stream_name)
                 self.init_video_stream_receiver(stream_name, origin_ip, stream_port)
 
+    def on_new_control_message(self, *messages):
+        print(messages)
+
     def on_new_alive_message(self, *messages):
         origin_ip = messages[0][0]
         active_session_ids = messages[2:]
         self.bundles[origin_ip]['active_session_ids'].append(active_session_ids)
 
-        print(self.bundles[origin_ip])
+        #print(self.bundles[origin_ip])
 
         # Send new data to all subscribers
         for subscriber in self.subscribers:
