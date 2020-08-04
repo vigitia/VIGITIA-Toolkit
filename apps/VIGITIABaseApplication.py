@@ -1,5 +1,6 @@
 
 # Parent class for all Toolkit applications
+from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterface
 
 
 class VIGITIABaseApplication:
@@ -18,6 +19,9 @@ class VIGITIABaseApplication:
         # TODO: Flags to implement
         self.force_aspect_ratio = False
         self.z_index = 0
+
+        self.data_interface = VIGITIASensorDataInterface.Instance()
+        self.data_interface.register_subscriber(self)
 
     """
     Getter Functions
@@ -72,23 +76,29 @@ class VIGITIABaseApplication:
 
     def set_y(self, y):
         self.y = y
+        self.rendering_manager.on_application_updated(self.get_name())
 
     def set_position(self, x, y):
         self.x = x
         self.y = y
+        self.rendering_manager.on_application_updated(self.get_name())
 
     def set_dimensions(self, width, height):
         self.width = width
         self.height = height
+        self.rendering_manager.on_application_updated(self.get_name())
 
     def set_width(self, width):
         self.width = width
+        self.rendering_manager.on_application_updated(self.get_name())
 
     def set_height(self, height):
         self.height = height
+        self.rendering_manager.on_application_updated(self.get_name())
 
     def set_rotation(self, rotation):
         self.rotation = rotation
+        self.rendering_manager.on_application_updated(self.get_name())
 
     """
     Functions for receiving data from the VIGITIA Sensor Data Interface
