@@ -34,7 +34,10 @@ TARGET_COMPUTER_PORT = 8000
 
 DEBUG_MODE = True
 
+
 class VIGITIASensorProcessingController:
+
+    hand_regions = []
 
     def __init__(self):
         self.init_tuio_server()
@@ -88,11 +91,12 @@ class VIGITIASensorProcessingController:
                 self.frame_id += 1
 
                 color_image_table = self.table_surface_extractor.extract_table_area(color_image)
+                depth_image_table = self.table_surface_extractor.extract_table_area(depth_image)
 
                 self.experiments(color_image, color_image_table, depth_image)
 
                 aruco_markers, movements, touch_points = self.process_sensor_data(color_image, color_image_table,
-                                                                                  depth_image)
+                                                                                  depth_image, depth_image_table)
 
                 self.tuio_server.start_tuio_bundle(dimension=self.dimension, source=self.source)
 
@@ -162,17 +166,21 @@ class VIGITIASensorProcessingController:
         #if len(detected_objects_dict) > 0:
         #    print(detected_objects_dict)
                 
-    def process_sensor_data(self, color_image, color_image_table, depth_image):
+    def process_sensor_data(self, color_image, color_image_table, depth_image, depth_image_table):
         aruco_markers = self.fiducials_detector.detect_fiducials(color_image_table)
         movements = self.movement_detector.detect_movement(color_image_table)
 
-        # TODO: Find solution for this temporary fix of ghost hands
-        self.hand_tracker.reset()
-        detected_hands = self.hand_tracker(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
-        hands, hand_regions = self.hand_tracker.add_hand_tracking_points(color_image.copy(), detected_hands)
-        cv2.imshow('hands', hands)
+        # Only every other frame to improve performance
+        if self.frame_id % 2 == 0:
+            # TODO: Find solution for this temporary fix of ghost hands
+            self.hand_tracker.reset()
+            detected_hands = self.hand_tracker(cv2.cvtColor(color_image_table, cv2.COLOR_BGR2RGB))
+            hands, hand_regions = self.hand_tracker.add_hand_tracking_points(color_image_table.copy(), detected_hands)
+            cv2.imshow('hands', hands)
 
-        touch_points = self.touch_detector.get_touch_points(color_image, depth_image, self.table_border, hand_regions)
+            self.hand_regions = hand_regions
+
+        touch_points = self.touch_detector.get_touch_points(color_image_table, depth_image_table, self.hand_regions)
 
         return aruco_markers, movements, touch_points
 
