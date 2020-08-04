@@ -8,11 +8,13 @@ import configparser
 from scipy.spatial import distance
 
 from services.foreground_mask_extractor import ForegroundMaskExtractor
-from calibration.table_surface_extractor import TableSurfaceExtractor
+# from calibration.table_surface_extractor import TableSurfaceExtractor
 
 MIN_DIST_TOUCH = 3  # mm
-DIST_HOVERING = 12  # mm
+DIST_HOVERING = 20  # mm
 MAX_DIST_TOUCH = 50  # mm
+
+MIN_FINGER_DISTANCE_FROM_TABLE_BORDER = 20  # Ignore touch points closer than X pixels to table border
 
 NUM_FRAMES_FOR_BACKGROUND_MODEL = 50
 
@@ -51,7 +53,7 @@ class TouchPoint:
         return tuple([self.palm_center_x, self.palm_center_y])
 
     def __repr__(self):
-        return 'TouchPoint {} at ({}, {}). Distance to the table: {}mm.'.format(str(self.id), (self.x), str(self.y),
+        return 'TouchPoint {} at ({}, {}). Distance to the table: {}mm.'.format(str(self.id), str(self.x), str(self.y),
                                                                                 str(self.distance_to_table_mm))
 
 
@@ -74,7 +76,7 @@ class TouchDetector:
     def __init__(self):
         self.init_background_model()
         self.foreground_mask_extractor = ForegroundMaskExtractor()
-        self.table_surface_extractor = TableSurfaceExtractor()
+        # self.table_surface_extractor = TableSurfaceExtractor()
         print('Touch Detector service ready')
 
     # TODO: Generate backround model during runtime of the last X frames
@@ -93,8 +95,11 @@ class TouchDetector:
             self.background_standard_deviation = deviation_temp
             self.background_model_available = True
 
-    def get_touch_points(self, color_image, depth_image, table_border, hand_regions):
-        self.table_border = table_border
+    def get_touch_points(self, color_image, depth_image, hand_regions):
+        # self.table_border = table_border
+        self.table_border = np.array([(0, 0), (color_image.shape[1], 0),
+                                      (color_image.shape[1], color_image.shape[0]), (0, color_image.shape[1])])
+
         self.num_frame += 1
 
         self.depth_res_x = depth_image.shape[1]
@@ -190,10 +195,9 @@ class TouchDetector:
 
         # foreground_mask = self.foreground_mask_extractor.get_foreground_mask_basic(color_image)
         foreground_mask = self.foreground_mask_extractor.get_foreground_mask(color_image)
-
         cv2.imshow('mask', foreground_mask)
 
-        foreground_mask = self.remove_pixels_outside_table_border(foreground_mask)
+        #foreground_mask = self.remove_pixels_outside_table_border(foreground_mask)
 
         black_image = np.dstack((foreground_mask, foreground_mask, foreground_mask))
 
@@ -225,6 +229,16 @@ class TouchDetector:
 
                     # Check distance between point and table surface to get touch state and the corresponding color
                     max_distance_mm, touch_state = self.get_touch_state(finger_candidate, depth_image)
+                    distance_between_points = distance.euclidean(center_point_palm, finger_candidate)
+                    if distance_between_points > 2 * palm_radius:
+                        if DEBUG_MODE:
+                            cv2.line(black_image, finger_candidate, center_point_palm, [0, 255, 0], 2)
+                            cv2.circle(black_image, finger_candidate, 10, touch_state, 2)
+                        if max_distance_mm < MAX_DIST_TOUCH:
+                            touch_points.append(TouchPoint(finger_candidate[0], finger_candidate[1], index,
+                                                           max_distance_mm, center_point_palm[0],
+                                                           center_point_palm[1]))
+                    continue
                     if max_distance_mm < MAX_DIST_TOUCH:
                         distance_between_points = distance.euclidean(center_point_palm, finger_candidate)
                         if distance_between_points > 1.7 * palm_radius:
@@ -235,11 +249,11 @@ class TouchDetector:
                                                            max_distance_mm, center_point_palm[0],
                                                            center_point_palm[1]))
                         #else:
-                        #    cv2.line(black_image, finger_candidate, center_point_palm, [255, 0, 0], 2)
+                            #cv2.line(black_image, finger_candidate, center_point_palm, [255, 0, 0], 2)
 
                         # TODO: Check if distance between points is realistic
 
-        black_image = self.table_surface_extractor.extract_table_area(black_image)
+        # black_image = self.table_surface_extractor.extract_table_area(black_image)
         #black_image = cv2.flip(black_image, -1)
         cv2.imshow('Detected hands', black_image)
 
@@ -342,7 +356,7 @@ class TouchDetector:
         for point in hull:
             distance_to_table_border = abs(cv2.pointPolygonTest(self.table_border, tuple(point[0]), True))
             # TODO Remove points close to the table border
-            MIN_FINGER_DISTANCE_FROM_TABLE_BORDER = 20
+
             if distance_to_table_border > MIN_FINGER_DISTANCE_FROM_TABLE_BORDER:
                 finger_candidates.append(tuple(point[0]))
 
@@ -449,10 +463,11 @@ class TouchDetector:
             cv2.circle(black_image, touch_point.get_touch_coordinates(), 8,
                        self.get_touch_color(touch_point.distance_to_table_mm), -1)
             cv2.circle(black_image, touch_point.get_palm_center_coordinates(), 5, COLOR_PALM_CENTER, -1)
-            cv2.putText(black_image, text=str(touch_point.id), org=touch_point.get_touch_coordinates(),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255))
+            cv2.putText(black_image, text='{}: {}mm'.format(str(touch_point.id), str(touch_point.distance_to_table_mm)),
+                        org=touch_point.get_touch_coordinates(),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 0, 0))
 
-        black_image = self.table_surface_extractor.extract_table_area(black_image)
+        #black_image = self.table_surface_extractor.extract_table_area(black_image)
         #black_image = cv2.flip(black_image, -1)
         cv2.imshow('touch points', black_image)
 
