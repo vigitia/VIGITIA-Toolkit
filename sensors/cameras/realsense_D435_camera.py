@@ -44,12 +44,15 @@ class RealsenseD435Camera(VIGITIACameraBase):
 
     def __init__(self):
 
+        super().__init__('Intel RealSense D435')
+
         self.add_video_stream('color', 'bgr8', RGB_RES_X, RGB_RES_Y, RGB_FPS,
                               'Color Stream of the Intel RealSense D435 camera')
         self.add_video_stream('depth', 'z16', DEPTH_RES_X, DEPTH_RES_Y, DEPTH_FPS,
                               'Depth Stream of the Intel RealSense D435 camera. Each pixel corresponds to the measured '
                               'distance in mm.')
 
+    def init_video_capture(self):
         try:
             # Create a pipeline
             self.pipeline = rs.pipeline()
