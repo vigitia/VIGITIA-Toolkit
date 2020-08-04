@@ -12,13 +12,15 @@ from os.path import isfile, join
 from importlib import import_module
 import pyclbr
 
+from apps.VIGITIABaseApplication import VIGITIABaseApplication
+
 APPLICATIONS_BASE_FOLDER = 'applications'
 APPLICATION_PARENT_CLASS = 'VIGITIABaseApplication'
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 
-class VIGITIARenderingManager(QMainWindow):
+class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
     applications = []
 
@@ -93,7 +95,7 @@ class VIGITIARenderingManager(QMainWindow):
 
         for application in self.applications:
             # TODO: Add a convenient way to select wanted applications (a GUI)
-            hidden_applications = ['BrowserWidget', 'ExampleWidget']
+            hidden_applications = ['BrowserWidget', 'ExampleWidget', 'VideoWidget']
 
             if application['name'] in hidden_applications:
                 print('Test. Not adding', application['name'])
