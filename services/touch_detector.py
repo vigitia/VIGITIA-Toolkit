@@ -124,18 +124,13 @@ class TouchDetector:
         points_inside = []
 
         if len(hand_regions) > 0:
-            # print(hand_regions)
-            #print(new_touch_points)
-
 
             for point in new_touch_points:
                 point_inside = False
-                print('Point:', point.x, point.y)
                 for hand_region in hand_regions:
                     if hand_region[0][0] <= point.x <= hand_region[1][0]:
                         if hand_region[0][1] <= point.y <= hand_region[1][1]:
                             point_inside = True
-                            print('Found point inside')
 
                 if point_inside:
                     points_inside.append(point)
