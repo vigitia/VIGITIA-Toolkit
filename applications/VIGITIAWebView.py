@@ -59,9 +59,6 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
         #self.setLayout(layout)
         #layout.addWidget(self.web)
 
-        data_interface = VIGITIASensorDataInterface.Instance()
-        data_interface.register_subscriber(self)
-
     @pyqtSlot()
     def loadFinishedHandler(self):
         print("load finished")

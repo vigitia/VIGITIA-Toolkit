@@ -35,9 +35,6 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         # QPoint object to tract the point
         self.lastPoint = QPoint()
 
-        data_interface = VIGITIASensorDataInterface.Instance()
-        data_interface.register_subscriber(self)
-
     def initUI(self):
         # setting geometry to main window
         self.setGeometry(0, 0, self.get_width(), self.get_height())
@@ -52,8 +49,7 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         for brush in self.brushes:
 
             # set the pen of the painter
-            painter.setPen(QPen(brush.get_color(), self.brushSize,
-                                Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            painter.setPen(QPen(brush.get_color(), self.brushSize, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
 
             painter.drawPoint(brush.get_pos(self))
 
@@ -162,9 +158,9 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         new_touch_point_ids = []
 
         for message in messages:
-            marker_id = message[0]
-            touch_x = message[3]
-            touch_y = message[4]
+            marker_id = message['session_id']
+            touch_x = message['x_pos']
+            touch_y = message['y_pos']
             new_touch_point_ids.append(marker_id)
 
             found_brush = False

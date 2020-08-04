@@ -21,9 +21,6 @@ class VideoWidget(QWidget, VIGITIABaseApplication):
 
         self.initUI()
 
-        self.data_interface = VIGITIASensorDataInterface.Instance()
-        self.data_interface.register_subscriber(self)
-
     def initUI(self):
         self.setGeometry(0, 0, self.get_width(), self.get_height())
         self.setStyleSheet("background-color: transparent;")
