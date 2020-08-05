@@ -11,7 +11,7 @@ class ForegroundMaskExtractor:
     def __init__(self):
         self.fgbg = cv2.createBackgroundSubtractorMOG2(history=1000, detectShadows=1)
         self.fgbg_basic = cv2.createBackgroundSubtractorMOG2(varThreshold=200, detectShadows=0)
-        print('Foreground Mask Extractor ready')
+        print('[Foreground Mask Extractor]: Ready')
 
     def get_foreground_mask(self, frame):
         blur = cv2.GaussianBlur(frame, (7, 7), 0)
@@ -37,7 +37,6 @@ class ForegroundMaskExtractor:
         foreground_mask = cv2.morphologyEx(foreground_mask, cv2.MORPH_CLOSE, kernel, 2)
 
         return foreground_mask
-
 
     def get_foreground_mask_basic(self, frame):
         # Use the Hue channel on the test background for good detection results

@@ -71,7 +71,7 @@ class RealsenseD435Camera(VIGITIACameraBase):
             # Getting the depth sensor's depth scale (see rs-align example for explanation)
             depth_sensor = profile.get_device().first_depth_sensor()
             self.depth_scale = depth_sensor.get_depth_scale()
-            print("Depth scale", self.depth_scale)
+            # print("[RealSense D435]: Depth scale", self.depth_scale)
 
             # TODO: Allow settings to be changed on initializing the function
             depth_sensor.set_option(rs.option.laser_power, 360)  # 0 - 360
@@ -87,7 +87,7 @@ class RealsenseD435Camera(VIGITIACameraBase):
             self.decimation_filter = rs.decimation_filter()
             self.temporal_filter = rs.temporal_filter()
         except Exception as e:
-            print('[RealSense D435] ERROR:', e, file=sys.stderr)
+            print('[RealSense D435]: ERROR:', e, file=sys.stderr)
             print('[RealSense D435]: Could not initialize camera. If the resource is busy, check if any other script '
                   'is currently accessing the camera. If this is not the case, replug the camera and try again.',
                   file=sys.stderr)
@@ -97,8 +97,6 @@ class RealsenseD435Camera(VIGITIACameraBase):
 
         self.started = False
         self.read_lock = threading.Lock()
-
-        print('Finished INIT')
 
     # The colorizer can colorize depth images
     def init_colorizer(self):
@@ -121,13 +119,13 @@ class RealsenseD435Camera(VIGITIACameraBase):
             return self
 
     def update(self):
-        print('[RealSense D435] Skip first ' + str(NUM_FRAMES_WAIT_INITIALIZING) +
+        print('[RealSense D435]: Skip first ' + str(NUM_FRAMES_WAIT_INITIALIZING) +
               ' frames to allow Auto White Balance to adjust')
 
         while self.started:
             self.num_frame += 1
             if DEBUG_MODE:
-                print('[RealSense D435] Frame: ', self.num_frame)
+                print('[RealSense D435]: Frame ', self.num_frame)
 
             # Get frameset of color and depth
             frames = self.pipeline.wait_for_frames()
@@ -148,7 +146,7 @@ class RealsenseD435Camera(VIGITIACameraBase):
             if self.num_frame < NUM_FRAMES_WAIT_INITIALIZING:
                 continue
             elif self.num_frame == NUM_FRAMES_WAIT_INITIALIZING:
-                print('[RealSense D435] Camera ready')
+                print('[RealSense D435]: Ready')
 
             # Apply Filters
             # aligned_depth_frame = self.hole_filling_filter.process(aligned_depth_frame)

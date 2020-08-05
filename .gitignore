@@ -161,7 +161,7 @@ vigitia_table_study/config.ini
 realsenseD435/config.ini
 
 
-vigitia_hand-tracker/config.ini
+old/vigitia_hand-tracker/config.ini
 
 *.ini
 

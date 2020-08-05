@@ -16,7 +16,7 @@ class MovementDetector:
     last_frame = None
 
     def __init__(self):
-        print('Movement Detector ready')
+        print('[Movement Detector]: Ready')
 
 
     # Check if movement was detected within the frame

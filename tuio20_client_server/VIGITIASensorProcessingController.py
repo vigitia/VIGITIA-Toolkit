@@ -138,7 +138,7 @@ class VIGITIASensorProcessingController:
                 counter += 1
                 if (time.time() - start_time) > 1:  # displays the frame rate every 1 second
                     if DEBUG_MODE:
-                        print("FPS: ", round(counter / (time.time() - start_time), 1))
+                        print("[SensorProcessingController]: FPS: ", round(counter / (time.time() - start_time), 1))
                     counter = 0
                     start_time = time.time()
 
@@ -149,9 +149,6 @@ class VIGITIASensorProcessingController:
                 break
 
     def experiments(self, color_image, color_image_table, depth_image):
-        pass
-        # depth_filtered = cv2.convertScaleAbs(depth_image, alpha=(255/2000))
-        # depth_foreground = self.foreground_mask_extractor.get_foreground_mask_depth(depth_filtered)
 
         #table = self.table_detector.get_table_border(color_image, depth_image)
         #cv2.imshow('table', table)

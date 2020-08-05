@@ -76,8 +76,8 @@ class TouchDetector:
     def __init__(self):
         self.init_background_model()
         self.foreground_mask_extractor = ForegroundMaskExtractor()
-        # self.table_surface_extractor = TableSurfaceExtractor()
-        print('Touch Detector service ready')
+
+        print('[Touch Detector]: Ready')
 
     # TODO: Generate backround model during runtime of the last X frames
     def init_background_model(self):
@@ -87,10 +87,10 @@ class TouchDetector:
             background_temp = np.load('background_average.npy')
             deviation_temp = np.load('background_standard_deviation.npy')
         except FileNotFoundError:
-            print("No stored background")
+            print("[Touch Detector]: No stored background")
 
         if background_temp is not None and deviation_temp is not None:
-            print('Found stored background model')
+            print('[Touch Detector]: Found stored background model')
             self.background_average = background_temp
             self.background_standard_deviation = deviation_temp
             self.background_model_available = True
@@ -143,7 +143,7 @@ class TouchDetector:
                     index_finger_candidate = None
                     for point in points_inside_region:
                         distance_between_points = distance.euclidean((point.x, point.y), index_finger)
-                        print('Distance between random finger and index finger: ', distance_between_points, 'px')
+                        # print('Distance between random finger and index finger: ', distance_between_points, 'px')
 
                         if smallest_distance == -1 or distance_between_points < smallest_distance:
                             smallest_distance = distance_between_points
@@ -174,7 +174,7 @@ class TouchDetector:
 
     def create_background_model(self, depth_image):
         pos = self.num_frame - 1
-        print('Storing frame ' + str(pos+1) + '/' + str(NUM_FRAMES_FOR_BACKGROUND_MODEL))
+        print('[Touch Detector]: Storing frame ' + str(pos+1) + '/' + str(NUM_FRAMES_FOR_BACKGROUND_MODEL))
 
         # TODO: Get dimensions from current frame
         if self.stored_background_values is None:
@@ -194,7 +194,6 @@ class TouchDetector:
                 self.stored_background_values[y][x][pos] = current_depth_px
 
     def calculate_background_model_statistics(self, depth_res_x, depth_res_y):
-        print('Calculating background model statistics')
         # TODO: Improve performance
         for y in range(depth_res_y):
             for x in range(depth_res_x):
@@ -211,8 +210,6 @@ class TouchDetector:
         # If conditions dont change, it does not need to be created every time
         np.save('background_average.npy', self.background_average)
         np.save('background_standard_deviation.npy', self.background_standard_deviation)
-
-        print('Finished calculating background model statistics')
 
     # Inspired by https://webnautes.tistory.com/m/1378
     def find_touch_points(self, color_image, depth_image):

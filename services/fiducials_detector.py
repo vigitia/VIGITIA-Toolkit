@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys
 import cv2
 import cv2.aruco as aruco
 import numpy as np
@@ -20,7 +19,7 @@ class FiducialsDetector:
 
     def __init__(self):
         self.init_aruco_tracking()
-        print('Fiducials Detector ready')
+        print('[FiducialsDetector]: Ready')
 
     def init_aruco_tracking(self):
         self.aruco_dictionary = aruco.Dictionary_get(ARUCO_DICT)

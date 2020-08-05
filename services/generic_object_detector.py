@@ -8,7 +8,7 @@ from cvlib.object_detection import draw_bbox
 class GenericObjectDetector:
 
     def __init__(self):
-        print('Generic Object Detector Service Ready')
+        print('[Generic Object Detector] Service Ready')
 
     def detect_generic_objects(self, frame):
         # bbox, label, conf = detect_common_objects(frame, confidence=0.75)

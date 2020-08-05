@@ -1,4 +1,4 @@
-# Source: https://github.com/wolterlw/hand_tracking
+# Source: https://github.com/wolterlw/hand_tracking with some adoptions for specific use case
 
 import csv
 import os
@@ -41,8 +41,9 @@ CONNECTIONS = [
     (5, 9), (9, 13), (13, 17), (0, 17)
 ]
 
+
 class HandTracker:
-    r"""
+    """
     Class to use Google's Mediapipe HandTracking pipeline from Python.
     So far only detection of a single hand is supported.
     Any any image size and aspect ratio supported.

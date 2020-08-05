@@ -6,12 +6,13 @@ import numpy as np
 class TableDetector:
 
     def __init__(self):
-        print('Table Detector ready')
+        print('[Table Detector]: Ready')
 
     # Based on https://theailearner.com/2019/11/22/simple-shape-detection-using-contour-approximation/
     # and https://answers.opencv.org/question/94845/python-opencv-extracting-xy-coordinates-of-point-features-on-an-image/
     def get_table_border(self, color_image, depth_image):
 
+        # Set to relevant range
         table_min_dist_mm = 0
         table_max_dist_mm = 2000
         depth_filtered = cv2.inRange(depth_image, np.array([table_min_dist_mm], dtype="uint16"),

@@ -1,12 +1,8 @@
 
-
-import os
-from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QPoint, QEvent, QObject, QVariant, pyqtSlot
+from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QPoint, QObject, QVariant, pyqtSlot
 from PyQt5.QtGui import QMouseEvent
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtWebEngineWidgets import *
-
-from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterface
 
 from apps.VIGITIABaseApplication import VIGITIABaseApplication
 
@@ -28,7 +24,6 @@ class CallHandler(QObject):
         return "ok"
 
 
-# class BrowserWidget(QWebEngineView):
 class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
     def __init__(self, rendering_manager):
         super().__init__()
@@ -41,7 +36,7 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
         self.height = 600
         self.rotation = 240
 
-        self.setGeometry(0, 0, self.width, self.height)
+        self.initUI()
 
         self.channel = QWebChannel()
         self.handler = CallHandler()
@@ -58,6 +53,9 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
         #layout = QVBoxLayout()
         #self.setLayout(layout)
         #layout.addWidget(self.web)
+
+    def initUI(self):
+        self.setGeometry(0, 0, self.width, self.height)
 
     @pyqtSlot()
     def loadFinishedHandler(self):
