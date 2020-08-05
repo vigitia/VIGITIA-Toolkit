@@ -95,7 +95,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
         for application in self.applications:
             # TODO: Add a convenient way to select wanted applications (a GUI)
-            hidden_applications = ['BrowserWidget', 'ExampleWidget', 'VideoWidget']
+            hidden_applications = ['BrowserWidget', 'ExampleWidget']
 
             if application['name'] in hidden_applications:
                 print('Test. Not adding', application['name'])

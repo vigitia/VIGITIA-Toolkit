@@ -64,9 +64,9 @@ class ExampleWidget(QWidget, VIGITIABaseApplication):
         painter.setBrush(QBrush(Qt.yellow, Qt.SolidPattern))
         painter.drawRect(40, 40, 400, 200)
 
-    def on_new_data(self, data):
-        pass
-        #print('Fiducial in ExampleWidget:', data)
+    def on_new_pointer_messages(self, data):
+        for message in data:
+            print(message)
 
     def keyPressEvent(self, event):
 

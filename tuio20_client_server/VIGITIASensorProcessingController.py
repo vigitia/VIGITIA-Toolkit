@@ -38,6 +38,7 @@ DEBUG_MODE = True
 class VIGITIASensorProcessingController:
 
     hand_regions = []
+    detected_hands = []
 
     def __init__(self):
         self.init_tuio_server()
@@ -100,10 +101,8 @@ class VIGITIASensorProcessingController:
 
                 self.tuio_server.start_tuio_bundle(dimension=self.dimension, source=self.source)
 
-                # Send a message for every video stream
-                # TODO: Automate, count up ID, ...
-                self.tuio_server.add_data_message(0, 'video', 'Intel Realsense D435 RGB', 1280, 720, 5000)
-                self.tuio_server.add_data_message(1, 'video', 'Intel Realsense D435 Depth', 1280, 720, 5001)
+                self.tuio_server.add_data_message(0, 'video', 'Intel Realsense D435 RGB table local', 1280, 720, 5000)
+                self.tuio_server.add_data_message(0, 'video', 'Intel Realsense D435 RGB full local', 1280, 720, 5001)
 
                 for marker in aruco_markers:
                     # TODO: Correct IDs
@@ -178,9 +177,11 @@ class VIGITIASensorProcessingController:
             hands, hand_regions = self.hand_tracker.add_hand_tracking_points(color_image_table.copy(), detected_hands)
             cv2.imshow('hands', hands)
 
+            self.detected_hands = detected_hands
             self.hand_regions = hand_regions
 
-        touch_points = self.touch_detector.get_touch_points(color_image_table, depth_image_table, self.hand_regions)
+        #touch_points = []
+        touch_points = self.touch_detector.get_touch_points(color_image_table, depth_image_table, self.hand_regions, self.detected_hands)
 
         return aruco_markers, movements, touch_points
 

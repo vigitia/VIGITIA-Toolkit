@@ -22,7 +22,7 @@ class VIGITIAVideoStreamReceiver:
         self.started = False
 
     def register_subscriber(self, new_subscriber):
-        print('[VIGITIAVideoStreamReceiver]: New Subscriber:', new_subscriber.__class__.__name__)
+        # print('[VIGITIAVideoStreamReceiver]: New Subscriber:', new_subscriber.__class__.__name__)
         self.subscribers.add(new_subscriber)
 
     def unregister_subscriber(self, subscriber):
@@ -47,6 +47,7 @@ class VIGITIAVideoStreamReceiver:
 
         while True:
             ret, frame = self.capture_receive.read()
+            print('New frame received')
 
             if frame is not None:
                 for subscriber in self.subscribers:
