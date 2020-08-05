@@ -116,5 +116,11 @@ class VIGITIABaseApplication:
     def on_new_bounding_box_messages(self, data):
         pass
 
-    def on_new_video_frame(self, frame, name):
+    def on_new_data_messages(self, data):
+        pass
+
+    def on_new_control_messages(self, data):
+        pass
+
+    def on_new_video_frame(self, frame, name, origin_ip, port):
         pass
