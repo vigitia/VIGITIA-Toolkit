@@ -5,7 +5,7 @@ import random
 import sys
 
 from PyQt5 import QtCore
-from PyQt5.QtCore import QPoint, Qt
+from PyQt5.QtCore import QPoint, Qt, QSize
 from PyQt5.QtGui import QMouseEvent, QPainter, QPen, QBrush
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
 
@@ -21,18 +21,17 @@ class ExampleWidget(QWidget, VIGITIABaseApplication):
         self.set_name(self.__class__.__name__)
         self.set_rendering_manager(rendering_manager)
 
-        self.x = 1500
-        self.y = 400
-        # self.width = 500
-        #self.height = 400
-        self.rotation = 300
+        self.x = self.get_screen_resolution()[0]/2
+        self.y = self.get_screen_resolution()[1]/2
+        self.width = 400
+        self.height = 400
+        self.rotation = 0
 
         # Make window frameless
         # self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
 
         # Make background transparent
-        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        self.setStyleSheet("background-color:transparent;")
+        # self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
         self.initUI()
 
@@ -41,32 +40,56 @@ class ExampleWidget(QWidget, VIGITIABaseApplication):
 
     def initUI(self):
         self.setGeometry(0, 0, self.get_width(), self.get_height())
+        self.setStyleSheet("background-color:transparent;")
 
-        self.button = QPushButton("Button1")
-        self.button.clicked.connect(self.onButtonClicked)
-        self.button.setStyleSheet("background-color: blue")
+        #self.button = QPushButton("Button1")
+        #self.button.resize(self.width, self.width)
+        #self.button.clicked.connect(self.onButtonClicked)
+        #self.button.setStyleSheet("background-color: blue")
 
-        self.label_1 = QLabel('Light green', self)
-        self.label_1.move(100, 100)
+        self.label_1 = QLabel('Touch me', self)
+        self.label_1.resize(self.width, self.width)
+        #self.label_1.move(0, 100)
         self.label_1.setStyleSheet("background-color: lightgreen")
 
+        self.setMinimumSize(self.width, self.width)
         window_layout = QVBoxLayout()
-        window_layout.addWidget(self.button)
+        #window_layout.addWidget(self.button, Qt.AlignTop)
+        window_layout.addWidget(self.label_1, Qt.AlignCenter)
         self.setLayout(window_layout)
 
         #self.show()
 
         #self.grab().save('test.jpg')
 
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setPen(QPen(Qt.black, 10, Qt.SolidLine))
-        painter.setBrush(QBrush(Qt.yellow, Qt.SolidPattern))
-        painter.drawRect(40, 40, 400, 200)
+    # def paintEvent(self, event):
+    #     painter = QPainter(self)
+    #     painter.setPen(QPen(Qt.black, 10, Qt.SolidLine))
+    #     painter.setBrush(QBrush(Qt.yellow, Qt.SolidPattern))
+    #     painter.drawRect(40, 40, 400, 200)
 
     def on_new_pointer_messages(self, data):
         for message in data:
             print(message)
+
+            local_pos, global_pos = self.get_pos(message['x_pos'], message['y_pos'])
+
+            if self.label_1.pos().x() <= local_pos.x() <= self.label_1.pos().x() + self.label_1.width():
+                if self.label_1.pos().y() <= local_pos.y() <= self.label_1.pos().y() + self.label_1.height():
+                    colors = ['blue', 'green', 'red', 'yellow', 'orange', 'brown']
+                    color = random.choice(colors)
+
+                    self.label_1.setStyleSheet("background-color: " + color)
+
+    def get_pos(self, x, y):
+        CAMERA_RES_X = 1280
+        CAMERA_RES_Y = 720
+        CANVAS_RES_X = 2560
+        CANVAS_RES_Y = 1440
+        global_pos = QPoint(int(x / CAMERA_RES_X * CANVAS_RES_X), int(y / CAMERA_RES_Y * CANVAS_RES_Y))
+        local_pos = self.mapFromGlobal(global_pos)
+
+        return local_pos, global_pos
 
     def keyPressEvent(self, event):
 
