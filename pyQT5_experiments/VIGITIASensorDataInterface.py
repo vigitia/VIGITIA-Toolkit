@@ -1,14 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# This class functions as a TUIO 2.0 client and decodes recieved TUIO messages using the python-osc library:
-# https://github.com/attwad/python-osc
-
-
-# Code parts for the TUIO client based on the TUIO 2.0 Protocol Specification (http://www.tuio.org/?tuio20) and the
-# TUIO 2.0 C++ Library by Martin Kaltebrunner:
-# https://github.com/mkalten/TUIO20_CPP/blob/b3fc7998670200091e5768747c3e04ac758084e3/TUIO2/TuioServer.cpp
-
 import sys
 import threading
 
@@ -45,6 +37,11 @@ class Singleton:
 
 @Singleton
 class VIGITIASensorDataInterface:
+    """ This class functions as a TUIO 2.0 client and decodes recieved TUIO messages using the python-osc library
+        (https://github.com/attwad/python-osc).
+        It also bundles incoming gstreamer video streams and provides a convenient way of applications
+
+    """
 
     def __init__(self):
         # IP needs to be always the IP of the computer
@@ -84,7 +81,7 @@ class VIGITIASensorDataInterface:
 
         osc_udp_server = ThreadingOSCUDPServer((self.ip, PORT), dispatcher)
 
-        print("Listening on {} for incoming TUIO messages".format(osc_udp_server.server_address))
+        print('[SensorDataInterface]: Listening on {} for incoming TUIO messages'.format(osc_udp_server.server_address))
 
         server_thread = threading.Thread(target=osc_udp_server.serve_forever)
         server_thread.start()
@@ -97,8 +94,7 @@ class VIGITIASensorDataInterface:
 
     # Forward a received video frame to all subscribers
     def on_new_video_frame(self, frame, name, origin_ip, port):
-        # print('New frame received of type', name)
-
+        # Directly forward frame to subscribers
         for subscriber in self.subscribers:
             subscriber.on_new_video_frame(frame, name, origin_ip, port)
 
@@ -135,7 +131,18 @@ class VIGITIASensorDataInterface:
 
     def on_new_pointer_message(self, *messages):
         origin_ip = messages[0][0]
-        self.bundles[origin_ip]['pointers'].append(messages[2:])
+        pointer_message = {
+            'session_id': messages[2],
+            'tuio_id': messages[3],
+            'component_id': messages[4],
+            'x_pos': messages[5],
+            'y_pos': messages[6],
+            'angle': messages[7],
+            'shear': messages[8],
+            'radius': messages[9],
+            'press': messages[10]
+        }
+        self.bundles[origin_ip]['pointers'].append(pointer_message)
 
     def on_new_bounding_box_message(self, *messages):
         origin_ip = messages[0][0]
@@ -149,7 +156,6 @@ class VIGITIASensorDataInterface:
         message_type = messages[3]
         # Messages of type video indicate the presence of a video stream
         if message_type == 'video':
-            session_id = messages[2]  # TODO: Not use session ID! Different computers are not synced on it
             stream_name = messages[4]
             stream_port = messages[7]
 
@@ -160,7 +166,7 @@ class VIGITIASensorDataInterface:
                     stream_already_registered = True
 
             if not stream_already_registered:
-                print('New video stream:', stream_name, origin_ip, stream_port)
+                print('[SensorDataInterface]: New video stream available:', stream_name, origin_ip, stream_port)
                 self.available_video_streams.append(stream_info)
                 self.init_video_stream_receiver(stream_name, origin_ip, stream_port)
 
@@ -193,7 +199,7 @@ class VIGITIASensorDataInterface:
 
 
 def main():
-    data_interface = VIGITIASensorDataInterface.Instance()
+    VIGITIASensorDataInterface.Instance()
     sys.exit()
 
 

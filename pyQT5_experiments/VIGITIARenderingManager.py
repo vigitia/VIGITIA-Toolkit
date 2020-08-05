@@ -1,4 +1,3 @@
-import random
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -21,6 +20,9 @@ DEBUG_MODE = False
 
 
 class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
+    """Responsible for drawing all applications on the same canvas (a fullscreen QMainWindow)
+
+    """
 
     applications = []
 
@@ -30,6 +32,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         self.initUI()
 
     def initUI(self):
+        # TODO: Define screen where the QMainWindow should be displayed
         self.showFullScreen()  # Application should run in Fullscreen
 
         # Define width and height as global variables
@@ -53,6 +56,13 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         self.add_applications(parent_widget)
 
     def on_application_updated(self, application_name):
+        """ This function is called if an application changes its size, position or rotation.
+
+            The RenderingManager is notified to redraw the application.
+
+            Args:
+                application_name (str): The name of the application that has changed
+        """
         print(application_name, 'has been updated')
         self.update_application(application_name)
 
@@ -85,8 +95,10 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
                             -origin_x + application['parent'].geometry().x() + application['instance'].get_x(),
                             -origin_y + application['parent'].geometry().y() + application['instance'].get_y())
 
-    # Return the resolution of the QMainWindow
     def get_screen_resolution(self):
+        """Return the resolution of the QMainWindow
+
+        """
         return self.width, self.height
 
     # Add all desired applications to the canvas
@@ -95,7 +107,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
         for application in self.applications:
             # TODO: Add a convenient way to select wanted applications (a GUI)
-            hidden_applications = ['BrowserWidget', 'ExampleWidget']
+            hidden_applications = ['BrowserWidget']
 
             if application['name'] in hidden_applications:
                 print('Test. Not adding', application['name'])
@@ -132,17 +144,20 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
                                                -origin_y + application['parent'].geometry().y() + application['instance'].get_y())
 
         # Test of raising an application to the top
+        # TODO: Implement z-index feature
         for application in self.applications:
-            if application['name'] == 'VIGITIAPaintingApp':
+            if application['name'] == 'ButtonWidget':
                 print('Bring painting app to front')
                 if application['parent'] is None:
                     application['instance'].raise_()
                 else:
                     application['parent'].raise_()
 
-    # Allows the rotation of an application (a QT Widget)
     # Based on https://stackoverflow.com/questions/58020983/rotate-the-widget-for-some-degree
     def rotate_applicaton(self, application):
+        """Allows the rotation of an application (a QT Widget)
+
+        """
 
         angle = application['instance'].rotation
         if application['proxy'] is None:
@@ -248,4 +263,3 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = VIGITIARenderingManager()
     sys.exit(app.exec_())
-

@@ -32,7 +32,7 @@ class VideoWidget(QWidget, VIGITIABaseApplication):
 
     def on_new_video_frame(self, frame, name, origin_ip, port):
         available_video_streams = self.data_interface.get_available_video_streams()
-        print(available_video_streams)
+        # print(available_video_streams)
 
         if name == 'Intel Realsense D435 RGB table' and frame is not None:
             image = self.opencv_imge_to_pyqt_image(frame)

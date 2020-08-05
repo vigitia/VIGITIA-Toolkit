@@ -47,7 +47,6 @@ class VIGITIAVideoStreamReceiver:
 
         while True:
             ret, frame = self.capture_receive.read()
-            print('New frame received')
 
             if frame is not None:
                 for subscriber in self.subscribers:

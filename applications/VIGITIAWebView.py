@@ -67,13 +67,11 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
         print('Python called back:', result)
 
     def on_new_pointer_messages(self, messages):
-
+        return
         for message in messages:
             print('Pointer in Webview:', message)
 
-            touch_x = message[3]
-            touch_y = message[4]
-            global_pos = QPoint(int(touch_x / 1280 * 2560), int(touch_y / 720 * 1440))
+            global_pos = QPoint(int(message['x_pos'] / 1280 * 2560), int(message['y_pos'] / 720 * 1440))
             local_pos = self.mapFromGlobal(global_pos)
 
             #target = self.focusProxy()
