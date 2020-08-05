@@ -29,6 +29,8 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         # drawing flag
         self.drawing = False
 
+        self.show_touch_points = False
+
         self.brushSize = 75
         self.brushColor = Qt.green
 
@@ -84,18 +86,16 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
             #     self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
 
     def on_new_pointer_messages(self, messages):
+        if not self.show_touch_points:
+            return
+
+        painter = QPainter(self.image)
+        painter.setPen(QPen(Qt.gray, 30, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
 
         for message in messages:
-            touch_x = message[3]
-            touch_y = message[4]
-            distance = message[5]
+            painter.drawPoint(self.get_pos(message['x_pos'], message['y_pos']))
 
-            print('drawing on canvas')
-
-            painter = QPainter(self.image)
-            painter.setPen(QPen(Qt.red, 50, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-            painter.drawPoint(self.get_pos(touch_x, touch_y))
-            self.update()
+        self.update()
 
             # global_pos = QPoint(int(touch_x / 1280 * 2560), int(touch_y / 720 * 1440))
             # local_pos = self.mapFromGlobal(global_pos)
@@ -109,8 +109,14 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
 
     def on_new_control_messages(self, data):
         print('control message in painting app', data)
-        if data[3] == 1:
+
+        # Clear canvas
+        if data[2] == 0 and data[3] == 1:
             self.reset_image()
+
+        # Toggle flag 'show_touch_points'
+        if data[2] == 1 and data[3] == 1:
+            self.show_touch_points = not self.show_touch_points
 
 
     def get_pos(self, x, y):
