@@ -29,7 +29,7 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         # drawing flag
         self.drawing = False
 
-        self.brushSize = 150
+        self.brushSize = 75
         self.brushColor = Qt.green
 
         # QPoint object to tract the point
@@ -39,6 +39,9 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         # setting geometry to main window
         self.setGeometry(0, 0, self.get_width(), self.get_height())
 
+        self.reset_image()
+
+    def reset_image(self):
         self.image = QImage(self.size(), QImage.Format_ARGB32)
         self.image.fill(Qt.transparent)
 
@@ -50,9 +53,12 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
             for brush in self.brushes:
 
                 # set the pen of the painter
-                painter.setPen(QPen(brush.get_color(), self.brushSize, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+                if brush.get_color() is not None:
+                    painter.setPen(QPen(brush.get_color(), 10))
+                    # painter.setPen(QPen(brush.get_color(), self.brushSize, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
 
-                painter.drawPoint(brush.get_pos(self))
+                    #painter.drawPoint(brush.get_pos(self))
+                    painter.drawEllipse(brush.get_pos(self), self.brushSize, self.brushSize)
 
             self.update()
         except AttributeError:
@@ -82,11 +88,12 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         for message in messages:
             touch_x = message[3]
             touch_y = message[4]
+            distance = message[5]
 
             print('drawing on canvas')
 
             painter = QPainter(self.image)
-            painter.setPen(QPen(Qt.red, 30, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            painter.setPen(QPen(Qt.red, 50, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
             painter.drawPoint(self.get_pos(touch_x, touch_y))
             self.update()
 
@@ -99,6 +106,12 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
             # print(global_pos)
             # self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
             # self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
+
+    def on_new_control_messages(self, data):
+        print('control message in painting app', data)
+        if data[3] == 1:
+            self.reset_image()
+
 
     def get_pos(self, x, y):
         CAMERA_RES_X = 1280
@@ -186,7 +199,10 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
 
                 if brush.num_frames_missing >= 30:
                     print('Brush', brush.marker_id, 'missing. Deleting it')
-                    del self.brushes[i]
+                    try:
+                        del self.brushes[i]
+                    except IndexError:
+                        pass
 
 
 class PaintBrush:
