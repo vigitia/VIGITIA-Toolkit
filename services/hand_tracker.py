@@ -390,7 +390,7 @@ class HandTracker:
 
         return frame, hand_regions
 
-    def get_bounding_box_of_points(self, points, extend_px=50):
+    def get_bounding_box_of_points(self, points, extend_px=80):
         min_x = None
         min_y = None
         max_x = None
