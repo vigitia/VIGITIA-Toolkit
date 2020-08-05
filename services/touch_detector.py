@@ -128,8 +128,8 @@ class TouchDetector:
             for hand_region in hand_regions:
                 points_inside_region = []
                 for point in new_touch_points:
-                    if point.distance_to_table_mm > DIST_HOVERING:
-                        continue
+                    #if point.distance_to_table_mm > DIST_HOVERING:
+                    #    continue
                     if hand_region[0][0] <= point.x <= hand_region[1][0]:
                         if hand_region[0][1] <= point.y <= hand_region[1][1]:
                             points_inside_region.append(point)
@@ -258,8 +258,8 @@ class TouchDetector:
                         if DEBUG_MODE:
                             cv2.line(black_image, finger_candidate, center_point_palm, [0, 255, 0], 2)
                             cv2.circle(black_image, finger_candidate, 10, touch_state, 2)
-                        if max_distance_mm < MAX_DIST_TOUCH:
-                            touch_points.append(TouchPoint(finger_candidate[0], finger_candidate[1], index,
+                        #if max_distance_mm < MAX_DIST_TOUCH:
+                        touch_points.append(TouchPoint(finger_candidate[0], finger_candidate[1], index,
                                                            max_distance_mm, center_point_palm[0],
                                                            center_point_palm[1]))
                     continue
