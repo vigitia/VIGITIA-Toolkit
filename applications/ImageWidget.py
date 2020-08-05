@@ -20,7 +20,7 @@ class Thread(QThread):
 
     def run(self):
         while True:
-            TIME_FOR_IMAGE_TO_DISAPPEAR = 2  # sec
+            TIME_FOR_IMAGE_TO_DISAPPEAR = 1  # sec
             if time.time() - self.widget.last_time_token_seen > TIME_FOR_IMAGE_TO_DISAPPEAR and self.widget.image_visible:
                 self.widget.image_visible = False
                 self.widget.label.hide()
