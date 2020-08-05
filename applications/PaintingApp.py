@@ -43,35 +43,39 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         self.image.fill(Qt.transparent)
 
     def on_new_token_messages(self, messages):
-        self.update_touch_points(messages)
+        try:
+            self.update_touch_points(messages)
 
-        painter = QPainter(self.image)
-        for brush in self.brushes:
+            painter = QPainter(self.image)
+            for brush in self.brushes:
 
-            # set the pen of the painter
-            painter.setPen(QPen(brush.get_color(), self.brushSize, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+                # set the pen of the painter
+                painter.setPen(QPen(brush.get_color(), self.brushSize, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
 
-            painter.drawPoint(brush.get_pos(self))
+                painter.drawPoint(brush.get_pos(self))
 
-        self.update()
+            self.update()
+        except AttributeError:
+            # TODO: Fix Function called before initUI()
+            pass
 
-        # for message in messages:
-        #     marker_id = message[1]
-        #     touch_x = message[4]
-        #     touch_y = message[5]
-        #
-        #     print('Brushes:', self.brushes)
-        #
-        #     global_pos = QPoint(int(touch_x / 1280 * 2560), int(touch_y / 720 * 1440))
-        #     local_pos = self.mapFromGlobal(global_pos)
-        #
-        #     # target = self.focusProxy()
-        #     target = self
-        #
-        #     # print(global_pos)
-        #
-        #     self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
-        #     self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
+            # for message in messages:
+            #     marker_id = message[1]
+            #     touch_x = message[4]
+            #     touch_y = message[5]
+            #
+            #     print('Brushes:', self.brushes)
+            #
+            #     global_pos = QPoint(int(touch_x / 1280 * 2560), int(touch_y / 720 * 1440))
+            #     local_pos = self.mapFromGlobal(global_pos)
+            #
+            #     # target = self.focusProxy()
+            #     target = self
+            #
+            #     # print(global_pos)
+            #
+            #     self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
+            #     self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
 
     def on_new_pointer_messages(self, messages):
 
@@ -159,6 +163,8 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
 
         for message in messages:
             marker_id = message['session_id']
+            if marker_id == 40:
+                continue
             touch_x = message['x_pos']
             touch_y = message['y_pos']
             new_touch_point_ids.append(marker_id)
