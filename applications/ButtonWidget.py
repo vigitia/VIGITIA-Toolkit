@@ -1,64 +1,43 @@
 
 # Example for a custom Widget with a transparent background
-
+import os
 import random
 import sys
 
 from PyQt5 import QtCore
-from PyQt5.QtCore import QPoint, Qt, QSize
-from PyQt5.QtGui import QMouseEvent, QPainter, QPen, QBrush
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
+from PyQt5.QtCore import QPoint, Qt
+from PyQt5.QtGui import QMouseEvent
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 
 from apps.VIGITIABaseApplication import VIGITIABaseApplication
 
-from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterface
 
-
-class ExampleWidget(QWidget, VIGITIABaseApplication):
+class ButtonWidget(QWidget, VIGITIABaseApplication):
 
     def __init__(self, rendering_manager):
         super().__init__()
         self.set_name(self.__class__.__name__)
         self.set_rendering_manager(rendering_manager)
 
-        self.x = self.get_screen_resolution()[0]/2
-        self.y = self.get_screen_resolution()[1]/2
-        self.width = 400
-        self.height = 400
+        self.x = self.get_screen_resolution()[0]/3
+        self.y = self.get_screen_resolution()[1]/3
+        self.width = 200
+        self.height = 200
         self.rotation = 0
 
-        # Make window frameless
-        # self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
-
-        # Make background transparent
-        # self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-
         self.initUI()
-
-        data_interface = VIGITIASensorDataInterface.Instance()
-        data_interface.register_subscriber(self)
 
     def initUI(self):
         self.setGeometry(0, 0, self.get_width(), self.get_height())
         self.setStyleSheet("background-color:transparent;")
 
-        #self.button = QPushButton("Button1")
-        #self.button.resize(self.width, self.width)
-        #self.button.clicked.connect(self.onButtonClicked)
-        #self.button.setStyleSheet("background-color: blue")
-
-        self.label_1 = QLabel('Touch me', self)
+        self.label_1 = QLabel('', self)
         self.label_1.resize(self.width, self.width)
-        #self.label_1.move(0, 100)
-        self.label_1.setStyleSheet("background-color: lightgreen")
+        self.label_1.setStyleSheet("background-color: green")
 
-        self.setMinimumSize(self.width, self.width)
         window_layout = QVBoxLayout()
-        #window_layout.addWidget(self.button, Qt.AlignTop)
         window_layout.addWidget(self.label_1, Qt.AlignCenter)
         self.setLayout(window_layout)
-
-        #self.show()
 
         #self.grab().save('test.jpg')
 
@@ -76,7 +55,7 @@ class ExampleWidget(QWidget, VIGITIABaseApplication):
 
             if self.label_1.pos().x() <= local_pos.x() <= self.label_1.pos().x() + self.label_1.width():
                 if self.label_1.pos().y() <= local_pos.y() <= self.label_1.pos().y() + self.label_1.height():
-                    colors = ['blue', 'green', 'red', 'yellow', 'orange', 'brown']
+                    colors = ['blue', 'green', 'red', 'brown', 'DarkGreen', 'DarkMagenta']
                     color = random.choice(colors)
 
                     self.label_1.setStyleSheet("background-color: " + color)
@@ -130,7 +109,7 @@ class ExampleWidget(QWidget, VIGITIABaseApplication):
             if self.label_1.pos().x() <= event.x() <= self.label_1.pos().x() + self.label_1.width():
                 if self.label_1.pos().y() <= event.y() <= self.label_1.pos().y() + self.label_1.height():
 
-                    colors = ['blue', 'green', 'red', 'yellow', 'orange', 'brown']
+                    colors = ['blue', 'red', 'orange', 'brown']
                     color = random.choice(colors)
 
                     self.label_1.setStyleSheet("background-color: " + color)
@@ -141,5 +120,5 @@ class ExampleWidget(QWidget, VIGITIABaseApplication):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ex = ExampleWidget()
+    ex = ButtonWidget()
     sys.exit(app.exec_())
