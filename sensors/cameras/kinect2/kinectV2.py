@@ -86,9 +86,10 @@ class KinectV2:
         #self.started = False
         #self.read_lock = threading.Lock()
 
+        self.started = True
         print('Finished init in kinect')
 
-        #self.loop()
+        self.loop()
 
     def get_listener(self):
         return self.listener
@@ -100,7 +101,7 @@ class KinectV2:
         else:
             print('stared kinect thread')
             self.started = True
-            self.thread = threading.Thread(target=self.update, args=())
+            self.thread = threading.Thread(target=self.loop, args=())
             #self.thread.daemon = True
             self.thread.start()
             return self
@@ -126,25 +127,30 @@ class KinectV2:
             #print(depth.asarray()[200, 200])
             #print(self.bigdepth.asarray(np.float32)[200, 200])
 
-            with self.read_lock:
-                self.color_frame = color.asarray()
-                self.depth_frame = depth.asarray() / 4500.
-                self.ir_frame = ir.asarray() / 65535.
-                self.registered_frame = self.registered.asarray(np.uint8)
-                self.bigdepth_frame = self.bigdepth.asarray(np.float32)
+            # with self.read_lock:
+            #     self.color_frame = color.asarray()
+            #     self.depth_frame = depth.asarray() / 4500.
+            #     self.ir_frame = ir.asarray() / 65535.
+            #     self.registered_frame = self.registered.asarray(np.uint8)
+            #     self.bigdepth_frame = self.bigdepth.asarray(np.float32)
 
-            # if DEBUG_MODE:
-            #     cv2.imshow("kinectv2_ir.png", ir.asarray() / 65535.)
-            #     cv2.imshow("kinectv2_depth.png", depth.asarray() / 4500.)
-            #     cv2.imshow("kinectv2_color.png", color.asarray())
-            #     cv2.imshow("kinectv2_registered.png", self.registered.asarray(np.uint8))
-            #     cv2.imshow("kinectv2_bigdepth.png", self.bigdepth.asarray(np.float32))
-            #     if self.need_color_depth_map:
-            #         cv2.imshow("kinectv2_color_depth_map.png", self.color_depth_map)
-            #
-            # key = cv2.waitKey(delay=1)
-            # if key == ord('q'):
-            #     break
+            if DEBUG_MODE:
+                cv2.imshow("kinectv2_ir.png", ir.asarray() / 65535.)
+                # cv2.imshow("kinectv2_depth.png", depth.asarray() / 4500.)
+                table_min_dist_mm = 0
+                table_max_dist_mm = 2000
+                depth_filtered = cv2.inRange(depth.asarray(), np.array([table_min_dist_mm], dtype="uint16"),
+                                             np.array([table_max_dist_mm], dtype="uint16"))
+                cv2.imshow("kinectv2_depth.png", depth_filtered)
+                cv2.imshow("kinectv2_color.png", color.asarray())
+                cv2.imshow("kinectv2_registered.png", self.registered.asarray(np.uint8))
+                cv2.imshow("kinectv2_bigdepth.png", self.bigdepth.asarray(np.float32))
+                if self.need_color_depth_map:
+                    cv2.imshow("kinectv2_color_depth_map.png", self.color_depth_map)
+
+            key = cv2.waitKey(delay=1)
+            if key == ord('q'):
+                break
 
             self.listener.release(frames)
 
@@ -162,8 +168,8 @@ class KinectV2:
     def __exit__(self, exec_type, exc_value, traceback):
         self.pipeline.stop()
 
-#kinect = KinectV2()
-#kinect.start()
+kinect = KinectV2()
+kinect.start()
 
 # if __name__ == '__main__':
 #     KinectV2()
