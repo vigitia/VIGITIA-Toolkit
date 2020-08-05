@@ -95,7 +95,7 @@ class TouchDetector:
             self.background_standard_deviation = deviation_temp
             self.background_model_available = True
 
-    def get_touch_points(self, color_image, depth_image, hand_regions):
+    def get_touch_points(self, color_image, depth_image, hand_regions, detected_hands):
         # self.table_border = table_border
         self.table_border = np.array([(0, 0), (color_image.shape[1], 0),
                                       (color_image.shape[1], color_image.shape[0]), (0, color_image.shape[1])])
@@ -110,7 +110,7 @@ class TouchDetector:
             return []
         else:
             new_touch_points = self.find_touch_points(color_image, depth_image)
-            new_touch_points = self.compare_with_cnn_points(new_touch_points, hand_regions)
+            new_touch_points = self.compare_with_cnn_points(new_touch_points, hand_regions, detected_hands)
             self.active_touch_points = self.merge_touch_points(new_touch_points)
 
             self.draw_touch_points(color_image, self.active_touch_points, hand_regions)
@@ -120,20 +120,52 @@ class TouchDetector:
 
             return self.active_touch_points
 
-    def compare_with_cnn_points(self, new_touch_points, hand_regions):
+    def compare_with_cnn_points(self, new_touch_points, hand_regions, detected_hands):
         points_inside = []
 
         if len(hand_regions) > 0:
 
-            for point in new_touch_points:
-                point_inside = False
-                for hand_region in hand_regions:
+            for hand_region in hand_regions:
+                points_inside_region = []
+                for point in new_touch_points:
+                    if point.distance_to_table_mm > DIST_HOVERING:
+                        continue
                     if hand_region[0][0] <= point.x <= hand_region[1][0]:
                         if hand_region[0][1] <= point.y <= hand_region[1][1]:
-                            point_inside = True
+                            points_inside_region.append(point)
 
-                if point_inside:
-                    points_inside.append(point)
+                for hand in detected_hands:
+
+                    index_finger = hand['joints'][8]
+                    x, y = index_finger
+
+                    smallest_distance = -1
+                    index_finger_candidate = None
+                    for point in points_inside_region:
+                        distance_between_points = distance.euclidean((point.x, point.y), index_finger)
+                        print('Distance between random finger and index finger: ', distance_between_points, 'px')
+
+                        if smallest_distance == -1 or distance_between_points < smallest_distance:
+                            smallest_distance = distance_between_points
+                            index_finger_candidate = point
+
+                    if index_finger_candidate is not None:
+                        points_inside.append(index_finger_candidate)
+
+
+
+            # for point in new_touch_points:
+            #     point_inside = False
+            #     for hand_region in hand_regions:
+            #         if hand_region[0][0] <= point.x <= hand_region[1][0]:
+            #             if hand_region[0][1] <= point.y <= hand_region[1][1]:
+            #                 point_inside = True
+            #
+            #     if point_inside:
+            #         points_inside.append(point)
+
+
+
 
         return points_inside
 
