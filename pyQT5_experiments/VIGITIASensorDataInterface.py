@@ -100,7 +100,7 @@ class VIGITIASensorDataInterface:
         # print('New frame received of type', name)
 
         for subscriber in self.subscribers:
-            subscriber.on_new_video_frame(frame, name)
+            subscriber.on_new_video_frame(frame, name, origin_ip, port)
 
     def on_new_frame_message(self, *messages):
         #print('New frame arrived:', messages)
@@ -142,24 +142,33 @@ class VIGITIASensorDataInterface:
         self.bundles[origin_ip]['bounding_boxes'].append(messages[2:])
 
     def on_new_data_message(self, *messages):
-        print(messages)
+        # print(messages)
         origin_ip = messages[0][0]
         self.bundles[origin_ip]['data'].append(messages[2:])
 
         message_type = messages[3]
+        # Messages of type video indicate the presence of a video stream
         if message_type == 'video':
-            session_id = messages[2]
-            if len(self.available_video_streams) > session_id:
-                pass
-            else:
-                print('New video stream')
-                stream_name = messages[4]
-                stream_port = messages[7]
-                self.available_video_streams.append(stream_name)
+            session_id = messages[2]  # TODO: Not use session ID! Different computers are not synced on it
+            stream_name = messages[4]
+            stream_port = messages[7]
+
+            stream_info = [stream_name, origin_ip, stream_port]
+            stream_already_registered = False
+            for entry in self.available_video_streams:
+                if set(entry) == set(stream_info):
+                    stream_already_registered = True
+
+            if not stream_already_registered:
+                print('New video stream:', stream_name, origin_ip, stream_port)
+                self.available_video_streams.append(stream_info)
                 self.init_video_stream_receiver(stream_name, origin_ip, stream_port)
 
     def on_new_control_message(self, *messages):
-        print(messages)
+        #print(messages)
+        # Send control messages directly because they are currently not in a bundle (sent from a smartphone)
+        for subscriber in self.subscribers:
+            subscriber.on_new_control_messages(messages)
 
     def on_new_alive_message(self, *messages):
         origin_ip = messages[0][0]
