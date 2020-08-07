@@ -26,8 +26,6 @@ class VIGITIABaseApplication:
 
         self.rendering_manager = None
 
-        # TODO: Flags to implement
-        self.force_aspect_ratio = False
         self.z_index = 0
 
         self.data_interface = VIGITIASensorDataInterface.Instance()
@@ -61,8 +59,8 @@ class VIGITIABaseApplication:
     def get_rotation(self):
         return self.rotation
 
-    def get_force_fullscreen(self):
-        return self.force_fullscreen
+    def get_z_index(self):
+        return self.z_index
 
     """
     Setter Functions
@@ -108,6 +106,10 @@ class VIGITIABaseApplication:
 
     def set_rotation(self, rotation):
         self.rotation = rotation
+        self.rendering_manager.on_application_updated(self.get_name())
+
+    def set_z_index(self, z_index):
+        self.z_index = z_index
         self.rendering_manager.on_application_updated(self.get_name())
 
     """
