@@ -1,9 +1,19 @@
 
-# Parent class for all Toolkit applications
 from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterface
 
 
 class VIGITIABaseApplication:
+    """ Parent class for all Toolkit applications.
+
+        All toolkit applications need to inherit this class.
+
+        It prepares getter and setter functions, manages basic info about the application and communicates changes
+        to the rendering manager.
+
+        The empty methods are the input points for incoming data from the sensor data interface and can easily be
+        overwritten by any class that inherits from this class
+
+    """
 
     def __init__(self):
 
