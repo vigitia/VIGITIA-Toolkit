@@ -21,6 +21,7 @@ class TableSurfaceSelector:
 
     def __init__(self):
         self.camera = RealsenseD435Camera()
+        self.camera.init_video_capture()
         self.camera.start()
 
         self.read_config_file()
