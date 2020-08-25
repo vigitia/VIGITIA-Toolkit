@@ -36,6 +36,9 @@ class ImageWidget(QWidget, VIGITIABaseApplication):
         super().__init__()
         self.set_name(self.__class__.__name__)
         self.set_rendering_manager(rendering_manager)
+
+        self.z_index = 2
+
         self.initUI()
 
         self.myThread = Thread(self)
@@ -62,9 +65,11 @@ class ImageWidget(QWidget, VIGITIABaseApplication):
         # print('Tokens:', data)
         for token in data:
             if token['component_id'] == 40:
+                print('Found Token 40')
                 self.last_time_token_seen = time.time()
-                self.image_visible = True
+                #if not self.image_visible:
                 self.label.show()
+                self.image_visible = True
                 token_angle = token['angle']
                 if self.image_rotation not in range(token_angle - 1, token_angle + 1):
                     # Based on https://stackoverflow.com/questions/31892557/rotating-a-pixmap-in-pyqt4-gives-undesired-translation

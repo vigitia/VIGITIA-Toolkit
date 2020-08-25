@@ -5,24 +5,20 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
-import sys
 
 from apps.VIGITIABaseApplication import VIGITIABaseApplication
 
-from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterface
 
-
-# class VIGITIAPaintingApp(QMainWindow):
 class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
     def __init__(self, rendering_manager):
         super().__init__()
         self.set_name(self.__class__.__name__)
         self.set_rendering_manager(rendering_manager)
 
+        self.set_z_index(1000)
+
         self.brushes = []
         self.present_markers = []
-
-        print('Resolution in Rendering manager:', self.get_width(), self.get_height())
 
         self.initUI()
 
@@ -86,8 +82,12 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
             #     self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
 
     def on_new_pointer_messages(self, messages):
-        if not self.show_touch_points:
+        try:
+            if not self.show_touch_points:
+                return
+        except AttributeError:
             return
+            # TODO: FIX function called before class has been initialized
 
         painter = QPainter(self.image)
         painter.setPen(QPen(Qt.gray, 30, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))

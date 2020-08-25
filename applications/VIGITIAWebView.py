@@ -25,16 +25,19 @@ class CallHandler(QObject):
 
 
 class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
+
+    is_hidden = False
+
     def __init__(self, rendering_manager):
         super().__init__()
         self.set_name(self.__class__.__name__)
         self.set_rendering_manager(rendering_manager)
 
-        self.x = 1550
-        self.y = 50
+        self.x = 100
+        self.y = 600
         self.width = 900
         self.height = 600
-        self.rotation = 240
+        self.rotation = 0
 
         self.initUI()
 
@@ -45,7 +48,7 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
 
         self.loadFinished.connect(self.loadFinishedHandler)
 
-        web_url = QUrl('https://maps.google.com')
+        web_url = QUrl('https://vigitia.de')
         #local_html_url = QUrl.fromLocalFile(os.path.abspath(os.path.join(os.path.dirname(__file__), "index.html")))
 
         self.load(web_url)
@@ -81,6 +84,17 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
 
             # self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
             # self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
+
+    def on_new_control_messages(self, data):
+        pass
+        # Show/hide video
+        # if data[2] == 3 and data[3] == 1:
+        #     self.is_hidden = not self.is_hidden
+        #
+        # if self.is_hidden:
+        #     self.hide()
+        # else:
+        #     self.show()
 
     def emulate_mouse_event(self, event_type, local_pos, global_pos, target):
         mouse_event = QMouseEvent(event_type, local_pos, global_pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)

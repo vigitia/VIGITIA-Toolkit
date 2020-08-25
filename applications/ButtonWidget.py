@@ -19,7 +19,7 @@ class ButtonWidget(QWidget, VIGITIABaseApplication):
         self.set_name(self.__class__.__name__)
         self.set_rendering_manager(rendering_manager)
 
-        self.x = self.get_screen_resolution()[0]/3
+        self.x = self.get_screen_resolution()[0]/4
         self.y = self.get_screen_resolution()[1]/3
         self.width = 200
         self.height = 200
