@@ -150,6 +150,11 @@ class VIGITIASensorProcessingController:
 
     def experiments(self, color_image, color_image_table, depth_image):
 
+        mask = self.foreground_mask_extractor.get_foreground_mask_otsu(color_image_table)
+        mask = cv2.applyColorMap(mask, cv2.COLORMAP_JET)
+
+        cv2.imshow('otsu', mask)
+
         #table = self.table_detector.get_table_border(color_image, depth_image)
         #cv2.imshow('table', table)
 

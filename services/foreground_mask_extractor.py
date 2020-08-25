@@ -5,6 +5,9 @@
 
 import cv2
 
+import numpy as np
+
+from skimage.filters import threshold_multiotsu
 
 class ForegroundMaskExtractor:
 
@@ -52,3 +55,18 @@ class ForegroundMaskExtractor:
         foreground_mask = cv2.morphologyEx(foreground_mask, cv2.MORPH_CLOSE, kernel, 2)
 
         return foreground_mask
+
+    def get_foreground_mask_otsu(self, frame):
+        
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_multiotsu.html
+        
+        # Applying multi-Otsu threshold for the default value, generating
+        # three classes.
+        thresholds = threshold_multiotsu(frame)
+
+        # Using the threshold values, we generate the three regions.
+        regions = np.digitize(frame, bins=thresholds)
+
+        return regions
