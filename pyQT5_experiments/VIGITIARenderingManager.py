@@ -90,10 +90,13 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
                         origin_x = self.width / 2 - application['instance'].frameGeometry().width() / 2
                         origin_y = self.height / 2 - application['instance'].frameGeometry().height() / 2
 
-                        # Now we move the rotated widget inluding its parent to the desired position
+                        # Now we move the rotated widget including its parent to the desired position
                         application['parent'].move(
                             -origin_x + application['parent'].geometry().x() + application['instance'].get_x(),
                             -origin_y + application['parent'].geometry().y() + application['instance'].get_y())
+
+                    # TODO: Test
+                    self.update_z_position_of_applications()
 
     def get_screen_resolution(self):
         """Return the resolution of the QMainWindow
@@ -105,6 +108,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
     def add_applications(self, parent_widget):
         self.applications = self.find_available_applications()
 
+        # TODO: Combine with update applications function
         for application in self.applications:
             # TODO: Add a convenient way to select wanted applications (a GUI)
             hidden_applications = ['BrowserWidget']
@@ -143,15 +147,37 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
                     application['parent'].move(-origin_x + application['parent'].geometry().x() + application['instance'].get_x(),
                                                -origin_y + application['parent'].geometry().y() + application['instance'].get_y())
 
+        self.update_z_position_of_applications()
+
         # Test of raising an application to the top
         # TODO: Implement z-index feature
+        # for application in self.applications:
+        #     if application['name'] == 'ButtonWidget':
+        #         print('Bring painting app to front')
+        #         if application['parent'] is None:
+        #             application['instance'].raise_()
+        #         else:
+        #             application['parent'].raise_()
+
+    def update_z_position_of_applications(self):
+
+        list_of_z_indexes = []
+
         for application in self.applications:
-            if application['name'] == 'ButtonWidget':
-                print('Bring painting app to front')
-                if application['parent'] is None:
-                    application['instance'].raise_()
-                else:
-                    application['parent'].raise_()
+            z_index = application['instance'].get_z_index()
+            list_of_z_indexes.append([application, z_index])
+
+        # Sort list by second element (the z-index)
+        list_of_z_indexes = sorted(list_of_z_indexes, key=lambda x: x[1])
+
+        for entry in list_of_z_indexes:
+            application = entry[0]
+            if application['parent'] is None:
+                application['instance'].raise_()
+            else:
+                application['parent'].raise_()
+
+        print(list_of_z_indexes)
 
     # Based on https://stackoverflow.com/questions/58020983/rotate-the-widget-for-some-degree
     def rotate_applicaton(self, application):
@@ -214,13 +240,15 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
         return application
 
-    # Checking the folder APPLICATIONS_BASE_FOLDER for all classes that inherit from the superclass "VIGITIAApplication"
-    # These are the applications that are currently available for display
     def find_available_applications(self):
+        """ Checking the folder APPLICATIONS_BASE_FOLDER for all classes that inherit from the superclass
+            'VIGITIAApplication'.
+            These are the applications that are currently available for display
+        """
         applications = []
 
         # Searching for applications in the following directory
-        # TODO: Also allow for searching in subdirectories and add support for Git Repositories
+        # TODO: Also allow for searching in subdirectories and therefore add support for Git Repositories
         applications_path = os.path.join(Path(__file__).resolve().parent.parent, APPLICATIONS_BASE_FOLDER)
 
         # Inspired by https://stackoverflow.com/questions/1057431/how-to-load-all-modules-in-a-folder
