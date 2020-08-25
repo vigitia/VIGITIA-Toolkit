@@ -10,6 +10,8 @@ class VideoWidget(QWidget, VIGITIABaseApplication):
 
     """
 
+    is_hidden = True
+
     def __init__(self, rendering_manager):
         super().__init__()
         self.set_name(self.__class__.__name__)
@@ -20,6 +22,7 @@ class VideoWidget(QWidget, VIGITIABaseApplication):
         self.width = self.get_screen_resolution()[0]/2
         self.height = self.get_screen_resolution()[1]/2
         self.rotation = 30
+        self.z_index = 50
 
         self.initUI()
 
@@ -30,6 +33,8 @@ class VideoWidget(QWidget, VIGITIABaseApplication):
         self.label = QLabel(self)
         self.label.resize(self.get_width(), self.get_height())
 
+        self.hide()
+
     def on_new_video_frame(self, frame, name, origin_ip, port):
         available_video_streams = self.data_interface.get_available_video_streams()
         # print(available_video_streams)
@@ -37,6 +42,17 @@ class VideoWidget(QWidget, VIGITIABaseApplication):
         if name == 'Intel Realsense D435 RGB table' and frame is not None:
             image = self.opencv_imge_to_pyqt_image(frame)
             self.label.setPixmap(QPixmap.fromImage(image))
+
+    def on_new_control_messages(self, data):
+
+        # Show/hide video
+        if data[2] == 2 and data[3] == 1:
+            self.is_hidden = not self.is_hidden
+
+        if self.is_hidden:
+            self.hide()
+        else:
+            self.show()
 
     def opencv_imge_to_pyqt_image(self, image):
         # https://stackoverflow.com/questions/34232632/convert-python-opencv-image-numpy-array-to-pyqt-qpixmap-image
