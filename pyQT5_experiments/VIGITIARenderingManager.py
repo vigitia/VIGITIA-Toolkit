@@ -1,3 +1,4 @@
+import traceback
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -43,7 +44,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
         # Attention: The window resolution might not be the same as the screen resolution
         # Screen scaling can influence the resolution
-        print('Main Window width:', self.width, 'height:', self.height)
+        print('[VIGITIARenderingManager]: Main Window width:', self.width, 'height:', self.height)
 
         # The QMainWindow should have a black background so that no light will be projected if no application is shown
         self.setStyleSheet("background-color: black;")
@@ -65,7 +66,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
             Args:
                 application_name (str): The name of the application that has changed
         """
-        print(application_name, 'has been updated')
+        print('[VIGITIARenderingManager]:', application_name, 'has been updated')
         self.update_application(application_name)
 
     def update_application(self, application_name):
@@ -112,7 +113,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
         # TODO: Combine with update applications function
         for application in self.applications:
-            print('Placing {} on canvas.'.format(application['name']))
+            print('[VIGITIARenderingManager]: Placing {} on canvas.'.format(application['name']))
 
             application['instance'].setGeometry(0, 0, application['instance'].get_width(),
                                                 application['instance'].get_height())
@@ -266,12 +267,13 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
                             # print('"{}" in Module "{}" is a VIGITIA Application'.format(class_name, module_name))
 
                             if class_name not in BLACKLIST:
-                                print("ADDING:", class_name)
 
                                 try:
                                     instance = my_class(self)
                                 except:
-                                    print('ERROR IN APPLICATION ', class_name)
+                                    print('[VIGITIARenderingManager]: ERROR IN APPLICATION ', class_name)
+                                    print('[VIGITIARenderingManager]: Fix the following problem and try again:')
+                                    traceback.print_exc()
                                     self.close()
                                     sys.exit(1)
 
@@ -284,7 +286,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
                                 applications.append(application)
                             else:
-                                print("Not adding ", class_name)
+                                print('[VIGITIARenderingManager]: Not adding "{}" because it is on the Blacklist.'.format(class_name))
 
         return applications
 
