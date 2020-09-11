@@ -60,6 +60,9 @@ class VIGITIASensorDataInterface:
 
         self.available_video_streams = []
 
+        self.camera_resolution = None
+        self.screen_resolution = None
+
         self.init_tuio_interface()
 
     def register_subscriber(self, new_subscriber):
@@ -98,7 +101,16 @@ class VIGITIASensorDataInterface:
         for subscriber in self.subscribers:
             subscriber.on_new_video_frame(frame, name, origin_ip, port)
 
+    # Translate the dimension attribute from the TUIO protocoll into readable x and y coordinates
+    def set_camera_resolution(self, dimension):
+        dimension_split = dimension.split('x')
+        self.camera_resolution = (int(dimension_split[0]), int(dimension_split[1]))
+
     def on_new_frame_message(self, *messages):
+
+        if self.camera_resolution is None:
+            self.set_camera_resolution(messages[4])
+
         #print('New frame arrived:', messages)
         origin_ip = messages[0][0]
 
@@ -117,14 +129,41 @@ class VIGITIASensorDataInterface:
             'active_session_ids': []
         }
 
+    # If the Sensor Data Interface does not know the output screen resolution, a toolkit application is asked for it
+    def get_screen_resolution(self):
+        if len(self.subscribers) > 0:
+            self.screen_resolution = list(self.subscribers)[0].get_screen_resolution()
+
+    # Translate coordinates from the camera resolution to the screen resolution
+    def translate_coordinates(self, x, y):
+        if self.camera_resolution is not None:
+
+            x_translated = int(x / self.camera_resolution[0] * self.screen_resolution[0])
+            y_translated = int(y / self.camera_resolution[1] * self.screen_resolution[1])
+
+
+            return x_translated, y_translated
+
+        else:
+            return x, y
+
     def on_new_token_message(self, *messages):
+
+        if self.screen_resolution is None or self.screen_resolution[0] <= 0 or self.screen_resolution[1] <= 0:
+            self.get_screen_resolution()
+
+        # Translate coordinates from camera space to screen space
+        x_translated, y_translated = self.translate_coordinates(messages[5], messages[6])
+
+        print(self.screen_resolution, self.camera_resolution)
+
         origin_ip = messages[0][0]
         token_message = {
             'session_id': messages[2],
             'tuio_id': messages[3],
             'component_id': messages[4],
-            'x_pos': messages[5],
-            'y_pos': messages[6],
+            'x_pos': x_translated,
+            'y_pos': y_translated,
             'angle': messages[7]
         }
         self.bundles[origin_ip]['tokens'].append(token_message)
