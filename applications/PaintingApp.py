@@ -118,13 +118,13 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         if data[2] == 1 and data[3] == 1:
             self.show_touch_points = not self.show_touch_points
 
-
     def get_pos(self, x, y):
-        CAMERA_RES_X = 1280
-        CAMERA_RES_Y = 720
-        CANVAS_RES_X = 2560
-        CANVAS_RES_Y = 1440
-        global_pos = QPoint(int(x / CAMERA_RES_X * CANVAS_RES_X), int(y / CAMERA_RES_Y * CANVAS_RES_Y))
+        #     CAMERA_RES_X = 1280
+        #     CAMERA_RES_Y = 720
+        #     CANVAS_RES_X = 2560
+        #     CANVAS_RES_Y = 1440
+        #     global_pos = QPoint(int(x / CAMERA_RES_X * CANVAS_RES_X), int(y / CAMERA_RES_Y * CANVAS_RES_Y))
+        global_pos = QPoint(x, y)
         local_pos = self.mapFromGlobal(global_pos)
 
         return local_pos
@@ -231,11 +231,12 @@ class PaintBrush:
             return Qt.magenta
 
     def get_pos(self, widget):
-        CAMERA_RES_X = 1280
-        CAMERA_RES_Y = 720
-        CANVAS_RES_X = 2560
-        CANVAS_RES_Y = 1440
-        global_pos = QPoint(int(self.x / CAMERA_RES_X * CANVAS_RES_X), int(self.y / CAMERA_RES_Y * CANVAS_RES_Y))
+        # CAMERA_RES_X = 1280
+        # CAMERA_RES_Y = 720
+        # CANVAS_RES_X = 2560
+        # CANVAS_RES_Y = 1440
+        # global_pos = QPoint(int(self.x / CAMERA_RES_X * CANVAS_RES_X), int(self.y / CAMERA_RES_Y * CANVAS_RES_Y))
+        global_pos = QPoint(self.x, self.y)
         local_pos = widget.mapFromGlobal(global_pos)
 
         return local_pos
