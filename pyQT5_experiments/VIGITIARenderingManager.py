@@ -17,7 +17,7 @@ from apps.VIGITIABaseApplication import VIGITIABaseApplication
 APPLICATIONS_BASE_FOLDER = 'applications'
 APPLICATION_PARENT_CLASS = 'VIGITIABaseApplication'
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 BLACKLIST = ['ButtonWidget', 'ImageWidget', 'VideoWidget', 'BrowserWidget']
 
@@ -254,8 +254,15 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
             file_type = os.path.splitext(file)[1]
             if file_type == '.py':
                 module_name = f"{'applications'}.{file[:-3]}"
-                module_info = pyclbr.readmodule(module_name)
-                module = import_module(module_name)
+                try:
+                    module_info = pyclbr.readmodule(module_name)
+                    module = import_module(module_name)
+                except:
+                    print('[VIGITIARenderingManager]: ERROR IN APPLICATION ', class_name)
+                    print('[VIGITIARenderingManager]: Fix the following problem and try again:')
+                    traceback.print_exc()
+                    self.close()
+                    sys.exit(1)
 
                 for item in module_info.values():
                     class_name = item.name  # The name of the found class
