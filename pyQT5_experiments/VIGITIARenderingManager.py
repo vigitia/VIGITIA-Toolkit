@@ -31,7 +31,8 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
     def __init__(self):
         super().__init__()
-
+        self.set_name(self.__class__.__name__)
+        self.set_rendering_manager(self)
         self.initUI()
 
     def initUI(self):
