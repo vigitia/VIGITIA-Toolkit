@@ -218,7 +218,9 @@ class TouchDetector:
         touch_points = []
 
         # foreground_mask = self.foreground_mask_extractor.get_foreground_mask_basic(color_image)
-        foreground_mask = self.foreground_mask_extractor.get_foreground_mask(color_image)
+        foreground_mask = self.foreground_mask_extractor.get_foreground_mask_otsu(color_image)
+        foreground_mask = cv2.bitwise_not(foreground_mask)
+        #foreground_mask = self.foreground_mask_extractor.get_foreground_mask(color_image)
         cv2.imshow('mask', foreground_mask)
 
         #foreground_mask = self.remove_pixels_outside_table_border(foreground_mask)
