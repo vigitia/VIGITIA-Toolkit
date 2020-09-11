@@ -57,16 +57,9 @@ class ForegroundMaskExtractor:
         return foreground_mask
 
     def get_foreground_mask_otsu(self, frame):
-        
+        # Source: https://docs.opencv.org/3.4/d7/d4d/tutorial_py_thresholding.html
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(frame, (5, 5), 0)
+        _, th = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        # https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_multiotsu.html
-        
-        # Applying multi-Otsu threshold for the default value, generating
-        # three classes.
-        thresholds = threshold_multiotsu(frame)
-
-        # Using the threshold values, we generate the three regions.
-        regions = np.digitize(frame, bins=thresholds)
-
-        return regions
+        return th
