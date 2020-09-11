@@ -18,6 +18,8 @@ APPLICATION_PARENT_CLASS = 'VIGITIABaseApplication'
 
 DEBUG_MODE = False
 
+BLACKLIST = ['ButtonWidget', 'ImageWidget', 'VideoWidget', 'BrowserWidget']
+
 
 class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
     """Responsible for drawing all applications on the same canvas (a fullscreen QMainWindow)
@@ -110,42 +112,36 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
         # TODO: Combine with update applications function
         for application in self.applications:
-            # TODO: Add a convenient way to select wanted applications (a GUI)
-            hidden_applications = ['BrowserWidget']
+            print('Placing {} on canvas.'.format(application['name']))
 
-            if application['name'] in hidden_applications:
-                print('Test. Not adding', application['name'])
+            application['instance'].setGeometry(0, 0, application['instance'].get_width(),
+                                                application['instance'].get_height())
+
+            # Rotate applications
+            if application['instance'].get_rotation() != 0:
+                application = self.rotate_applicaton(application)
+
+            if application['parent'] is None:
+                if DEBUG_MODE:
+                    application['instance'].setStyleSheet('border: 3px solid #FF0000')
+                application['instance'].move(application['instance'].get_x(), application['instance'].get_y())
+                application['instance'].setParent(parent_widget)
             else:
-                print('Placing {} on canvas.'.format(application['name']))
+                if DEBUG_MODE:
+                    application['parent'].setStyleSheet('border: 3px solid #FF0000')
+                application['parent'].setParent(parent_widget)
 
-                application['instance'].setGeometry(0, 0, application['instance'].get_width(),
-                                                    application['instance'].get_height())
+                # Set parent of rotated widget to fullscreen to make sure that the rotated widget fits
+                application['parent'].setGeometry(0, 0, self.width, self.height)
 
-                # Rotate applications
-                if application['instance'].get_rotation() != 0:
-                    application = self.rotate_applicaton(application)
+                # Since the rotated widget is now placed in the center of the parent instead of at the origin,
+                # we move the entire parent so that the rotated widget is back at 0,0
+                origin_x = self.width/2 - application['instance'].frameGeometry().width()/2
+                origin_y = self.height/2 - application['instance'].frameGeometry().height()/2
 
-                if application['parent'] is None:
-                    if DEBUG_MODE:
-                        application['instance'].setStyleSheet('border: 3px solid #FF0000')
-                    application['instance'].move(application['instance'].get_x(), application['instance'].get_y())
-                    application['instance'].setParent(parent_widget)
-                else:
-                    if DEBUG_MODE:
-                        application['parent'].setStyleSheet('border: 3px solid #FF0000')
-                    application['parent'].setParent(parent_widget)
-
-                    # Set parent of rotated widget to fullscreen to make sure that the rotated widget fits
-                    application['parent'].setGeometry(0, 0, self.width, self.height)
-
-                    # Since the rotated widget is now placed in the center of the parent instead of at the origin,
-                    # we move the entire parent so that the rotated widget is back at 0,0
-                    origin_x = self.width/2 - application['instance'].frameGeometry().width()/2
-                    origin_y = self.height/2 - application['instance'].frameGeometry().height()/2
-
-                    # Now we move the rotated widget inluding its parent to the desired position
-                    application['parent'].move(-origin_x + application['parent'].geometry().x() + application['instance'].get_x(),
-                                               -origin_y + application['parent'].geometry().y() + application['instance'].get_y())
+                # Now we move the rotated widget inluding its parent to the desired position
+                application['parent'].move(-origin_x + application['parent'].geometry().x() + application['instance'].get_x(),
+                                           -origin_y + application['parent'].geometry().y() + application['instance'].get_y())
 
         self.update_z_position_of_applications()
 
@@ -268,14 +264,27 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
                     for superclass in superclasses:
                         if superclass.__name__ == APPLICATION_PARENT_CLASS:
                             # print('"{}" in Module "{}" is a VIGITIA Application'.format(class_name, module_name))
-                            application = {
-                                'name': class_name,
-                                'instance': my_class(self),  # Pass the RenderingManager on to the class
-                                'parent': None,
-                                'proxy': None
-                            }
 
-                            applications.append(application)
+                            if class_name not in BLACKLIST:
+                                print("ADDING:", class_name)
+
+                                try:
+                                    instance = my_class(self)
+                                except:
+                                    print('ERROR IN APPLICATION ', class_name)
+                                    self.close()
+                                    sys.exit(1)
+
+                                application = {
+                                    'name': class_name,
+                                    'instance': instance,  # Pass the RenderingManager on to the class
+                                    'parent': None,
+                                    'proxy': None
+                                }
+
+                                applications.append(application)
+                            else:
+                                print("Not adding ", class_name)
 
         return applications
 
