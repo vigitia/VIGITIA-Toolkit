@@ -2,6 +2,8 @@ import os
 import time
 
 from PyQt5 import uic
+from PyQt5.QtCore import Qt, QPoint
+from PyQt5.QtGui import QImage, QPainter, QPen, QBrush
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
 
 from apps.VIGITIABaseApplication import VIGITIABaseApplication
@@ -32,22 +34,44 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
         self.nutri_score_orange.hide()
         self.nutri_score_carrot.hide()
 
+        self.reset_image()
+
+        self.update()
+
+    def reset_image(self):
+        self.image = QImage(self.size(), QImage.Format_ARGB32)
+        self.image.fill(Qt.transparent)
+
+    def draw_circle(self, x, y, width, height, color):
+        painter = QPainter(self.image)
+        painter.setPen(QPen(color, 10, Qt.SolidLine))
+        painter.drawRect(x, y, width, height)
+
+    # paint event
+    def paintEvent(self, event):
+        # create a canvas
+        canvasPainter = QPainter(self)
+
+        # draw rectangle  on the canvas
+        canvasPainter.drawImage(self.rect(), self.image, self.image.rect())
+
     def add_widget(self):
         self.moveToThread(self.rendering_manager)
         NutriScore(self, 100, 100)
 
-    def on_new_token_messages(self, data):
-        # print('Tokens:', data)
-        for token in data:
-            if token['component_id'] == 36:
-                self.nutri_score_orange.show()
-                self.nutri_score_orange.move(token['x_pos'], token['y_pos'])
-            elif token['component_id'] == 37:
-                self.nutri_score_carrot.show()
-                self.nutri_score_carrot.move(token['x_pos'], token['y_pos'])
-            elif token['component_id'] == 44:
-                self.nutri_score_banana.show()
-                self.nutri_score_banana.move(token['x_pos'], token['y_pos'])
+    # def on_new_token_messages(self, data):
+    #     # print('Tokens:', data)
+    #     for token in data:
+    #         if token['component_id'] == 1000:
+    #             print(token)
+    #             self.nutri_score_orange.show()
+    #             self.nutri_score_orange.move(token['x_pos'], token['y_pos'])
+    #         elif token['component_id'] == 37:
+    #             self.nutri_score_carrot.show()
+    #             self.nutri_score_carrot.move(token['x_pos'], token['y_pos'])
+    #         elif token['component_id'] == 44:
+    #             self.nutri_score_banana.show()
+    #             self.nutri_score_banana.move(token['x_pos'], token['y_pos'])
 
                 #if token['component_id'] not in self.present_tokens:
                     # self.add_widget()
@@ -62,6 +86,45 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
                     # }
                     # self.present_tokens.append(token['component_id'])
 
+    # def on_new_bounding_box_messages(self, data):
+    #     self.reset_image()
+    #
+    #     for bounding_box in data:
+    #         self.draw_circle(bounding_box['x_pos'], bounding_box['y_pos'], bounding_box['width'], bounding_box['height'], Qt.white)
+    #
+    #     self.update()
+
+    def on_new_tuio_bundle(self, data):
+        tokens = data['tokens']
+        bounding_boxes = data['bounding_boxes']
+
+        for token in tokens:
+            if token['component_id'] == 1000:
+
+                self.reset_image()
+
+                width = 0
+                height = 0
+                for bounding_box in bounding_boxes:
+                    if bounding_box['session_id'] == 1000:
+                        self.draw_circle(bounding_box['x_pos'], bounding_box['y_pos'], bounding_box['width'],
+                                         bounding_box['height'], Qt.white)
+                        width = bounding_box['width']
+                        height = bounding_box['height']
+
+                print(token)
+                self.nutri_score_orange.show()
+                self.nutri_score_orange.move(token['x_pos'] + width, token['y_pos'] + height)
+            elif token['component_id'] == 37:
+                self.nutri_score_carrot.show()
+                self.nutri_score_carrot.move(token['x_pos'], token['y_pos'])
+            elif token['component_id'] == 44:
+                self.nutri_score_banana.show()
+                self.nutri_score_banana.move(token['x_pos'], token['y_pos'])
+
+        self.update()
+
+        
 
 class NutriScore(QWidget):
 
