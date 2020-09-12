@@ -25,7 +25,7 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
         # drawing flag
         self.drawing = False
 
-        self.show_touch_points = False
+        self.show_touch_points = True
 
         self.brushSize = 75
         self.brushColor = Qt.green
@@ -90,10 +90,11 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
             # TODO: FIX function called before class has been initialized
 
         painter = QPainter(self.image)
-        painter.setPen(QPen(Qt.gray, 30, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        painter.setPen(QPen(Qt.green, 30, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
 
         for message in messages:
-            painter.drawPoint(self.get_pos(message['x_pos'], message['y_pos']))
+            #painter.drawPoint(self.get_pos(message['x_pos'], message['y_pos']))
+            painter.drawPoint(message['x_pos'], message['y_pos'])
 
         self.update()
 

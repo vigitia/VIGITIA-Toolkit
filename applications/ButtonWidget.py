@@ -50,8 +50,7 @@ class ButtonWidget(QWidget, VIGITIABaseApplication):
     def on_new_pointer_messages(self, data):
         for message in data:
             print(message)
-
-            local_pos, global_pos = self.get_pos(message['x_pos'], message['y_pos'])
+            local_pos = self.mapFromGlobal(QPoint(message['x_pos'], message['y_pos']))
 
             if self.label_1.pos().x() <= local_pos.x() <= self.label_1.pos().x() + self.label_1.width():
                 if self.label_1.pos().y() <= local_pos.y() <= self.label_1.pos().y() + self.label_1.height():
