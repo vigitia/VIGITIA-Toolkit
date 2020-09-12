@@ -13,7 +13,7 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <widget class="QLabel" name="label">
+  <widget class="QLabel" name="name">
    <property name="geometry">
     <rect>
      <x>12</x>
@@ -25,16 +25,18 @@
    <property name="font">
     <font>
      <pointsize>36</pointsize>
+     <weight>75</weight>
+     <bold>true</bold>
     </font>
    </property>
    <property name="text">
-    <string>Apfel</string>
+    <string> Banane</string>
    </property>
    <property name="alignment">
     <set>Qt::AlignCenter</set>
    </property>
   </widget>
-  <widget class="QLabel" name="label_2">
+  <widget class="QLabel" name="calories">
    <property name="geometry">
     <rect>
      <x>20</x>
@@ -84,7 +86,7 @@
     <enum>Qt::Horizontal</enum>
    </property>
   </widget>
-  <widget class="QLabel" name="label_3">
+  <widget class="QLabel" name="carbohydrates">
    <property name="geometry">
     <rect>
      <x>18</x>
@@ -105,7 +107,7 @@
     <set>Qt::AlignCenter</set>
    </property>
   </widget>
-  <widget class="QLabel" name="label_4">
+  <widget class="QLabel" name="fat">
    <property name="geometry">
     <rect>
      <x>21</x>
@@ -126,7 +128,7 @@
     <set>Qt::AlignCenter</set>
    </property>
   </widget>
-  <widget class="QLabel" name="label_5">
+  <widget class="QLabel" name="protein">
    <property name="geometry">
     <rect>
      <x>20</x>
