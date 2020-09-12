@@ -141,11 +141,24 @@ class VIGITIASensorDataInterface:
             x_translated = int(x / self.camera_resolution[0] * self.screen_resolution[0])
             y_translated = int(y / self.camera_resolution[1] * self.screen_resolution[1])
 
-
             return x_translated, y_translated
 
         else:
             return x, y
+
+    def translate_x_coordinate(self, x):
+        if self.camera_resolution is not None:
+            x_translated = int(x / self.camera_resolution[0] * self.screen_resolution[0])
+            return x_translated
+        else:
+            return x
+
+    def translate_y_coordinate(self, y):
+        if self.camera_resolution is not None:
+            y_translated = int(y / self.camera_resolution[1] * self.screen_resolution[1])
+            return y_translated
+        else:
+            return y
 
     def on_new_token_message(self, *messages):
 
@@ -153,17 +166,15 @@ class VIGITIASensorDataInterface:
             self.get_screen_resolution()
 
         # Translate coordinates from camera space to screen space
-        x_translated, y_translated = self.translate_coordinates(messages[5], messages[6])
-
-        print(self.screen_resolution, self.camera_resolution)
+        #x_translated, y_translated = self.translate_coordinates(messages[5], messages[6])
 
         origin_ip = messages[0][0]
         token_message = {
             'session_id': messages[2],
             'tuio_id': messages[3],
             'component_id': messages[4],
-            'x_pos': x_translated,
-            'y_pos': y_translated,
+            'x_pos': messages[5],
+            'y_pos': messages[6],
             'angle': messages[7]
         }
         self.bundles[origin_ip]['tokens'].append(token_message)
@@ -185,7 +196,16 @@ class VIGITIASensorDataInterface:
 
     def on_new_bounding_box_message(self, *messages):
         origin_ip = messages[0][0]
-        self.bundles[origin_ip]['bounding_boxes'].append(messages[2:])
+        bounding_box_message = {
+            'session_id': messages[2],
+            'x_pos': messages[3],
+            'y_pos': messages[4],
+            'angle': messages[5],
+            'width': messages[6],
+            'height': messages[7],
+            'area': messages[8]
+        }
+        self.bundles[origin_ip]['bounding_boxes'].append(bounding_box_message)
 
     def on_new_data_message(self, *messages):
         # print(messages)
