@@ -28,6 +28,7 @@ from services.hand_tracker import HandTracker
 # TODO: Allow multiple
 TARGET_COMPUTER_IP = get_ip_address()
 # TARGET_COMPUTER_IP = '132.199.199.67'
+# TARGET_COMPUTER_IP = '127.0.0.1'
 
 TARGET_COMPUTER_PORT = 8000
 
@@ -80,10 +81,10 @@ class VIGITIASensorProcessingController:
         self.fiducials_detector = FiducialsDetector()
         #self.movement_detector = MovementDetector()
         self.foreground_mask_extractor = ForegroundMaskExtractor()
-        #self.touch_detector = TouchDetector()
+        self.touch_detector = TouchDetector()
         #self.table_detector = TableDetector()
         self.generic_object_detector = GenericObjectDetector()
-        #self.hand_tracker = HandTracker()
+        self.hand_tracker = HandTracker()
 
     # The main application loop. Code parts for fps counter from
     # https://stackoverflow.com/questions/43761004/fps-how-to-divide-count-by-time-function-to-determine-fps
@@ -117,7 +118,7 @@ class VIGITIASensorProcessingController:
                 # Run Sensor Processing Services. They all add their data to the TUIO Bundle
                 foreground_mask = self.get_foreground_mask(color_image_table)
 
-                self.get_detected_objects(color_image_table, foreground_mask)
+                #self.get_detected_objects(color_image_table, foreground_mask)
                 self.get_aruco_markers(color_image_table)
                 #self.get_movements(color_image_table)
                 self.get_touch_points(color_image_table, depth_image_table)
@@ -149,12 +150,34 @@ class VIGITIASensorProcessingController:
 
     def get_foreground_mask(self, color_image_table):
         mask = self.foreground_mask_extractor.get_foreground_mask_otsu(color_image_table)
-        if DEBUG_MODE:
-            cv2.imshow('otsu', mask)
+        # if DEBUG_MODE:
+        #     cv2.imshow('otsu', mask)
         return mask
 
     def get_detected_objects(self, color_image_table, foreground_mask):
         detected_objects = self.generic_object_detector.detect_generic_objects(color_image_table, foreground_mask)
+
+        for detected_object in detected_objects:
+            if detected_object['label'] == 'orange':
+                component_id = 1000
+            elif detected_object['label'] == 'banana':
+                component_id = 1001
+            elif detected_object['label'] == 'carrot':
+                component_id = 1002
+            else:
+                component_id = 1003
+
+            print(detected_object['width'], detected_object['height'])
+
+            self.tuio_server.add_token_message(s_id=component_id, tu_id=0, c_id=component_id,
+                                               x_pos=detected_object['center_x'],
+                                               y_pos=detected_object['center_y'],
+                                               angle=0)
+
+            self.tuio_server.add_bounding_box_message(s_id=component_id, x_pos=detected_object['center_x'],
+                                                      y_pos=detected_object['center_y'], angle=0,
+                                                      width=detected_object['width'],
+                                                      height=detected_object['height'], area=0)
 
     def get_aruco_markers(self, color_image_table):
         aruco_markers = self.fiducials_detector.detect_fiducials(color_image_table)
@@ -186,17 +209,17 @@ class VIGITIASensorProcessingController:
     def get_touch_points(self, color_image_table, depth_image_table):
         touch_points = []
         # Only every other frame to improve performance
-        # if self.frame_id % 2 == 0:
-        #     # TODO: Find solution for this temporary fix of ghost hands
-        #     self.hand_tracker.reset()
-        #     detected_hands = self.hand_tracker(cv2.cvtColor(color_image_table, cv2.COLOR_BGR2RGB))
-        #     hands, hand_regions = self.hand_tracker.add_hand_tracking_points(color_image_table.copy(), detected_hands)
-        #     cv2.imshow('hands', hands)
-        #
-        #     self.detected_hands = detected_hands
-        #     self.hand_regions = hand_regions
-        #
-        # touch_points = self.touch_detector.get_touch_points(color_image_table, depth_image_table, self.hand_regions, self.detected_hands)
+        if self.frame_id % 2 == 0:
+            # TODO: Find solution for this temporary fix of ghost hands
+            self.hand_tracker.reset()
+            detected_hands = self.hand_tracker(cv2.cvtColor(color_image_table, cv2.COLOR_BGR2RGB))
+            hands, hand_regions = self.hand_tracker.add_hand_tracking_points(color_image_table.copy(), detected_hands)
+            cv2.imshow('hands', hands)
+
+            self.detected_hands = detected_hands
+            self.hand_regions = hand_regions
+
+        touch_points = self.touch_detector.get_touch_points(color_image_table, depth_image_table, self.hand_regions, self.detected_hands)
 
         for touch_point in touch_points:
             # print(touch_point)
