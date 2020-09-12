@@ -147,16 +147,14 @@ class VIGITIASensorDataInterface:
             return x, y
 
     def translate_x_coordinate(self, x):
-        if self.camera_resolution is not None:
-            x_translated = int(x / self.camera_resolution[0] * self.screen_resolution[0])
-            return x_translated
+        if self.camera_resolution is not None and self.screen_resolution is not None:
+            return int(x / self.camera_resolution[0] * self.screen_resolution[0])
         else:
             return x
 
     def translate_y_coordinate(self, y):
-        if self.camera_resolution is not None:
-            y_translated = int(y / self.camera_resolution[1] * self.screen_resolution[1])
-            return y_translated
+        if self.camera_resolution is not None and self.screen_resolution is not None:
+            return int(y / self.camera_resolution[1] * self.screen_resolution[1])
         else:
             return y
 
@@ -173,20 +171,24 @@ class VIGITIASensorDataInterface:
             'session_id': messages[2],
             'tuio_id': messages[3],
             'component_id': messages[4],
-            'x_pos': messages[5],
-            'y_pos': messages[6],
+            'x_pos': self.translate_x_coordinate(messages[5]),
+            'y_pos': self.translate_y_coordinate(messages[6]),
             'angle': messages[7]
         }
         self.bundles[origin_ip]['tokens'].append(token_message)
 
     def on_new_pointer_message(self, *messages):
+
+        if self.screen_resolution is None or self.screen_resolution[0] <= 0 or self.screen_resolution[1] <= 0:
+            self.get_screen_resolution()
+
         origin_ip = messages[0][0]
         pointer_message = {
             'session_id': messages[2],
             'tuio_id': messages[3],
             'component_id': messages[4],
-            'x_pos': messages[5],
-            'y_pos': messages[6],
+            'x_pos': self.translate_x_coordinate(messages[5]),
+            'y_pos': self.translate_y_coordinate(messages[6]),
             'angle': messages[7],
             'shear': messages[8],
             'radius': messages[9],
