@@ -24,14 +24,27 @@ class GenericObjectDetector:
             if i > 9:
                 break
             label, confidence = self.detect_extracted_object(extracted_object['extracted_object'])
-            print(label)
+
             cv2.rectangle(frame, (extracted_object['x'], extracted_object['y']), (extracted_object['width'], extracted_object['height']), (0, 0, 255), 2)
 
-            cv2.putText(img=frame, text=str(label), org=(int(extracted_object['x']), int(extracted_object['y'])),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 0, 0))
+            if len(label) > 0:
+                detected_objects.append({
+                    'label': label,
+                    'conf': confidence,
+                    'x': extracted_object['x'],
+                    'y': extracted_object['y'],
+                    'width': extracted_object['width'],
+                    'height': extracted_object['height'],
+                    'center_x': int(extracted_object['x'] + extracted_object['width'] / 2),
+                    'center_y': int(extracted_object['y'] + extracted_object['height'] / 2)
+                })
 
+                cv2.putText(img=frame, text=str(label), org=(int(extracted_object['x']), int(extracted_object['y'])),
+                            fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 0, 0))
 
         cv2.imshow('labels', frame)
+
+        return detected_objects
 
 
         # print(frame.shape)
@@ -64,7 +77,7 @@ class GenericObjectDetector:
         bbox, label, conf = detect_common_objects(extracted_object, confidence=0.3, model='yolov3-tiny')
 
         if len(label) > 0:
-            label = label
+            label = label[0]
             confidence = conf[0]
 
         return label, confidence
@@ -72,8 +85,9 @@ class GenericObjectDetector:
     def extract_objects(self, frame, mask):
 
         kernel = np.ones((5, 5), np.uint8)
-        frame = cv2.erode(frame, kernel, iterations=2)
-        frame = cv2.dilate(frame, kernel, iterations=2)
+        mask = cv2.erode(mask, kernel, iterations=3)
+        #mask = cv2.dilate(mask, kernel, iterations=3)
+        cv2.imshow('mask', mask)
 
         contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -95,7 +109,7 @@ class GenericObjectDetector:
             contours_poly[i] = cv2.approxPolyDP(c, 3, True)
             boundRect[i] = cv2.boundingRect(contours_poly[i])
 
-        EXPAND_BOX = 20
+        EXPAND_BOX = 30
         MIN_LENGTH = 50
 
         objects_extracted = []
@@ -107,18 +121,24 @@ class GenericObjectDetector:
             width = int(boundRect[i][0] + boundRect[i][2] + EXPAND_BOX)
             height = int(boundRect[i][1] + boundRect[i][3]) + EXPAND_BOX
 
-            extracted_object = frame.copy()[y:y + height, x:x + width]
+            if width > MIN_LENGTH and height > MIN_LENGTH:
+                copy = frame.copy()
+                extracted_object = copy[y:y+height, x:x+width]
+                if extracted_object.shape[0] > MIN_LENGTH and extracted_object.shape[1] > MIN_LENGTH:
 
-            if extracted_object.shape[0] > MIN_LENGTH and extracted_object.shape[1] > MIN_LENGTH:
+                    object_info = {
+                        'x': x,
+                        'y': y,
+                        'width': width,
+                        'height': height,
+                        'extracted_object': extracted_object
+                    }
 
-                object_info = {
-                    'x': x,
-                    'y': y,
-                    'width': width,
-                    'height': height,
-                    'extracted_object': extracted_object
-                }
+                    objects_extracted.append(object_info)
 
-                objects_extracted.append(object_info)
+        # try:
+        #     cv2.imshow('0', objects_extracted[0]['extracted_object'])
+        # except:
+        #     pass
 
         return objects_extracted
