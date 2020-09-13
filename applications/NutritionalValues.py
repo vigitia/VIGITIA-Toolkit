@@ -1,8 +1,9 @@
 import os
 import time
+from datetime import datetime
 
 from PyQt5 import uic
-from PyQt5.QtCore import Qt, QPoint
+from PyQt5.QtCore import Qt, QPoint, QThread
 from PyQt5.QtGui import QImage, QPainter, QPen, QBrush, QColor
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
 
@@ -14,6 +15,8 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
     """
 
     present_tokens = []
+
+    running = False
 
     # It needs to receive the rendering manager as an argument
     def __init__(self, rendering_manager):
@@ -27,6 +30,8 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
         self.setGeometry(0, 0, self.get_width(), self.get_height())  # Initialize the application dimensions
         self.setStyleSheet("background-color: transparent;")
 
+        self.image = QImage(self.size(), QImage.Format_ARGB32)
+
         self.nutri_scores = []
 
         self.nutri_score_banana = NutriScore(self, 0, 0, 'Banane', '115kcal', '26,4g', '1,2g', '0,2g')
@@ -35,6 +40,18 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
         self.nutri_score_banana.hide()
         self.nutri_score_orange.hide()
         self.nutri_score_carrot.hide()
+
+        self.smartphone_widget = Smartphone(self, 0, 0)
+        self.smartphone_widget.hide()
+        self.smartphone = {
+            'x': 0,
+            'y': 0,
+            'width': 0,
+            'height': 0,
+            'last_time_seen': 0,
+            'hidden': True,
+            'widget': self.smartphone_widget
+        }
 
         self.nutri_scores.append({
             'id': 10000,
@@ -69,12 +86,9 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
             'widget': self.nutri_score_carrot
         })
 
-        self.reset_image()
-
-        self.update()
+        self.running = True
 
     def reset_image(self):
-        self.image = QImage(self.size(), QImage.Format_ARGB32)
         self.image.fill(Qt.transparent)
 
     def draw_circle(self, x, y, width, height):
@@ -96,43 +110,57 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
         NutriScore(self, 100, 100)
 
     def on_new_tuio_bundle(self, data):
-        bounding_boxes = data['bounding_boxes']
+        if self.running:
+            bounding_boxes = data['bounding_boxes']
 
-        now = int(round(time.time() * 1000))
+            now = int(round(time.time() * 1000))
 
-        MAX_TIME_MISSING_MS = 1000
-        SMOOTHING_FACTOR = 0.7  # Value between 0 and 1, depending if the old or the new value should count more.
+            MAX_TIME_MISSING_MS = 1000
+            SMOOTHING_FACTOR = 0.7  # Value between 0 and 1, depending if the old or the new value should count more.
 
-        for bounding_box in bounding_boxes:
-            if bounding_box['session_id'] == 10000 or bounding_box['session_id'] == 10001 or bounding_box['session_id'] == 10002:
-                entry = list(filter(lambda entry: entry['id'] == bounding_box['session_id'], self.nutri_scores))[0]
+            for bounding_box in bounding_boxes:
+                if bounding_box['session_id'] == 10000 or bounding_box['session_id'] == 10001 or bounding_box['session_id'] == 10002 or bounding_box['session_id'] == 10003:
+                    if bounding_box['session_id'] == 10000 or bounding_box['session_id'] == 10001 or bounding_box[
+                        'session_id'] == 10002:
+                        entry = list(filter(lambda entry: entry['id'] == bounding_box['session_id'], self.nutri_scores))[0]
+                    if bounding_box['session_id'] == 10003:
+                        entry = self.smartphone
 
-                entry['x'] = int(SMOOTHING_FACTOR * (bounding_box['x_pos'] - entry['x']) + entry['x'])
-                entry['y'] = int(SMOOTHING_FACTOR * (bounding_box['y_pos'] - entry['y']) + entry['y'])
-                entry['width'] = int(SMOOTHING_FACTOR * (bounding_box['width'] - entry['width']) + entry['width'])
-                entry['height'] = int(SMOOTHING_FACTOR * (bounding_box['height'] - entry['height']) + entry['height'])
-                entry['last_time_seen'] = int(round(time.time() * 1000))
+                    entry['x'] = int(SMOOTHING_FACTOR * (bounding_box['x_pos'] - entry['x']) + entry['x'])
+                    entry['y'] = int(SMOOTHING_FACTOR * (bounding_box['y_pos'] - entry['y']) + entry['y'])
+                    entry['width'] = int(SMOOTHING_FACTOR * (bounding_box['width'] - entry['width']) + entry['width'])
+                    entry['height'] = int(SMOOTHING_FACTOR * (bounding_box['height'] - entry['height']) + entry['height'])
+                    entry['last_time_seen'] = int(round(time.time() * 1000))
 
-                if entry['hidden']:
-                    entry['hidden'] = False
-                    entry['widget'].show()
+                    if entry['hidden']:
+                        entry['hidden'] = False
+                        entry['widget'].show()
 
-        self.update()
-        self.reset_image()
+            self.update()
+            self.reset_image()
 
-        for entry in self.nutri_scores:
+            for entry in self.nutri_scores:
 
-            if not entry['hidden']:
+                if not entry['hidden']:
+                    # Hide element if missing for too long
+                    if now - entry['last_time_seen'] > MAX_TIME_MISSING_MS:
+                        entry['hidden'] = True
+                        entry['widget'].hide()
+                        break
+
+                    # Draw elements:
+                    self.draw_circle(entry['x'], entry['y'], entry['width'], entry['height'])
+
+                    entry['widget'].move(entry['x'] + entry['width'], entry['y'])
+
+            # Update smartphone
+            if not self.smartphone['hidden']:
                 # Hide element if missing for too long
-                if now - entry['last_time_seen'] > MAX_TIME_MISSING_MS:
-                    entry['hidden'] = True
-                    entry['widget'].hide()
-                    break
-
-                # Draw elements:
-                self.draw_circle(entry['x'], entry['y'], entry['width'], entry['height'])
-
-                entry['widget'].move(entry['x'] + entry['width'], entry['y'])
+                if now - self.smartphone['last_time_seen'] > MAX_TIME_MISSING_MS:
+                    self.smartphone['hidden'] = True
+                    self.smartphone['widget'].hide()
+                else:
+                    self.smartphone['widget'].move(int(self.smartphone['x'] + self.smartphone['width'] * 0.75), self.smartphone['y'])
 
 
 class NutriScore(QWidget):
@@ -170,3 +198,45 @@ class NutriScore(QWidget):
         self.label_carbohydrates.setText(self.carbohydrates_name)
         self.label_protein.setText(self.protein_name)
         self.label_fat.setText(self.fat_name)
+
+
+class Smartphone(QWidget):
+    WIDTH = 400
+    HEIGHT = 600
+
+    def __init__(self, parent, x, y):
+        super(Smartphone, self).__init__(parent)
+
+        self.x = x
+        self.y = y
+
+        self.initUI()
+
+        self.thread = Thread(self)
+        self.thread.start()
+
+    def initUI(self):
+        self.setGeometry(self.x, self.y, self.WIDTH, self.HEIGHT)
+        uic.loadUi(os.path.abspath(os.path.join(os.path.dirname(__file__), 'Smartphone.ui')), self)
+
+        self.label_time = self.findChild(QLabel, 'time')
+
+    def set_time(self):
+        now = datetime.now()
+        time_string = now.strftime('%H:%M:%S')
+        self.label_time.setText(time_string)
+
+
+class Thread(QThread):
+
+    def __init__(self, smartphone):
+        QThread.__init__(self)
+        self.smartphone = smartphone
+
+    def __del__(self):
+        self.wait()
+
+    def run(self):
+        while True:
+            self.smartphone.set_time()
+            time.sleep(0.1)
