@@ -200,11 +200,11 @@ class VIGITIASensorDataInterface:
         origin_ip = messages[0][0]
         bounding_box_message = {
             'session_id': messages[2],
-            'x_pos': messages[3],
-            'y_pos': messages[4],
+            'x_pos': self.translate_x_coordinate(messages[3]),
+            'y_pos': self.translate_y_coordinate(messages[4]),
             'angle': messages[5],
-            'width': messages[6],
-            'height': messages[7],
+            'width': self.translate_x_coordinate(messages[6]),
+            'height': self.translate_x_coordinate(messages[7]),
             'area': messages[8]
         }
         self.bundles[origin_ip]['bounding_boxes'].append(bounding_box_message)
