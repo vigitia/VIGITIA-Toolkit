@@ -409,8 +409,10 @@ class TouchDetector:
         except ValueError:
             return -1, COLOR_NO_TOUCH
 
-    # Implemented like described in paper "DIRECT: Making Touch Tracking on Ordinary Surfaces Practical with
-    # Hybrid Depth-Infrared Sensing." by Xiao, R., Hudson, S., & Harrison, C. (2016).
+    # Implemented like described in paper "DIRECT: Making Touch Tracking on Ordinary Surfaces Practical with Hybrid
+    # Depth-Infrared Sensing." by Xiao, R., Hudson, S., & Harrison, C. (2016). See:
+    # https://github.com/nneonneo/direct-handtracking/blob/c199dd61ab097f3b3f155798c2519828352d9bdb/ofx/apps
+    # /handTracking/direct/src/IRDepthTouchTracker.cpp
     def merge_touch_points(self, new_touch_points):
 
         distances = []
