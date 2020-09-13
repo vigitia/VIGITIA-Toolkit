@@ -93,7 +93,7 @@ class GenericObjectDetector:
 
         #mask = cv2.bitwise_not(mask)
 
-        kernel = np.ones((5, 5), np.uint8)
+        kernel = np.ones((9, 9), np.uint8)
         mask = cv2.erode(mask, kernel, iterations=4)
         #mask = cv2.dilate(mask, kernel, iterations=3)
         cv2.imshow('mask', mask)
@@ -144,9 +144,9 @@ class GenericObjectDetector:
 
                     objects_extracted.append(object_info)
 
-        try:
-            cv2.imshow('3', objects_extracted[3]['extracted_object'])
-        except:
-            pass
+        # try:
+        #     cv2.imshow('3', objects_extracted[3]['extracted_object'])
+        # except:
+        #     pass
 
         return objects_extracted
