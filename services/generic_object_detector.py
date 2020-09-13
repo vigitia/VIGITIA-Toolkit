@@ -25,7 +25,9 @@ class GenericObjectDetector:
                 break
             label, confidence = self.detect_extracted_object(extracted_object['extracted_object'])
 
-            cv2.rectangle(frame, (extracted_object['x'], extracted_object['y']), (extracted_object['width'], extracted_object['height']), (0, 0, 255), 2)
+            cv2.rectangle(frame, (extracted_object['x'], extracted_object['y']),
+                          (extracted_object['x'] + extracted_object['width'],
+                           extracted_object['y'] + extracted_object['height']), (0, 0, 255), 2)
 
             if len(label) > 0:
                 detected_objects.append({
@@ -72,11 +74,13 @@ class GenericObjectDetector:
         label = ''
         confidence = 0
 
-        # bbox, label, conf = detect_common_objects(frame, confidence=0.25)
-        # bbox, label, conf = detect_common_objects(frame, confidence=0.75, enable_gpu=True)
-        bbox, label, conf = detect_common_objects(extracted_object, confidence=0.3, model='yolov3-tiny')
+        # bbox, label, conf = detect_common_objects(extracted_object, confidence=0.25)
+        # bbox, label, conf = detect_common_objects(extracted_object, confidence=0.75, enable_gpu=True)
+        bbox, label, conf = detect_common_objects(extracted_object, confidence=0.25, model='yolov3-tiny')
+
 
         if len(label) > 0:
+            print(label, conf)
             label = label[0]
             confidence = conf[0]
 
@@ -84,8 +88,13 @@ class GenericObjectDetector:
 
     def extract_objects(self, frame, mask):
 
+        MIN_CONTOUR_SIZE = 1000
+        MAX_HIERARCHY_DEPTH = 10
+
+        #mask = cv2.bitwise_not(mask)
+
         kernel = np.ones((5, 5), np.uint8)
-        mask = cv2.erode(mask, kernel, iterations=3)
+        mask = cv2.erode(mask, kernel, iterations=4)
         #mask = cv2.dilate(mask, kernel, iterations=3)
         cv2.imshow('mask', mask)
 
@@ -93,10 +102,8 @@ class GenericObjectDetector:
 
         contours_filtered = []
 
-        MIN_CONTOUR_SIZE = 100
-
         for i, contour in enumerate(contours):
-            if hierarchy[0, i, 3] <= 1:
+            if hierarchy[0, i, 3] <= MAX_HIERARCHY_DEPTH:
                 #print(hierarchy[0, i, 3])
                 area = cv2.contourArea(contour)
                 if area > MIN_CONTOUR_SIZE:
@@ -109,21 +116,22 @@ class GenericObjectDetector:
             contours_poly[i] = cv2.approxPolyDP(c, 3, True)
             boundRect[i] = cv2.boundingRect(contours_poly[i])
 
-        EXPAND_BOX = 30
+        EXPAND_BOX = 50
         MIN_LENGTH = 50
 
         objects_extracted = []
 
         for i in range(len(contours_filtered)):
-            color = (200, 100, 50)
-            x = int(boundRect[i][0]) - EXPAND_BOX
-            y = int(boundRect[i][1]) - EXPAND_BOX
-            width = int(boundRect[i][0] + boundRect[i][2] + EXPAND_BOX)
-            height = int(boundRect[i][1] + boundRect[i][3]) + EXPAND_BOX
+            x = boundRect[i][0] - EXPAND_BOX
+            y = boundRect[i][1] - EXPAND_BOX
+            width = boundRect[i][2] + 2 * EXPAND_BOX
+            height = boundRect[i][3] + 2 * EXPAND_BOX
 
             if width > MIN_LENGTH and height > MIN_LENGTH:
                 copy = frame.copy()
                 extracted_object = copy[y:y+height, x:x+width]
+                if i == 3:
+                    print(extracted_object.shape)
                 if extracted_object.shape[0] > MIN_LENGTH and extracted_object.shape[1] > MIN_LENGTH:
 
                     object_info = {
@@ -136,9 +144,9 @@ class GenericObjectDetector:
 
                     objects_extracted.append(object_info)
 
-        # try:
-        #     cv2.imshow('0', objects_extracted[0]['extracted_object'])
-        # except:
-        #     pass
+        try:
+            cv2.imshow('3', objects_extracted[3]['extracted_object'])
+        except:
+            pass
 
         return objects_extracted
