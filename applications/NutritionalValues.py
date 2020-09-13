@@ -27,12 +27,47 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
         self.setGeometry(0, 0, self.get_width(), self.get_height())  # Initialize the application dimensions
         self.setStyleSheet("background-color: transparent;")
 
-        self.nutri_score_banana = NutriScore(self, 100, 600, 'Banane', '115', '26,4g', '1,2g', '0,2g')
-        self.nutri_score_orange = NutriScore(self, 600, 600, 'Orange', '115', '26,4g', '1,2g', '0,2g')
-        self.nutri_score_carrot = NutriScore(self, 1100, 600, 'Karotte', '115', '26,4g', '1,2g', '0,2g')
+        self.nutri_scores = []
+
+        self.nutri_score_banana = NutriScore(self, 0, 0, 'Banane', '115', '26,4g', '1,2g', '0,2g')
+        self.nutri_score_orange = NutriScore(self, 0, 0, 'Orange', '115', '26,4g', '1,2g', '0,2g')
+        self.nutri_score_carrot = NutriScore(self, 0, 0, 'Karotte', '115', '26,4g', '1,2g', '0,2g')
         self.nutri_score_banana.hide()
         self.nutri_score_orange.hide()
         self.nutri_score_carrot.hide()
+
+        self.nutri_scores.append({
+            'id': 10000,
+            'x': 0,
+            'y': 0,
+            'width': 0,
+            'height': 0,
+            'hidden': True,
+            'last_time_seen': 0,
+            'widget': self.nutri_score_orange
+        })
+
+        self.nutri_scores.append({
+            'id': 10001,
+            'x': 0,
+            'y': 0,
+            'width': 0,
+            'height': 0,
+            'hidden': True,
+            'last_time_seen': 0,
+            'widget': self.nutri_score_banana
+        })
+
+        self.nutri_scores.append({
+            'id': 10002,
+            'x': 0,
+            'y': 0,
+            'width': 0,
+            'height': 0,
+            'hidden': True,
+            'last_time_seen': 0,
+            'widget': self.nutri_score_carrot
+        })
 
         self.reset_image()
 
@@ -98,29 +133,25 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
         tokens = data['tokens']
         bounding_boxes = data['bounding_boxes']
 
-        for token in tokens:
-            if token['component_id'] == 1000:
+        self.reset_image()
+        for bounding_box in bounding_boxes:
+            print(bounding_box)
+            if bounding_box['session_id'] == 10000 or bounding_box['session_id'] == 10001 or bounding_box['session_id'] == 10002:
+                entry = list(filter(lambda entry: entry['id'] == bounding_box['session_id'], self.nutri_scores))[0]
+                entry['x'] = bounding_box['x_pos']
+                entry['y'] = bounding_box['y_pos']
+                entry['width'] = bounding_box['width']
+                entry['height'] = bounding_box['height']
+                entry['last_time_seen'] = time.time()
 
-                self.reset_image()
+                if entry['hidden']:
+                    entry['hidden'] = False
+                    entry['widget'].show()
 
-                width = 0
-                height = 0
-                for bounding_box in bounding_boxes:
-                    if bounding_box['session_id'] == 1000:
-                        self.draw_circle(bounding_box['x_pos'], bounding_box['y_pos'], bounding_box['width'],
-                                         bounding_box['height'], Qt.white)
-                        width = bounding_box['width']
-                        height = bounding_box['height']
+                entry['widget'].move(entry['x'] + entry['width'], entry['y'])
+                self.draw_circle(entry['x'], entry['y'], entry['width'], entry['height'], Qt.white)
 
-                print(token)
-                self.nutri_score_orange.show()
-                self.nutri_score_orange.move(token['x_pos'] + width, token['y_pos'] + height)
-            elif token['component_id'] == 37:
-                self.nutri_score_carrot.show()
-                self.nutri_score_carrot.move(token['x_pos'], token['y_pos'])
-            elif token['component_id'] == 44:
-                self.nutri_score_banana.show()
-                self.nutri_score_banana.move(token['x_pos'], token['y_pos'])
+                print(entry)
 
         self.update()
 
