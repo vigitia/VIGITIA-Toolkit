@@ -37,9 +37,13 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
         self.nutri_score_banana = NutriScore(self, 0, 0, 'Banane', '115kcal', '26,4g', '1,2g', '0,2g')
         self.nutri_score_orange = NutriScore(self, 0, 0, 'Orange', '56kcal', '10,7g', '1,3g', '0,3g')
         self.nutri_score_carrot = NutriScore(self, 0, 0, 'Karotte', '32kcal', '7,2g', '0,8g', '0,0g')
+        self.nutri_score_apple = NutriScore(self, 0, 0, 'Apfel', '65kcal', '14,3g', '0,4g', '0,5g')
+        self.nutri_score_donut = NutriScore(self, 0, 0, 'Donut', '201kcal', '19,5g', '3,5g', '11,5g')
         self.nutri_score_banana.hide()
         self.nutri_score_orange.hide()
         self.nutri_score_carrot.hide()
+        self.nutri_score_apple.hide()
+        self.nutri_score_donut.hide()
 
         self.smartphone_widget = Smartphone(self, 0, 0)
         self.smartphone_widget.hide()
@@ -86,6 +90,28 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
             'widget': self.nutri_score_carrot
         })
 
+        self.nutri_scores.append({
+            'id': 10004,
+            'x': 0,
+            'y': 0,
+            'width': 0,
+            'height': 0,
+            'hidden': True,
+            'last_time_seen': 0,
+            'widget': self.nutri_score_apple
+        })
+
+        self.nutri_scores.append({
+            'id': 10005,
+            'x': 0,
+            'y': 0,
+            'width': 0,
+            'height': 0,
+            'hidden': True,
+            'last_time_seen': 0,
+            'widget': self.nutri_score_donut
+        })
+
         self.running = True
 
     def reset_image(self):
@@ -111,6 +137,8 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
 
     def on_new_tuio_bundle(self, data):
         if self.running:
+
+            print(data['bounding_boxes'])
             bounding_boxes = data['bounding_boxes']
 
             now = int(round(time.time() * 1000))
@@ -118,12 +146,14 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
             MAX_TIME_MISSING_MS = 1000
             SMOOTHING_FACTOR = 0.7  # Value between 0 and 1, depending if the old or the new value should count more.
 
+            ids_food = [10000, 10001, 10002, 10004, 10005]
+            id_smartphone = 10003
+
             for bounding_box in bounding_boxes:
-                if bounding_box['session_id'] == 10000 or bounding_box['session_id'] == 10001 or bounding_box['session_id'] == 10002 or bounding_box['session_id'] == 10003:
-                    if bounding_box['session_id'] == 10000 or bounding_box['session_id'] == 10001 or bounding_box[
-                        'session_id'] == 10002:
+                if bounding_box['session_id'] in ids_food or bounding_box['session_id'] == id_smartphone:
+                    if bounding_box['session_id'] in ids_food:
                         entry = list(filter(lambda entry: entry['id'] == bounding_box['session_id'], self.nutri_scores))[0]
-                    if bounding_box['session_id'] == 10003:
+                    if bounding_box['session_id'] == id_smartphone:
                         entry = self.smartphone
 
                     entry['x'] = int(SMOOTHING_FACTOR * (bounding_box['x_pos'] - entry['x']) + entry['x'])

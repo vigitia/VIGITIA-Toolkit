@@ -182,6 +182,10 @@ class RealsenseD435Camera(VIGITIACameraBase):
             else:
                 return None, None
 
+    def get_resolution(self):
+        return RGB_RES_X, RGB_RES_Y
+
+
     def stop(self):
         self.started = False
         self.thread.join()

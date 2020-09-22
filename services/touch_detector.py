@@ -380,11 +380,11 @@ class TouchDetector:
             pass
 
         for point in hull:
-            distance_to_table_border = abs(cv2.pointPolygonTest(self.table_border, tuple(point[0]), True))
+            #distance_to_table_border = abs(cv2.pointPolygonTest(self.table_border, tuple(point[0]), True))
             # TODO Remove points close to the table border
 
-            if distance_to_table_border > MIN_FINGER_DISTANCE_FROM_TABLE_BORDER:
-                finger_candidates.append(tuple(point[0]))
+            #if distance_to_table_border > MIN_FINGER_DISTANCE_FROM_TABLE_BORDER:
+            finger_candidates.append(tuple(point[0]))
 
         return hull, center_point, finger_candidates, inner_points, starts, ends
 

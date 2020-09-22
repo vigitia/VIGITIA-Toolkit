@@ -14,6 +14,37 @@ class GenericObjectDetector:
     def __init__(self):
         print('[Generic Object Detector] Service Ready')
 
+    def detect_objects_basic(self, frame, mask):
+
+        detected_objects = []
+
+        print(frame.shape)
+
+        # bbox, label, conf = detect_common_objects(frame, confidence=0.25)
+        # bbox, label, conf = detect_common_objects(frame, confidence=0.75, enable_gpu=True)
+        bbox, label, conf = detect_common_objects(frame, confidence=0.3, model='yolov3-tiny')
+
+        if DEBUG_MODE:
+            output_image = draw_bbox(frame, bbox, label, conf)
+            cv2.imshow('all objects', output_image)
+
+        # for i in range(len(bbox)):
+        #     detected_objects.append({
+        #         'label': label[i],
+        #         'bbox': bbox[i],
+        #         'conf': conf[i],
+        #         'x': extracted_object['x'],
+        #         'y': extracted_object['y'],
+        #         'width': extracted_object['width'],
+        #         'height': extracted_object['height'],
+        #         'center_x': int(extracted_object['x'] + extracted_object['width'] / 2),
+        #         'center_y': int(extracted_object['y'] + extracted_object['height'] / 2)
+        #     })
+
+            print(detected_objects)
+
+        return detected_objects
+
     def detect_generic_objects(self, frame, mask):
 
         detected_objects = []
@@ -46,26 +77,6 @@ class GenericObjectDetector:
 
         cv2.imshow('labels', frame)
 
-        return detected_objects
-
-
-        # print(frame.shape)
-        #
-        # # bbox, label, conf = detect_common_objects(frame, confidence=0.25)
-        # # bbox, label, conf = detect_common_objects(frame, confidence=0.75, enable_gpu=True)
-        # bbox, label, conf = detect_common_objects(frame, confidence=0.3, model='yolov3-tiny')
-        #
-        # if DEBUG_MODE:
-        #     output_image = draw_bbox(frame, bbox, label, conf)
-        #
-        # for i in range(len(bbox)):
-        #     detected_objects.append({
-        #         'label': label[i],
-        #         'bbox': bbox[i],
-        #         'conf': conf[i]
-        #     })
-        #
-        # print(detected_objects)
 
         return detected_objects
 

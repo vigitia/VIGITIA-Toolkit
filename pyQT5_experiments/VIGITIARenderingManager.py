@@ -17,9 +17,10 @@ from apps.VIGITIABaseApplication import VIGITIABaseApplication
 APPLICATIONS_BASE_FOLDER = 'applications'
 APPLICATION_PARENT_CLASS = 'VIGITIABaseApplication'
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
-BLACKLIST = ['ButtonWidget', 'ImageWidget', 'VideoWidget', 'BrowserWidget']
+#BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'VIGITIAPaintingApp', 'ButtonWidget']
+BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'VIGITIAPaintingApp', 'ButtonWidget']
 
 
 class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):

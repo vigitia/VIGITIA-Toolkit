@@ -19,8 +19,8 @@ class ButtonWidget(QWidget, VIGITIABaseApplication):
         self.set_name(self.__class__.__name__)
         self.set_rendering_manager(rendering_manager)
 
-        self.x = self.get_screen_resolution()[0]/4
-        self.y = self.get_screen_resolution()[1]/3
+        self.x = self.get_screen_resolution()[0]/5
+        self.y = self.get_screen_resolution()[1]/5
         self.width = 200
         self.height = 200
         self.rotation = 0
@@ -33,7 +33,7 @@ class ButtonWidget(QWidget, VIGITIABaseApplication):
 
         self.label_1 = QLabel('', self)
         self.label_1.resize(self.width, self.width)
-        self.label_1.setStyleSheet("background-color: green")
+        self.label_1.setStyleSheet("background-color: red")
 
         window_layout = QVBoxLayout()
         window_layout.addWidget(self.label_1, Qt.AlignCenter)

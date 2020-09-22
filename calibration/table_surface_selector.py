@@ -79,10 +79,13 @@ class TableSurfaceSelector:
         print("In calibration mode")
         # Show circles of previous coordinates
 
-        cv2.circle(color_image, self.table_corner_top_left, 2, (0, 0, 255), -1)
-        cv2.circle(color_image, self.table_corner_top_right, 2, (0, 0, 255), -1)
-        cv2.circle(color_image, self.table_corner_bottom_left, 2, (0, 0, 255), -1)
-        cv2.circle(color_image, self.table_corner_bottom_right, 2, (0, 0, 255), -1)
+        DIAMETER = 5
+        CIRCLE
+
+        cv2.circle(color_image, self.table_corner_top_left, DIAMETER, (0, 0, 255), -1)
+        cv2.circle(color_image, self.table_corner_top_right, DIAMETER, (0, 0, 255), -1)
+        cv2.circle(color_image, self.table_corner_bottom_left, DIAMETER, (0, 0, 255), -1)
+        cv2.circle(color_image, self.table_corner_bottom_right, DIAMETER, (0, 0, 255), -1)
 
         # Draw circles for clicks in a different color to mark the new points
         for coordinate in self.last_mouse_click_coordinates:

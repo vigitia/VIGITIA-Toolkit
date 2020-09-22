@@ -53,7 +53,7 @@
     </font>
    </property>
    <property name="text">
-    <string>Montag, 14.09.2020</string>
+    <string>Mittwoch, 16.09.2020</string>
    </property>
    <property name="alignment">
     <set>Qt::AlignCenter</set>

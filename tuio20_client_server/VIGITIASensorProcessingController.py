@@ -28,11 +28,10 @@ from services.hand_tracker import HandTracker
 # TODO: Allow multiple
 TARGET_COMPUTER_IP = get_ip_address()
 # TARGET_COMPUTER_IP = '132.199.199.67'
-# TARGET_COMPUTER_IP = '127.0.0.1'
 
 TARGET_COMPUTER_PORT = 8000
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 
 class VIGITIASensorProcessingController:
@@ -118,10 +117,10 @@ class VIGITIASensorProcessingController:
                 # Run Sensor Processing Services. They all add their data to the TUIO Bundle
                 foreground_mask = self.get_foreground_mask(color_image_table)
 
-                #self.get_detected_objects(color_image_table, foreground_mask)
+                self.get_detected_objects(color_image_table.copy(), foreground_mask)
                 self.get_aruco_markers(color_image_table)
                 #self.get_movements(color_image_table)
-                self.get_touch_points(color_image_table, depth_image_table)
+                #self.get_touch_points(color_image_table, depth_image_table)
 
                 # Send the TUIO Bundle
                 self.tuio_server.send_tuio_bundle()
@@ -159,13 +158,19 @@ class VIGITIASensorProcessingController:
 
         for detected_object in detected_objects:
             if detected_object['label'] == 'orange':
-                component_id = 1000
+                component_id = 10000
             elif detected_object['label'] == 'banana':
-                component_id = 1001
+                component_id = 10001
             elif detected_object['label'] == 'carrot':
-                component_id = 1002
+                component_id = 10002
+            elif detected_object['label'] == 'cell phone':
+                component_id = 10003
+            elif detected_object['label'] == 'apple':
+                component_id = 10004
+            elif detected_object['label'] == 'donut':
+                component_id = 10005
             else:
-                component_id = 1003
+                component_id = 10006
 
             print(detected_object['width'], detected_object['height'])
 
@@ -174,8 +179,8 @@ class VIGITIASensorProcessingController:
                                                y_pos=detected_object['center_y'],
                                                angle=0)
 
-            self.tuio_server.add_bounding_box_message(s_id=component_id, x_pos=detected_object['center_x'],
-                                                      y_pos=detected_object['center_y'], angle=0,
+            self.tuio_server.add_bounding_box_message(s_id=component_id, x_pos=detected_object['x'],
+                                                      y_pos=detected_object['y'], angle=0,
                                                       width=detected_object['width'],
                                                       height=detected_object['height'], area=0)
 
