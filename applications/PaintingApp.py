@@ -27,7 +27,7 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
 
         self.show_touch_points = True
 
-        self.brushSize = 75
+        self.brushSize = 100
         self.brushColor = Qt.green
 
         # QPoint object to tract the point
@@ -52,7 +52,7 @@ class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
 
                 # set the pen of the painter
                 if brush.get_color() is not None:
-                    painter.setPen(QPen(brush.get_color(), 10))
+                    painter.setPen(QPen(brush.get_color(), 20))
                     # painter.setPen(QPen(brush.get_color(), self.brushSize, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
 
                     #painter.drawPoint(brush.get_pos(self))

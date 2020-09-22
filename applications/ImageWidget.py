@@ -80,8 +80,8 @@ class ImageWidget(QWidget, VIGITIABaseApplication):
 
                     self.label.setPixmap(pixmap)
 
-                global_pos = QPoint(int(token['x_pos'] / 1280 * 2560), int(token['y_pos'] / 720 * 1440))
-                local_pos = self.mapFromGlobal(global_pos)
+                #global_pos = QPoint(int(token['x_pos'] / 1280 * 2560), int(token['y_pos'] / 720 * 1440))
+                local_pos = self.mapFromGlobal(QPoint(token['x_pos'],token['y_pos']))
 
                 try:
                     self.label.move(local_pos.x() - self.label.width()/2, local_pos.y() - self.label.height()/2 + 500)

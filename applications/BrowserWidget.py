@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import os
 
 from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QPoint, QObject, QVariant, pyqtSlot
 from PyQt5.QtGui import QMouseEvent
@@ -25,7 +29,13 @@ class CallHandler(QObject):
 
 
 class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
+    """ BrowserWidget
 
+        Example application demonstrating how to display Webpages and local HTML Files on the table
+
+    """
+
+    # Flag to toggle visibility
     is_hidden = False
 
     def __init__(self, rendering_manager):
@@ -33,29 +43,30 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
         self.set_name(self.__class__.__name__)
         self.set_rendering_manager(rendering_manager)
 
-        self.x = 100
-        self.y = 600
-        self.width = 900
-        self.height = 600
+        self.x = 500
+        self.y = 300
+        self.width = 1000
+        self.height = 700
         self.rotation = 0
+        self.z_index = 100
 
         self.initUI()
 
+        self.connect_to_javascript_code()
+
+        url = QUrl('https://maps.google.com')
+
+        # Explanation on how to load a local HTML page
+        #url = QUrl.fromLocalFile(os.path.abspath(os.path.join(os.path.dirname(__file__), "index.html")))
+
+        self.load(url)
+
+    def connect_to_javascript_code(self):
         self.channel = QWebChannel()
         self.handler = CallHandler()
         self.channel.registerObject('handler', self.handler)
         self.page().setWebChannel(self.channel)
-
         self.loadFinished.connect(self.loadFinishedHandler)
-
-        web_url = QUrl('https://vigitia.de')
-        #local_html_url = QUrl.fromLocalFile(os.path.abspath(os.path.join(os.path.dirname(__file__), "index.html")))
-
-        self.load(web_url)
-
-        #layout = QVBoxLayout()
-        #self.setLayout(layout)
-        #layout.addWidget(self.web)
 
     def initUI(self):
         self.setGeometry(0, 0, self.width, self.height)
@@ -69,13 +80,12 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
     def js_callback(self, result):
         print('Python called back:', result)
 
+    # Use Touch events in the application: Convert the pointer messages to mouse click events
     def on_new_pointer_messages(self, messages):
         return
         for message in messages:
-            print('Pointer in Webview:', message)
 
-            global_pos = QPoint(int(message['x_pos'] / 1280 * 2560), int(message['y_pos'] / 720 * 1440))
-            local_pos = self.mapFromGlobal(global_pos)
+            local_pos = self.mapFromGlobal(QPoint(message['x_pos'], message['y_pos']))
 
             #target = self.focusProxy()
             target = self
@@ -96,20 +106,14 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
         # else:
         #     self.show()
 
+    #
     def emulate_mouse_event(self, event_type, local_pos, global_pos, target):
         mouse_event = QMouseEvent(event_type, local_pos, global_pos, Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
         try:
             QCoreApplication.sendEvent(target, mouse_event)
         except:
-            print('Touch in Webview not working')
+            print('[BrowserWidget]: Error on injecting Touch Event in BrowserWidget')
 
-    # def keyPressEvent(self, event):
-    #     if event.key() == Qt.Key_Escape:
-    #         self.close()
-
-
-# if __name__ == "__main__":
-#     app = QApplication(sys.argv)
-#     window = BrowserWidget()
-#     window.show()
-#     sys.exit(app.exec_())
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.close()
