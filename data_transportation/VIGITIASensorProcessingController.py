@@ -10,18 +10,14 @@ from sensors.cameras.realsense_D435_camera import RealsenseD435Camera
 
 from tuio20_client_server.TUIOServer import TUIOServer  # Import TUIO Server
 
-from calibration.table_surface_extractor import TableSurfaceExtractor
-
-from gstreamer.VIGITIAVideoStreamer import VIGITIAVideoStreamer  # Import VideoStreamer
+from services.table_surface_extractor import TableSurfaceExtractor
 
 from utility.get_ip import get_ip_address
 
 # Import Sensor Processing Services:
 from services.fiducials_detector import FiducialsDetector
-from services.movement_detector import MovementDetector
 from services.foreground_mask_extractor import ForegroundMaskExtractor
 from services.touch_detector import TouchDetector
-from services.table_detector import TableDetector
 from services.generic_object_detector import GenericObjectDetector
 from services.hand_tracker import HandTracker
 
@@ -31,7 +27,7 @@ TARGET_COMPUTER_IP = get_ip_address()
 
 TARGET_COMPUTER_PORT = 8000
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 
 class VIGITIASensorProcessingController:
@@ -100,7 +96,7 @@ class VIGITIASensorProcessingController:
             if color_image is not None:
                 self.frame_id += 1
 
-                # Preprocess camera frames
+                # Pre-process camera frames
                 color_image_table = self.table_surface_extractor.extract_table_area(color_image)
                 depth_image_table = self.table_surface_extractor.extract_table_area(depth_image)
 
@@ -108,19 +104,14 @@ class VIGITIASensorProcessingController:
                     # Preview frames
                     cv2.imshow('color_image_table', color_image_table)
 
-                # Start TUIO Bundle
+                # Start a new TUIO Bundle for the current frame
                 self.tuio_server.start_tuio_bundle(dimension=self.dimension, source=self.source)
 
                 # Stream Frames
                 #self.stream_frames(color_image, color_image_table, depth_image)
 
                 # Run Sensor Processing Services. They all add their data to the TUIO Bundle
-                foreground_mask = self.get_foreground_mask(color_image_table)
-
-                #self.get_detected_objects(color_image_table.copy(), foreground_mask)
-                self.get_aruco_markers(color_image_table)
-                #self.get_movements(color_image_table)
-                self.get_touch_points(color_image_table, depth_image_table)
+                self.run_sensor_processing_services(color_image, color_image_table, depth_image, depth_image_table)
 
                 # Send the TUIO Bundle
                 self.tuio_server.send_tuio_bundle()
@@ -138,6 +129,15 @@ class VIGITIASensorProcessingController:
             if key & 0xFF == ord('q') or key == 27:
                 cv2.destroyAllWindows()
                 break
+
+    # Call all selected sensor processing services for the current frame
+    def run_sensor_processing_services(self, color_image, color_image_table, depth_image, depth_image_table):
+        foreground_mask = self.get_foreground_mask(color_image_table)
+        # cv2.imshow('Binary Mask', foreground_mask)
+
+        self.get_aruco_markers(color_image_table)
+        # self.get_detected_objects(color_image_table.copy(), foreground_mask)
+        self.get_touch_points(color_image_table, depth_image_table)
 
     # This function handles the streaming of all video frames
     def stream_frames(self, color_image, color_image_table, depth_image):
@@ -202,6 +202,7 @@ class VIGITIASensorProcessingController:
                                                       width=0,
                                                       height=0, area=0)
 
+    # Call the MovementDetectionService that finds areas where movement is happening above the table
     def get_movements(self, color_image_table):
         movements = self.movement_detector.detect_movement(color_image_table)
 
@@ -213,28 +214,33 @@ class VIGITIASensorProcessingController:
                                                       width=movement['bounding_rect_width'],
                                                       height=movement['bounding_rect_height'], area=0)
 
+    # Find touch points on the table
     def get_touch_points(self, color_image_table, depth_image_table):
         touch_points = []
-        # Only every other frame to improve performance
+
+        # Use the CNN Hand tracker only every other frame to improve performance
         if self.frame_id % 2 == 0:
             # TODO: Find solution for this temporary fix of ghost hands
             self.hand_tracker.reset()
             detected_hands = self.hand_tracker(cv2.cvtColor(color_image_table, cv2.COLOR_BGR2RGB))
             hands, hand_regions = self.hand_tracker.add_hand_tracking_points(color_image_table.copy(), detected_hands)
-            cv2.imshow('hands', hands)
+            if DEBUG_MODE:
+                cv2.imshow('hands', hands)
 
             self.detected_hands = detected_hands
             self.hand_regions = hand_regions
 
+        # Find the touch points using the TouchDetectionService
         touch_points = self.touch_detector.get_touch_points(color_image_table, depth_image_table, self.hand_regions, self.detected_hands)
 
+        # Send out a TUIO pointer message for each touch point
         for touch_point in touch_points:
-            # print(touch_point)
-            # TODO: Correct IDs
+            # TODO: Add correct Type/User and Component ID
             self.tuio_server.add_pointer_message(s_id=touch_point.id, tu_id=0, c_id=0, x_pos=touch_point.x,
                                                  y_pos=touch_point.y, angle=0, shear=0, radius=0,
                                                  press=touch_point.is_touching)
 
+    # Use the calibration data to extract the table area from the camera frame
     def get_table_border(self):
         table_border = self.table_surface_extractor.get_table_border()
         return table_border
