@@ -112,15 +112,15 @@ class VIGITIASensorProcessingController:
                 self.tuio_server.start_tuio_bundle(dimension=self.dimension, source=self.source)
 
                 # Stream Frames
-                self.stream_frames(color_image, color_image_table, depth_image)
+                #self.stream_frames(color_image, color_image_table, depth_image)
 
                 # Run Sensor Processing Services. They all add their data to the TUIO Bundle
                 foreground_mask = self.get_foreground_mask(color_image_table)
 
-                self.get_detected_objects(color_image_table.copy(), foreground_mask)
+                #self.get_detected_objects(color_image_table.copy(), foreground_mask)
                 self.get_aruco_markers(color_image_table)
                 #self.get_movements(color_image_table)
-                #self.get_touch_points(color_image_table, depth_image_table)
+                self.get_touch_points(color_image_table, depth_image_table)
 
                 # Send the TUIO Bundle
                 self.tuio_server.send_tuio_bundle()
@@ -139,23 +139,26 @@ class VIGITIASensorProcessingController:
                 cv2.destroyAllWindows()
                 break
 
+    # This function handles the streaming of all video frames
     def stream_frames(self, color_image, color_image_table, depth_image):
-        pass
-        # self.tuio_server.add_data_message(0, 'video', 'Intel Realsense D435 RGB table local', 1280, 720, 5000)
-        # self.tuio_server.add_data_message(0, 'video', 'Intel Realsense D435 RGB full local', 1280, 720, 5001)
+        # Send TUIO data messages to let the SensorDataInterface on the Target Computer know that new frames are coming
+        self.tuio_server.add_data_message(0, 'video', 'Intel Realsense D435 RGB table local', 1280, 720, 5000)
+        self.tuio_server.add_data_message(0, 'video', 'Intel Realsense D435 RGB full local', 1280, 720, 5001)
 
-        # self.video_streamer.stream_frame(color_image_table)
-        # self.video_streamer_two.stream_frame(color_image)
+        # Stream the frames using the correct instance of the sensor processing controller
+        self.video_streamer.stream_frame(color_image_table)
+        self.video_streamer_two.stream_frame(color_image)
 
+    # Some SensorProcessingServices need the foreground mask. Request it here and pass it over to them.
     def get_foreground_mask(self, color_image_table):
         mask = self.foreground_mask_extractor.get_foreground_mask_otsu(color_image_table)
-        # if DEBUG_MODE:
-        #     cv2.imshow('otsu', mask)
         return mask
 
+    # Get data from the GenericObjectDetectionService and convert it to TUIO messages
     def get_detected_objects(self, color_image_table, foreground_mask):
         detected_objects = self.generic_object_detector.detect_generic_objects(color_image_table, foreground_mask)
 
+        # Give each object an ID
         for detected_object in detected_objects:
             if detected_object['label'] == 'orange':
                 component_id = 10000
@@ -172,8 +175,7 @@ class VIGITIASensorProcessingController:
             else:
                 component_id = 10006
 
-            print(detected_object['width'], detected_object['height'])
-
+            # Send out information as TUIO Messages
             self.tuio_server.add_token_message(s_id=component_id, tu_id=0, c_id=component_id,
                                                x_pos=detected_object['center_x'],
                                                y_pos=detected_object['center_y'],
@@ -234,8 +236,8 @@ class VIGITIASensorProcessingController:
                                                  press=touch_point.is_touching)
 
     def get_table_border(self):
-        pass
-        # self.table_border = self.table_surface_extractor.get_table_border()
+        table_border = self.table_surface_extractor.get_table_border()
+        return table_border
 
 
 def main():

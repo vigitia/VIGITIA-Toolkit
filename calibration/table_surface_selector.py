@@ -8,8 +8,22 @@ import configparser
 from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
 from sensors.cameras.realsense_D435_camera import RealsenseD435Camera
 
+CIRCLE_DIAMETER = 5
+CIRCLE_COLOR_OLD = (0, 0, 255)
+CIRCLE_COLOR_NEW = (0, 255, 0)
+FONT_COLOR = (0, 0, 255)
+HINT = 'Click on each of the four corners of the table'
+
+CONFIG_FILE_NAME = 'config.ini'
+
 
 class TableSurfaceSelector:
+    """ TableSurfaceSelector
+
+        This class allows you to select the corners of the table using a simple GUI.
+        This will be needed to rectify the camera images, extract the table area and calibrate the system.
+
+    """
 
     last_mouse_click_coordinates = []
 
@@ -20,32 +34,36 @@ class TableSurfaceSelector:
     table_corner_bottom_right = (0, 0)
 
     def __init__(self):
-        self.camera = RealsenseD435Camera()
-        self.camera.init_video_capture()
-        self.camera.start()
+        self.init_camera()
 
         self.read_config_file()
         self.init_opencv()
         self.loop()
 
+    def init_camera(self):
+        self.camera = RealsenseD435Camera()
+        self.camera.init_video_capture()
+        self.camera.start()
+
     def init_opencv(self):
-        cv2.namedWindow('realsense', cv2.WINDOW_AUTOSIZE)
+        cv2.namedWindow('Calibration Mode', cv2.WINDOW_AUTOSIZE)
 
         # Set mouse callbacks to extract the coordinates of clicked spots in the image
-        cv2.setMouseCallback('realsense', self.on_mouse_click)
+        cv2.setMouseCallback('Calibration Mode', self.on_mouse_click)
 
     # Log mouse click positions to the console
     def on_mouse_click(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
             print((x, y))
             self.last_mouse_click_coordinates.append((x, y))
+            # Reset list after four clicks
             if len(self.last_mouse_click_coordinates) > 4:
                 self.last_mouse_click_coordinates = []
 
     # In the config file, info like the table corner coordinates are stored
     def read_config_file(self):
         config = configparser.ConfigParser()
-        config.read('config.ini')
+        config.read(CONFIG_FILE_NAME)
         print(config.sections())
 
         if len(config.sections()) > 0:
@@ -55,9 +73,9 @@ class TableSurfaceSelector:
             self.table_corner_bottom_left = make_tuple(config['CORNERS']['CornerBottomLeft'])
             self.table_corner_bottom_right = make_tuple(config['CORNERS']['CornerBottomRight'])
 
-            print('Successfully read data from config file')
+            print('[Calibration Mode]: Successfully read data from config file')
         else:
-            print('Error reading data from config file')
+            print('[Calibration Mode]: Error reading data from config file')
 
     # Streaming loop
     def loop(self):
@@ -67,7 +85,7 @@ class TableSurfaceSelector:
             if color_image is not None:
                 self.display_mode_calibration(color_image)
             else:
-                print("No color image")
+                print("[Calibration Mode]: Please wait until camera is ready...")
 
             key = cv2.waitKey(1)
             # Press esc or 'q' to close the image window
@@ -76,31 +94,26 @@ class TableSurfaceSelector:
                 break
 
     def display_mode_calibration(self, color_image):
-        print("In calibration mode")
         # Show circles of previous coordinates
-
-        DIAMETER = 5
-        CIRCLE
-
-        cv2.circle(color_image, self.table_corner_top_left, DIAMETER, (0, 0, 255), -1)
-        cv2.circle(color_image, self.table_corner_top_right, DIAMETER, (0, 0, 255), -1)
-        cv2.circle(color_image, self.table_corner_bottom_left, DIAMETER, (0, 0, 255), -1)
-        cv2.circle(color_image, self.table_corner_bottom_right, DIAMETER, (0, 0, 255), -1)
+        cv2.circle(color_image, self.table_corner_top_left, CIRCLE_DIAMETER, CIRCLE_COLOR_OLD, -1)
+        cv2.circle(color_image, self.table_corner_top_right, CIRCLE_DIAMETER, CIRCLE_COLOR_OLD, -1)
+        cv2.circle(color_image, self.table_corner_bottom_left, CIRCLE_DIAMETER, CIRCLE_COLOR_OLD, -1)
+        cv2.circle(color_image, self.table_corner_bottom_right, CIRCLE_DIAMETER, CIRCLE_COLOR_OLD, -1)
 
         # Draw circles for clicks in a different color to mark the new points
         for coordinate in self.last_mouse_click_coordinates:
-            cv2.circle(color_image, coordinate, 2, (0, 255, 0), -1)
+            cv2.circle(color_image, coordinate, CIRCLE_DIAMETER, CIRCLE_COLOR_NEW, -1)
 
-        cv2.putText(img=color_image, text='Calibration Mode - Press on each of the four corners of the table (' +
-                                          str(len(self.last_mouse_click_coordinates)) + '/4)',
-                    org=(int(color_image.shape[1] / 6), int(color_image.shape[0] / 2)),
-                    fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255))
+        # Add text to explain what to do
+        cv2.putText(img=color_image, text=HINT + ' (' + str(len(self.last_mouse_click_coordinates)) + '/4)',
+                    org=(int(color_image.shape[1] / 6), int(color_image.shape[0] / 8)),
+                    fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=1, color=(0, 0, 255))
 
         if len(self.last_mouse_click_coordinates) == 4:
-            print('Calibrated')
+            print('[Calibration Mode]: Calibrated')
             self.update_table_corner_calibration()
 
-        cv2.imshow('realsense', color_image)
+        cv2.imshow('Calibration Mode', color_image)
 
     def update_table_corner_calibration(self):
         # Order coordinates by x value
@@ -127,16 +140,15 @@ class TableSurfaceSelector:
                              'CornerBottomLeft': str(self.table_corner_bottom_left),
                              'CornerBottomRight': str(self.table_corner_bottom_right)}
 
-        with open('config.ini', 'w') as configfile:
+        with open(CONFIG_FILE_NAME, 'w') as configfile:
             config.write(configfile)
 
         self.camera.stop()
         cv2.destroyAllWindows()
         sys.exit(0)
 
-
     def project_targets_on_table(self):
-        # TODO: Project Targets on table and let a user click them. Then we have points that lie for sure on the table surface
+        # TODO: Project Targets on table and let a user click them.
         pass
 
 
