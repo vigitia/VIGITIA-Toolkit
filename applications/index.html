@@ -11,7 +11,8 @@
 
 <body>
   <div class="container">
-    <h1>Hi!</h1>
+    <h1>Example Website demonstrating how to embed local HTML Files in the Toolkit!</h1>
+    <h1>Check the source code to see how to send data between the Toolkit and JavaScript code</h1>
   </div>
   <script language="JavaScript">
         function pythonToJS(message) {
@@ -23,9 +24,8 @@
 
         new QWebChannel(qt.webChannelTransport, function (channel) {
           window.handler = channel.objects.handler;
-          handler.message_from_javascript('hello!');
-          handler.message_from_javascript('world!');
-          handler.test(function(retVal) {
+          handler.message_from_javascript('Hello World!');
+          handler.sent_message_to_javascript(function(retVal) {
             // console.error as console.log message don't show up in the python console
             console.error(JSON.stringify(retVal));
           })

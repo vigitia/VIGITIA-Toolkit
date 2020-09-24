@@ -20,7 +20,7 @@ from core.VIGITIABaseApplication import VIGITIABaseApplication
 class CallHandler(QObject):
 
     @pyqtSlot(result=QVariant)
-    def test(self):
+    def sent_message_to_javascript(self):
         print('call received')
         return QVariant({"abc": "def", "ab": 22})
 
@@ -53,18 +53,19 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
         self.rotation = 0
         self.z_index = 10000
 
-        # Prevent ESC from beeing blocked by BrowserWidget (https://stackoverflow.com/questions/56890831/qwidget-cannot-catch-escape-backspace-or-c-x-key-press-events)
+        # Prevent ESC from beeing blocked by BrowserWidget
+        # https://stackoverflow.com/questions/56890831/qwidget-cannot-catch-escape-backspace-or-c-x-key-press-events
         QShortcut(QKeySequence("Escape"), self, activated=self.on_Escape)
 
         self.initUI()
 
         # Uncomment this line to establish connection to js code
-        #self.connect_to_javascript_code()
+        self.connect_to_javascript_code()
 
         # Define url or local index.html path here
         url = QUrl('https://maps.google.com')
         # Explanation on how to load a local HTML page
-        #url = QUrl.fromLocalFile(os.path.abspath(os.path.join(os.path.dirname(__file__), "index.html")))
+        # url = QUrl.fromLocalFile(os.path.abspath(os.path.join(os.path.dirname(__file__), "index.html")))
 
         self.load(url)
 
@@ -123,5 +124,4 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
 
     @pyqtSlot()
     def on_Escape(self):
-        print("Escape")
         self.rendering_manager.close_window()
