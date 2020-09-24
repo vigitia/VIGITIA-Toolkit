@@ -66,7 +66,6 @@ class VIGITIASensorDataInterface:
         self.init_tuio_interface()
 
     def register_subscriber(self, new_subscriber):
-        print('New Subscriber:', new_subscriber.__class__.__name__)
         self.subscribers.add(new_subscriber)
 
     def unregister_subscriber(self, subscriber):

@@ -57,7 +57,7 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
         self.initUI()
 
         # Uncomment this line to establish connection to js code
-        self.connect_to_javascript_code()
+        # self.connect_to_javascript_code()
 
         # Define url or local index.html path here
         url = QUrl('https://maps.google.com')
@@ -94,8 +94,6 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
 
             #target = self.focusProxy()
             target = self
-
-            print(global_pos)
 
             self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
             self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)

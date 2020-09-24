@@ -9,7 +9,7 @@ from PyQt5.QtCore import *
 from VIGITIA_toolkit.core.VIGITIABaseApplication import VIGITIABaseApplication
 
 
-class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):
+class PaintingWidget(QMainWindow, VIGITIABaseApplication):
     def __init__(self, rendering_manager):
         super().__init__()
         self.set_name(self.__class__.__name__)

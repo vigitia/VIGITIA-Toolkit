@@ -27,8 +27,8 @@ APPLICATION_PARENT_CLASS = 'VIGITIABaseApplication'
 DEBUG_MODE = False
 
 # Add the names of all applications that you dont want to render to this list
-#BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'VIGITIAPaintingApp', 'ButtonWidget']
-BLACKLIST = ['ImageWidget', 'VideoWidget', 'ButtonWidget', 'NutritionalValues', 'Patterns']
+#BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'PaintingWidget', 'ButtonWidget']
+BLACKLIST = ['ImageWidget', 'VideoWidget', 'ButtonWidget', 'Patterns', 'PaintingWidget', 'BrowserWidget']
 
 
 class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
@@ -128,7 +128,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
         # TODO: Combine with update applications function
         for application in self.applications:
-            print('[VIGITIARenderingManager]: Placing {} on canvas.'.format(application['name']))
+            print('[VIGITIARenderingManager]: Placing Application "{}" on canvas.'.format(application['name']))
 
             application['instance'].setGeometry(0, 0, application['instance'].get_width(),
                                                 application['instance'].get_height())
@@ -180,8 +180,6 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
                 application['instance'].raise_()
             else:
                 application['parent'].raise_()
-
-        print(list_of_z_indexes)
 
     # Based on https://stackoverflow.com/questions/58020983/rotate-the-widget-for-some-degree
     def rotate_applicaton(self, application):
@@ -253,7 +251,6 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
                     # Check if the class has the required superclass
                     for superclass in superclasses:
                         if superclass.__name__ == APPLICATION_PARENT_CLASS:
-                            # print('"{}" in Module "{}" is a VIGITIA Application'.format(class_name, module_name))
 
                             if class_name not in BLACKLIST:
 

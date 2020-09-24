@@ -9,8 +9,15 @@ from PyQt5.QtWidgets import QWidget, QLabel
 
 from VIGITIA_toolkit.core.VIGITIABaseApplication import VIGITIABaseApplication
 
+# Constants for smoothing detected object positions
+MAX_TIME_MISSING_MS = 1000  # Remove a displayed NutriScore if object is missing for more than the given time in ms
+SMOOTHING_FACTOR = 0.7  # Value between 0 and 1, depending if the old or the new value should count more.
+
+
 class NutritionalValues(QWidget, VIGITIABaseApplication):
     """ NutritionalValues
+
+        This class displays Nutritional infos for detected objects on the table
 
     """
 
@@ -32,30 +39,22 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
 
         self.image = QImage(self.size(), QImage.Format_ARGB32)
 
+        # A list to keep track of all displayed nutritional scores
         self.nutri_scores = []
 
+        # Init for all objects that should be detected
         self.nutri_score_banana = NutriScore(self, 0, 0, 'Banane', '115kcal', '26,4g', '1,2g', '0,2g')
         self.nutri_score_orange = NutriScore(self, 0, 0, 'Orange', '56kcal', '10,7g', '1,3g', '0,3g')
         self.nutri_score_carrot = NutriScore(self, 0, 0, 'Karotte', '32kcal', '7,2g', '0,8g', '0,0g')
         self.nutri_score_apple = NutriScore(self, 0, 0, 'Apfel', '65kcal', '14,3g', '0,4g', '0,5g')
         self.nutri_score_donut = NutriScore(self, 0, 0, 'Donut', '201kcal', '19,5g', '3,5g', '11,5g')
+
+        # Hide the widgets and only show them if the object is detected
         self.nutri_score_banana.hide()
         self.nutri_score_orange.hide()
         self.nutri_score_carrot.hide()
         self.nutri_score_apple.hide()
         self.nutri_score_donut.hide()
-
-        self.smartphone_widget = Smartphone(self, 0, 0)
-        self.smartphone_widget.hide()
-        self.smartphone = {
-            'x': 0,
-            'y': 0,
-            'width': 0,
-            'height': 0,
-            'last_time_seen': 0,
-            'hidden': True,
-            'widget': self.smartphone_widget
-        }
 
         self.nutri_scores.append({
             'id': 10000,
@@ -112,39 +111,47 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
             'widget': self.nutri_score_donut
         })
 
+        # Load the smartphone widget component
+        self.smartphone_widget = Smartphone(self, 0, 0)
+        self.smartphone_widget.hide()
+        self.smartphone = {
+            'x': 0,
+            'y': 0,
+            'width': 0,
+            'height': 0,
+            'last_time_seen': 0,
+            'hidden': True,
+            'widget': self.smartphone_widget
+        }
+
+        # Loading everything finished
         self.running = True
 
+    # Clear everything that has been painted on the screen
     def reset_image(self):
         self.image.fill(Qt.transparent)
 
+    # Draw a circle around detected objects
     def draw_circle(self, x, y, width, height):
         painter = QPainter(self.image)
         painter.setPen(QPen(QColor(255, 255, 255, 150), 10, Qt.SolidLine))
         painter.drawEllipse(x, y, width, height)
-        #painter.drawLine(int(x + width/2), int(y + height/2), x + width, 200)
 
-    # paint event
+    # Function for handling Qt Paint Events to draw on the canvas
     def paintEvent(self, event):
-        # create a canvas
+        # Create a canvas
         canvasPainter = QPainter(self)
 
         # draw rectangle  on the canvas
         canvasPainter.drawImage(self.rect(), self.image, self.image.rect())
 
-    def add_widget(self):
-        self.moveToThread(self.rendering_manager)
-        NutriScore(self, 100, 100)
-
+    # This function will be automatically called by the SensorDataInterface if new data is available
     def on_new_tuio_bundle(self, data):
         if self.running:
 
-            print(data['bounding_boxes'])
             bounding_boxes = data['bounding_boxes']
 
             now = int(round(time.time() * 1000))
-
-            MAX_TIME_MISSING_MS = 1000
-            SMOOTHING_FACTOR = 0.7  # Value between 0 and 1, depending if the old or the new value should count more.
 
             ids_food = [10000, 10001, 10002, 10004, 10005]
             id_smartphone = 10003
@@ -193,11 +200,13 @@ class NutritionalValues(QWidget, VIGITIABaseApplication):
                     self.smartphone['widget'].move(int(self.smartphone['x'] + self.smartphone['width'] * 0.75), self.smartphone['y'])
 
 
+# Class for loading the Nutriscore widget
 class NutriScore(QWidget):
 
     WIDTH = 500
     HEIGHT = 500
 
+    # Pass its parent, coordinates and data that should be displayed on init
     def __init__(self, parent, x, y, item_name, calories, carbohydrates, protein, fat):
         super(NutriScore, self).__init__(parent)
 
@@ -216,12 +225,14 @@ class NutriScore(QWidget):
         self.setGeometry(self.x, self.y, self.WIDTH, self.HEIGHT)
         uic.loadUi(os.path.abspath(os.path.join(os.path.dirname(__file__), 'NutriScore.ui')), self)
 
+        # Find the labeles in the UI by name
         self.label_name = self.findChild(QLabel, 'name')
         self.label_calories = self.findChild(QLabel, 'calories')
         self.label_carbohydrates = self.findChild(QLabel, 'carbohydrates')
         self.label_protein = self.findChild(QLabel, 'protein')
         self.label_fat = self.findChild(QLabel, 'fat')
 
+    # Update the label values
     def init_values(self):
         self.label_name.setText(self.item_name)
         self.label_calories.setText(self.calories_name)
@@ -230,10 +241,12 @@ class NutriScore(QWidget):
         self.label_fat.setText(self.fat_name)
 
 
+# Class for loading the smartphone widget from the UI file
 class Smartphone(QWidget):
     WIDTH = 400
     HEIGHT = 600
 
+    # Pass its parent and coordinates on init
     def __init__(self, parent, x, y):
         super(Smartphone, self).__init__(parent)
 
@@ -242,22 +255,25 @@ class Smartphone(QWidget):
 
         self.initUI()
 
-        self.thread = Thread(self)
+        # Init a new thread for a constant update of the current time
+        self.thread = TimeUpdaterThread(self)
         self.thread.start()
 
     def initUI(self):
         self.setGeometry(self.x, self.y, self.WIDTH, self.HEIGHT)
+        # Load the UI file
         uic.loadUi(os.path.abspath(os.path.join(os.path.dirname(__file__), 'Smartphone.ui')), self)
 
         self.label_time = self.findChild(QLabel, 'time')
 
+    # Call this function to update the displayed time
     def set_time(self):
         now = datetime.now()
         time_string = now.strftime('%H:%M:%S')
         self.label_time.setText(time_string)
 
-
-class Thread(QThread):
+# This thread updates the displayed clock in the smartphone widget
+class TimeUpdaterThread(QThread):
 
     def __init__(self, smartphone):
         QThread.__init__(self)
