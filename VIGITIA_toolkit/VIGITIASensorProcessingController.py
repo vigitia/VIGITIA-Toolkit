@@ -7,21 +7,21 @@ import time
 
 import cv2
 
-from data_transportation.VIGITIAVideoStreamer import VIGITIAVideoStreamer
-from sensors.cameras.realsense_D435_camera import RealsenseD435Camera
+from VIGITIA_toolkit.data_transportation.VIGITIAVideoStreamer import VIGITIAVideoStreamer
+from VIGITIA_toolkit.sensors.cameras.realsense_D435_camera import RealsenseD435Camera
 
-from data_transportation.TUIOServer import TUIOServer  # Import TUIO Server
+from VIGITIA_toolkit.data_transportation.TUIOServer import TUIOServer  # Import TUIO Server
 
-from sensor_processing_services.TableExtractionService import TableSurfaceExtractor
+from VIGITIA_toolkit.sensor_processing_services.TableExtractionService import TableSurfaceExtractor
 
-from utility.get_ip import get_ip_address
+from VIGITIA_toolkit.utility.get_ip import get_ip_address
 
 # Import Sensor Processing Services:
-from sensor_processing_services.FiducialsDetectionService import FiducialsDetectionService
-from sensor_processing_services.BackgroundSubstractionService import ForegroundMaskExtractor
-from sensor_processing_services.TouchDetectionService import TouchDetectionService
-from sensor_processing_services.ObjectDetectionService import ObjectDetectionService
-from sensor_processing_services.HandLandmarkDetectionService import HandLandmarkDetectionService
+from VIGITIA_toolkit.sensor_processing_services.FiducialsDetectionService import FiducialsDetectionService
+from VIGITIA_toolkit.sensor_processing_services.BackgroundSubstractionService import ForegroundMaskExtractor
+from VIGITIA_toolkit.sensor_processing_services.TouchDetectionService import TouchDetectionService
+from VIGITIA_toolkit.sensor_processing_services.ObjectDetectionService import ObjectDetectionService
+from VIGITIA_toolkit.sensor_processing_services.HandLandmarkDetectionService import HandLandmarkDetectionService
 
 # TODO: Allow multiple
 TARGET_COMPUTER_IP = get_ip_address()
@@ -29,7 +29,7 @@ TARGET_COMPUTER_IP = get_ip_address()
 
 TARGET_COMPUTER_PORT = 8000
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 
 class VIGITIASensorProcessingController:

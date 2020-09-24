@@ -6,7 +6,7 @@ import cv2
 import configparser
 # https://stackoverflow.com/questions/9763116/parse-a-tuple-from-a-string
 from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
-from sensors.cameras.realsense_D435_camera import RealsenseD435Camera
+from VIGITIA_toolkit.sensors.cameras import RealsenseD435Camera
 
 CIRCLE_DIAMETER = 5
 CIRCLE_COLOR_OLD = (0, 0, 255)

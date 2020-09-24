@@ -13,7 +13,7 @@ import numpy as np
 import threading
 
 # Camera Settings
-from core.VIGITIACameraBase import VIGITIACameraBase
+from VIGITIA_toolkit.core.VIGITIACameraBase import VIGITIACameraBase
 
 DEPTH_RES_X = 1280
 DEPTH_RES_Y = 720
@@ -87,8 +87,8 @@ class RealsenseD435Camera(VIGITIACameraBase):
             self.decimation_filter = rs.decimation_filter()
             self.temporal_filter = rs.temporal_filter()
         except Exception as e:
-            print('[RealSense D435]: ERROR:', e, file=sys.stderr)
-            print('[RealSense D435]: Could not initialize camera. If the resource is busy, check if any other script '
+            print('[RealsenseD435Camera]: ERROR:', e, file=sys.stderr)
+            print('[RealsenseD435Camera]: Could not initialize camera. If the resource is busy, check if any other script '
                   'is currently accessing the camera. If this is not the case, replug the camera and try again.',
                   file=sys.stderr)
             sys.exit(0)
@@ -109,7 +109,6 @@ class RealsenseD435Camera(VIGITIACameraBase):
 
     def start(self):
         if self.started:
-            print('Already running')
             return None
         else:
             self.started = True
@@ -119,13 +118,13 @@ class RealsenseD435Camera(VIGITIACameraBase):
             return self
 
     def update(self):
-        print('[RealSense D435]: Skip first ' + str(NUM_FRAMES_WAIT_INITIALIZING) +
+        print('[RealsenseD435Camera]: Skip first ' + str(NUM_FRAMES_WAIT_INITIALIZING) +
               ' frames to allow Auto White Balance to adjust')
 
         while self.started:
             self.num_frame += 1
             if DEBUG_MODE:
-                print('[RealSense D435]: Frame ', self.num_frame)
+                print('[RealsenseD435Camera]: Frame ', self.num_frame)
 
             # Get frameset of color and depth
             frames = self.pipeline.wait_for_frames()

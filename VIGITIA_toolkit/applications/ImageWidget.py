@@ -6,7 +6,7 @@ from PyQt5.QtCore import QThread, Qt, QPoint
 from PyQt5.QtWidgets import QWidget, QLabel
 from PyQt5.QtGui import QPixmap, QTransform
 
-from core.VIGITIABaseApplication import VIGITIABaseApplication
+from VIGITIA_toolkit.core.VIGITIABaseApplication import VIGITIABaseApplication
 
 
 class Thread(QThread):

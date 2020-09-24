@@ -3,11 +3,11 @@ import time
 from datetime import datetime
 
 from PyQt5 import uic
-from PyQt5.QtCore import Qt, QPoint, QThread
-from PyQt5.QtGui import QImage, QPainter, QPen, QBrush, QColor
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PyQt5.QtCore import Qt, QThread
+from PyQt5.QtGui import QImage, QPainter, QPen, QColor
+from PyQt5.QtWidgets import QWidget, QLabel
 
-from core.VIGITIABaseApplication import VIGITIABaseApplication
+from VIGITIA_toolkit.core.VIGITIABaseApplication import VIGITIABaseApplication
 
 class NutritionalValues(QWidget, VIGITIABaseApplication):
     """ NutritionalValues

@@ -1,5 +1,5 @@
 
-from core.VIGITIASensorDataInterface import VIGITIASensorDataInterface
+from VIGITIA_toolkit.core.VIGITIASensorDataInterface import VIGITIASensorDataInterface
 
 
 class VIGITIABaseApplication:

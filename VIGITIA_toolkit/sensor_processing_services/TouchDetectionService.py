@@ -4,10 +4,9 @@
 import numpy as np
 import cv2
 import imutils
-import configparser
 from scipy.spatial import distance
 
-from sensor_processing_services.BackgroundSubstractionService import ForegroundMaskExtractor
+from VIGITIA_toolkit.sensor_processing_services.BackgroundSubstractionService import ForegroundMaskExtractor
 # from calibration.table_surface_extractor import TableSurfaceExtractor
 
 MIN_DIST_TOUCH = 3  # mm

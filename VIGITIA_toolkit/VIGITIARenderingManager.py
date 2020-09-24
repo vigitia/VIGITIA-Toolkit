@@ -3,7 +3,6 @@ import traceback
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
-from PyQt5.QtWebEngineWidgets import *
 import sys
 import os
 from os import listdir
@@ -12,7 +11,11 @@ from os.path import isfile, join
 from importlib import import_module
 import pyclbr
 
-from core.VIGITIABaseApplication import VIGITIABaseApplication
+# The following import needs to be present otherwise the rendering manager will throw an error
+# from PyQt5.QtWebEngineWidgets import *
+from PyQt5.QtWebEngineWidgets import *
+
+from VIGITIA_toolkit.core.VIGITIABaseApplication import VIGITIABaseApplication
 
 # Folder path to search for applications
 APPLICATIONS_BASE_FOLDER = 'applications'
@@ -25,7 +28,7 @@ DEBUG_MODE = False
 
 # Add the names of all applications that you dont want to render to this list
 #BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'VIGITIAPaintingApp', 'ButtonWidget']
-BLACKLIST = ['ImageWidget', 'VideoWidget', 'ButtonWidget', 'NutritionalValues']
+BLACKLIST = ['ImageWidget', 'VideoWidget', 'ButtonWidget', 'NutritionalValues', 'Patterns']
 
 
 class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):

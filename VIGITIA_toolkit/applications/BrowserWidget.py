@@ -1,16 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
-import sys
-
 from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QPoint, QObject, QVariant, pyqtSlot, QEvent
 from PyQt5.QtGui import QMouseEvent, QKeySequence
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtWidgets import QShortcut
 
-from core.VIGITIABaseApplication import VIGITIABaseApplication
+from VIGITIA_toolkit.core.VIGITIABaseApplication import VIGITIABaseApplication
 
 # Communication between javascript and Python based on https://gist.github.com/mphuie/63e964e9ff8ae25d16a949389392e0d7
 # and https://doc.qt.io/qt-5/qtwebengine-webenginewidgets-contentmanipulation-example.html
@@ -50,8 +47,8 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
         self.y = 300
         self.width = 1000
         self.height = 700
-        self.rotation = 0
-        self.z_index = 10000
+        self.rotation = 315
+        self.z_index = 100
 
         # Prevent ESC from beeing blocked by BrowserWidget
         # https://stackoverflow.com/questions/56890831/qwidget-cannot-catch-escape-backspace-or-c-x-key-press-events

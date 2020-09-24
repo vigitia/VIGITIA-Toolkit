@@ -1,6 +1,5 @@
 
 # Example for a custom Widget with a transparent background
-import os
 import random
 import sys
 
@@ -9,7 +8,7 @@ from PyQt5.QtCore import QPoint, Qt
 from PyQt5.QtGui import QMouseEvent
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 
-from core.VIGITIABaseApplication import VIGITIABaseApplication
+from VIGITIA_toolkit.core.VIGITIABaseApplication import VIGITIABaseApplication
 
 
 class ButtonWidget(QWidget, VIGITIABaseApplication):
