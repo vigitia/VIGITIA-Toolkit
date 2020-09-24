@@ -1,0 +1,37 @@
+<!-- Source: https://gist.github.com/mphuie/63e964e9ff8ae25d16a949389392e0d7 -->
+<html>
+<head>
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <style>
+      ::selection {
+        background:transparent;
+      }
+    </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Example Website demonstrating how to embed local HTML Files in the Toolkit!</h1>
+    <h1>Check the source code to see how to send data between the Toolkit and JavaScript code</h1>
+  </div>
+  <script language="JavaScript">
+        function pythonToJS(message) {
+            console.error('In pythonToJS()');
+            console.error(message);
+
+            return JSON.stringify('Hi from Javascript');
+        };
+
+        new QWebChannel(qt.webChannelTransport, function (channel) {
+          window.handler = channel.objects.handler;
+          handler.message_from_javascript('Hello World!');
+          handler.sent_message_to_javascript(function(retVal) {
+            // console.error as console.log message don't show up in the python console
+            console.error(JSON.stringify(retVal));
+          })
+
+        });
+      </script>
+
+</body>
+</html>

@@ -1,0 +1,2 @@
+TODO: Remove the "anchors.cvs", "hand_landmark.tflite" and "palm_detection.tflite" files and link to the GitHub Repo where they are from:
+https://github.com/metalwhale/hand_tracking/
