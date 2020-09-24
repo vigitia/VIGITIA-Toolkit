@@ -165,6 +165,6 @@ old/vigitia_hand-tracker/config.ini
 
 *.ini
 
-tuio20_client_server/background_average.npy
+data_transportation/background_average.npy
 
-tuio20_client_server/background_standard_deviation.npy
+data_transportation/background_standard_deviation.npy
