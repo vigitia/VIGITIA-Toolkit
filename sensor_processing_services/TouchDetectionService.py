@@ -7,7 +7,7 @@ import imutils
 import configparser
 from scipy.spatial import distance
 
-from services.foreground_mask_extractor import ForegroundMaskExtractor
+from sensor_processing_services.BackgroundSubstractionService import ForegroundMaskExtractor
 # from calibration.table_surface_extractor import TableSurfaceExtractor
 
 MIN_DIST_TOUCH = 3  # mm

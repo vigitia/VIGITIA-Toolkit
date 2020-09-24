@@ -9,9 +9,11 @@ import tensorflow as tf
 from sklearn.cluster import DBSCAN
 
 # Paths to the Models needed for hand tracking
-PALM_MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'models', 'palm_detection.tflite'))
-LANDMARK_MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'models', 'hand_landmark.tflite'))
-ANCHORS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'models', 'anchors.csv'))
+CNN_MODELS_FOLDER_NAME = 'cnn_models'
+
+PALM_MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), CNN_MODELS_FOLDER_NAME, 'palm_detection.tflite'))
+LANDMARK_MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), CNN_MODELS_FOLDER_NAME, 'hand_landmark.tflite'))
+ANCHORS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), CNN_MODELS_FOLDER_NAME, 'anchors.csv'))
 
 
 # Constants for drawing of the hand

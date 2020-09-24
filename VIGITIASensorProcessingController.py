@@ -6,20 +6,22 @@ import sys
 import time
 
 import cv2
+
+from data_transportation.VIGITIAVideoStreamer import VIGITIAVideoStreamer
 from sensors.cameras.realsense_D435_camera import RealsenseD435Camera
 
 from data_transportation.TUIOServer import TUIOServer  # Import TUIO Server
 
-from services.table_surface_extractor import TableSurfaceExtractor
+from sensor_processing_services.TableExtractionService import TableSurfaceExtractor
 
 from utility.get_ip import get_ip_address
 
 # Import Sensor Processing Services:
-from services.fiducials_detector import FiducialsDetector
-from services.foreground_mask_extractor import ForegroundMaskExtractor
-from services.TouchDetectionService import TouchDetector
-from services.generic_object_detector import GenericObjectDetector
-from services.hand_tracker import HandTracker
+from sensor_processing_services.FiducialsDetectionService import FiducialsDetector
+from sensor_processing_services.BackgroundSubstractionService import ForegroundMaskExtractor
+from sensor_processing_services.TouchDetectionService import TouchDetector
+from sensor_processing_services.ObjectDetectionService import GenericObjectDetector
+from sensor_processing_services.HandLandmarkDetectionService import HandTracker
 
 # TODO: Allow multiple
 TARGET_COMPUTER_IP = get_ip_address()
@@ -44,7 +46,7 @@ class VIGITIASensorProcessingController:
     def __init__(self):
         self.init_cameras()
         self.init_tuio_server()
-        self.init_video_streamers()
+        # self.init_video_streamers()
         self.init_sensor_data_processing_services()
 
         self.loop()
@@ -65,10 +67,8 @@ class VIGITIASensorProcessingController:
         self.source = os.uname()[1]  # TODO: Not working on windows
 
     def init_video_streamers(self):
-        pass
         # TODO: Let user select in GUI what video should be streamed
-        # self.video_streamer = VIGITIAVideoStreamer(TARGET_COMPUTER_IP, 5000)
-        # self.video_streamer_two = VIGITIAVideoStreamer(TARGET_COMPUTER_IP, 5001)
+        self.video_streamer = VIGITIAVideoStreamer(TARGET_COMPUTER_IP, 5000)
 
     # Init all Sensor Processing Services here
     def init_sensor_data_processing_services(self):
@@ -108,7 +108,7 @@ class VIGITIASensorProcessingController:
                 self.tuio_server.start_tuio_bundle(dimension=self.dimension, source=self.source)
 
                 # Stream Frames
-                #self.stream_frames(color_image, color_image_table, depth_image)
+                # self.stream_frames(color_image, color_image_table, depth_image)
 
                 # Run Sensor Processing Services. They all add their data to the TUIO Bundle
                 self.run_sensor_processing_services(color_image, color_image_table, depth_image, depth_image_table)
@@ -143,11 +143,11 @@ class VIGITIASensorProcessingController:
     def stream_frames(self, color_image, color_image_table, depth_image):
         # Send TUIO data messages to let the SensorDataInterface on the Target Computer know that new frames are coming
         self.tuio_server.add_data_message(0, 'video', 'Intel Realsense D435 RGB table local', 1280, 720, 5000)
-        self.tuio_server.add_data_message(0, 'video', 'Intel Realsense D435 RGB full local', 1280, 720, 5001)
+        # self.tuio_server.add_data_message(0, 'video', 'Intel Realsense D435 RGB full local', 1280, 720, 5001)
 
         # Stream the frames using the correct instance of the sensor processing controller
         self.video_streamer.stream_frame(color_image_table)
-        self.video_streamer_two.stream_frame(color_image)
+        # self.video_streamer_two.stream_frame(color_image)
 
     # Some SensorProcessingServices need the foreground mask. Request it here and pass it over to them.
     def get_foreground_mask(self, color_image_table):
