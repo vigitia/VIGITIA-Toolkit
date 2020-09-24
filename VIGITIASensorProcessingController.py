@@ -8,7 +8,7 @@ import time
 import cv2
 from sensors.cameras.realsense_D435_camera import RealsenseD435Camera
 
-from tuio20_client_server.TUIOServer import TUIOServer  # Import TUIO Server
+from data_transportation.TUIOServer import TUIOServer  # Import TUIO Server
 
 from services.table_surface_extractor import TableSurfaceExtractor
 

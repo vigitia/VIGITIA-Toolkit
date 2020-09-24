@@ -20,7 +20,7 @@ APPLICATION_PARENT_CLASS = 'VIGITIABaseApplication'
 DEBUG_MODE = False
 
 #BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'VIGITIAPaintingApp', 'ButtonWidget']
-BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'VIGITIAPaintingApp', 'ButtonWidget']
+BLACKLIST = ['ImageWidget', 'VideoWidget', 'VIGITIAPaintingApp', 'ButtonWidget', 'NutritionalValues']
 
 
 class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
