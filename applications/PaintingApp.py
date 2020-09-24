@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
-from apps.VIGITIABaseApplication import VIGITIABaseApplication
+from core.VIGITIABaseApplication import VIGITIABaseApplication
 
 
 class VIGITIAPaintingApp(QMainWindow, VIGITIABaseApplication):

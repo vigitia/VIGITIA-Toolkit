@@ -2,7 +2,7 @@
 from PyQt5.QtWidgets import QWidget, QLabel
 from PyQt5.QtGui import QImage, QPixmap
 
-from apps.VIGITIABaseApplication import VIGITIABaseApplication
+from core.VIGITIABaseApplication import VIGITIABaseApplication
 
 
 class VideoWidget(QWidget, VIGITIABaseApplication):

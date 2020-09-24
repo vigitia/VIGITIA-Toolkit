@@ -7,7 +7,7 @@
 import cv2
 import threading
 
-from apps.VIGITIACameraBase import VIGITIACameraBase
+from core.VIGITIACameraBase import VIGITIACameraBase
 
 CAMERA_ID = 0
 RES_X = 1920

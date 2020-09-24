@@ -1,5 +1,5 @@
 
-from pyQT5_experiments.VIGITIASensorDataInterface import VIGITIASensorDataInterface
+from core.VIGITIASensorDataInterface import VIGITIASensorDataInterface
 
 
 class VIGITIABaseApplication:

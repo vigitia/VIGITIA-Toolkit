@@ -10,7 +10,7 @@ from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtWidgets import QShortcut
 
-from apps.VIGITIABaseApplication import VIGITIABaseApplication
+from core.VIGITIABaseApplication import VIGITIABaseApplication
 
 # Communication between javascript and Python based on https://gist.github.com/mphuie/63e964e9ff8ae25d16a949389392e0d7
 # and https://doc.qt.io/qt-5/qtwebengine-webenginewidgets-contentmanipulation-example.html

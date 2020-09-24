@@ -13,7 +13,7 @@ import numpy as np
 import threading
 
 # Camera Settings
-from apps.VIGITIACameraBase import VIGITIACameraBase
+from core.VIGITIACameraBase import VIGITIACameraBase
 
 DEPTH_RES_X = 1280
 DEPTH_RES_Y = 720

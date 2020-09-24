@@ -1,7 +1,7 @@
 
 from PyQt5.QtWidgets import QWidget
 
-from apps.VIGITIABaseApplication import VIGITIABaseApplication
+from core.VIGITIABaseApplication import VIGITIABaseApplication
 
 
 # A toolkit applications needs to be a valid PyQt application. It also needs to inherit from VIGITIABaseApplication

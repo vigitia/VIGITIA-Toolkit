@@ -4,7 +4,7 @@
 import sys
 import threading
 
-from gstreamer.VIGITIAVideoStreamReceiver import VIGITIAVideoStreamReceiver
+from data_transportation.VIGITIAVideoStreamReceiver import VIGITIAVideoStreamReceiver
 from utility.get_ip import get_ip_address
 
 from pythonosc.osc_server import ThreadingOSCUDPServer

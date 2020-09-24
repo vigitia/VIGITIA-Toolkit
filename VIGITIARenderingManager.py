@@ -12,7 +12,7 @@ from os.path import isfile, join
 from importlib import import_module
 import pyclbr
 
-from apps.VIGITIABaseApplication import VIGITIABaseApplication
+from core.VIGITIABaseApplication import VIGITIABaseApplication
 
 APPLICATIONS_BASE_FOLDER = 'applications'
 APPLICATION_PARENT_CLASS = 'VIGITIABaseApplication'
@@ -20,7 +20,7 @@ APPLICATION_PARENT_CLASS = 'VIGITIABaseApplication'
 DEBUG_MODE = False
 
 #BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'VIGITIAPaintingApp', 'ButtonWidget']
-BLACKLIST = ['ImageWidget', 'VideoWidget', 'VIGITIAPaintingApp', 'ButtonWidget', 'NutritionalValues']
+BLACKLIST = ['ImageWidget', 'VideoWidget', 'ButtonWidget', 'NutritionalValues']
 
 
 class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
@@ -303,8 +303,11 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
     def keyPressEvent(self, event):
         # Close the application if the ESC button is pressed
         if event.key() == Qt.Key_Escape:
-            self.close()
-            sys.exit(0)
+            self.close_window()
+
+    def close_window(self):
+        self.close()
+        sys.exit(app.exec_)
 
 
 if __name__ == "__main__":

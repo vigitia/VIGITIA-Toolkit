@@ -9,7 +9,7 @@ from PyQt5.QtCore import QPoint, Qt
 from PyQt5.QtGui import QMouseEvent
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 
-from apps.VIGITIABaseApplication import VIGITIABaseApplication
+from core.VIGITIABaseApplication import VIGITIABaseApplication
 
 
 class ButtonWidget(QWidget, VIGITIABaseApplication):

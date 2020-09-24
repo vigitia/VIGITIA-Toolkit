@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, QPoint, QThread
 from PyQt5.QtGui import QImage, QPainter, QPen, QBrush, QColor
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
 
-from apps.VIGITIABaseApplication import VIGITIABaseApplication
+from core.VIGITIABaseApplication import VIGITIABaseApplication
 
 class NutritionalValues(QWidget, VIGITIABaseApplication):
     """ NutritionalValues
