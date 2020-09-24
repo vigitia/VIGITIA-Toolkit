@@ -168,3 +168,7 @@ old/vigitia_hand-tracker/config.ini
 data_transportation/background_average.npy
 
 data_transportation/background_standard_deviation.npy
+
+background_standard_deviation.npy
+
+background_average.npy

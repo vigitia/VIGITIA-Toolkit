@@ -248,7 +248,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
         # Searching for applications in the following directory
         # TODO: Also allow for searching in subdirectories and therefore add support for Git Repositories
-        applications_path = os.path.join(Path(__file__).resolve().parent.parent, APPLICATIONS_BASE_FOLDER)
+        applications_path = os.path.join(Path(__file__).resolve().parent, APPLICATIONS_BASE_FOLDER)
 
         # Inspired by https://stackoverflow.com/questions/1057431/how-to-load-all-modules-in-a-folder
         files = [f for f in listdir(applications_path) if isfile(join(applications_path, f)) and f != '__init__.py']

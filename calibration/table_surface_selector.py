@@ -12,7 +12,7 @@ CIRCLE_DIAMETER = 5
 CIRCLE_COLOR_OLD = (0, 0, 255)
 CIRCLE_COLOR_NEW = (0, 255, 0)
 FONT_COLOR = (0, 0, 255)
-HINT = 'Click on each of the four corners of the table'
+HINT = 'Click on each of the four corners of the table/projection'
 
 CONFIG_FILE_NAME = 'config.ini'
 

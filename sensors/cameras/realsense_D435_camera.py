@@ -146,7 +146,7 @@ class RealsenseD435Camera(VIGITIACameraBase):
             if self.num_frame < NUM_FRAMES_WAIT_INITIALIZING:
                 continue
             elif self.num_frame == NUM_FRAMES_WAIT_INITIALIZING:
-                print('[RealSense D435]: Ready')
+                print('[RealSense D435]: Camera Ready')
 
             # Apply Filters
             # aligned_depth_frame = self.hole_filling_filter.process(aligned_depth_frame)
@@ -184,7 +184,6 @@ class RealsenseD435Camera(VIGITIACameraBase):
 
     def get_resolution(self):
         return RGB_RES_X, RGB_RES_Y
-
 
     def stop(self):
         self.started = False

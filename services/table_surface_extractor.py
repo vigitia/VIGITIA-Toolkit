@@ -7,7 +7,7 @@ import numpy as np
 import configparser
 from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
 
-CONFIG_FILE_NAME = 'config.ini'
+CONFIG_FILE_NAME = '../calibration/config.ini'
 
 
 class TableSurfaceExtractor:

@@ -17,7 +17,7 @@ from utility.get_ip import get_ip_address
 # Import Sensor Processing Services:
 from services.fiducials_detector import FiducialsDetector
 from services.foreground_mask_extractor import ForegroundMaskExtractor
-from services.touch_detector import TouchDetector
+from services.TouchDetectionService import TouchDetector
 from services.generic_object_detector import GenericObjectDetector
 from services.hand_tracker import HandTracker
 

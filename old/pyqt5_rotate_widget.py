@@ -9,7 +9,7 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from applications.pyqt_paint_example import PaintExample
-from applications.VIGITIAWebView import BrowserWidget
+from applications.BrowserWidget import BrowserWidget
 
 
 def main():
