@@ -2,11 +2,13 @@
 # -*- coding: utf-8 -*-
 
 import os
+import sys
 
-from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QPoint, QObject, QVariant, pyqtSlot
-from PyQt5.QtGui import QMouseEvent
+from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QPoint, QObject, QVariant, pyqtSlot, QEvent
+from PyQt5.QtGui import QMouseEvent, QKeySequence
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtWebEngineWidgets import *
+from PyQt5.QtWidgets import QShortcut
 
 from apps.VIGITIABaseApplication import VIGITIABaseApplication
 
@@ -14,6 +16,7 @@ from apps.VIGITIABaseApplication import VIGITIABaseApplication
 # and https://doc.qt.io/qt-5/qtwebengine-webenginewidgets-contentmanipulation-example.html
 
 
+# Exampe class to demonstrate connection between python and javascript code
 class CallHandler(QObject):
 
     @pyqtSlot(result=QVariant)
@@ -48,14 +51,18 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
         self.width = 1000
         self.height = 700
         self.rotation = 0
-        self.z_index = 100
+        self.z_index = 10000
+
+        # Prevent ESC from beeing blocked by BrowserWidget (https://stackoverflow.com/questions/56890831/qwidget-cannot-catch-escape-backspace-or-c-x-key-press-events)
+        QShortcut(QKeySequence("Escape"), self, activated=self.on_Escape)
 
         self.initUI()
 
-        self.connect_to_javascript_code()
+        # Uncomment this line to establish connection to js code
+        #self.connect_to_javascript_code()
 
+        # Define url or local index.html path here
         url = QUrl('https://maps.google.com')
-
         # Explanation on how to load a local HTML page
         #url = QUrl.fromLocalFile(os.path.abspath(os.path.join(os.path.dirname(__file__), "index.html")))
 
@@ -73,7 +80,7 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
 
     @pyqtSlot()
     def loadFinishedHandler(self):
-        print("load finished")
+        # Example on how to call a function in the javascript code of a website
         js_code = 'pythonToJS("I am a message from python");'
         self.page().runJavaScript(js_code, self.js_callback)
 
@@ -82,18 +89,18 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
 
     # Use Touch events in the application: Convert the pointer messages to mouse click events
     def on_new_pointer_messages(self, messages):
-        return
         for message in messages:
 
-            local_pos = self.mapFromGlobal(QPoint(message['x_pos'], message['y_pos']))
+            global_pos = QPoint(message['x_pos'], message['y_pos'])
+            local_pos = self.mapFromGlobal(global_pos)
 
             #target = self.focusProxy()
             target = self
 
             print(global_pos)
 
-            # self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
-            # self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
+            self.emulate_mouse_event(QEvent.MouseMove, local_pos, global_pos, target)
+            self.emulate_mouse_event(QEvent.MouseButtonPress, local_pos, global_pos, target)
 
     def on_new_control_messages(self, data):
         pass
@@ -114,6 +121,7 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
         except:
             print('[BrowserWidget]: Error on injecting Touch Event in BrowserWidget')
 
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
-            self.close()
+    @pyqtSlot()
+    def on_Escape(self):
+        print("Escape")
+        self.rendering_manager.close_window()
