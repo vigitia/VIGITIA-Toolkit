@@ -10,7 +10,7 @@ ADAPTIVE_THRESH_CONSTANT = 10  # TODO: Find best value
 ARUCO_DICT = aruco.DICT_4X4_100
 
 
-class FiducialsDetector:
+class FiducialsDetectionService:
 
     aruco_dictionary = None
     aruco_detector_parameters = None
@@ -19,7 +19,7 @@ class FiducialsDetector:
 
     def __init__(self):
         self.init_aruco_tracking()
-        print('[FiducialsDetector]: Ready')
+        print('[FiducialsDetectionService]: Ready')
 
     def init_aruco_tracking(self):
         self.aruco_dictionary = aruco.Dictionary_get(ARUCO_DICT)

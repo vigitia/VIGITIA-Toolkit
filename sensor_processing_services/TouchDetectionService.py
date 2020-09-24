@@ -57,7 +57,10 @@ class TouchPoint:
                                                                                 str(self.distance_to_table_mm))
 
 
-class TouchDetector:
+class TouchDetectionService:
+    """ The TouchDetectionService takes aligned RGB and depth images as in input and finds touch and hover events.
+
+    """
 
     num_frame = 0
 
@@ -77,7 +80,7 @@ class TouchDetector:
         self.init_background_model()
         self.foreground_mask_extractor = ForegroundMaskExtractor()
 
-        print('[Touch Detector]: Ready')
+        print('[TouchDetectionService]: Ready')
 
     # TODO: Generate backround model during runtime of the last X frames
     def init_background_model(self):
@@ -87,38 +90,37 @@ class TouchDetector:
             background_temp = np.load('background_average.npy')
             deviation_temp = np.load('background_standard_deviation.npy')
         except FileNotFoundError:
-            print("[Touch Detector]: No stored background")
+            print("[TouchDetectionService]: No stored background")
 
         if background_temp is not None and deviation_temp is not None:
-            print('[Touch Detector]: Found stored background model')
+            print('[TouchDetectionService]: Found stored background model')
             self.background_average = background_temp
             self.background_standard_deviation = deviation_temp
             self.background_model_available = True
 
-    def get_touch_points(self, color_image, depth_image, hand_regions, detected_hands):
-        # self.table_border = table_border
-        self.table_border = np.array([(0, 0), (color_image.shape[1], 0),
-                                      (color_image.shape[1], color_image.shape[0]), (0, color_image.shape[1])])
+    # Main function to request touch points in the image
+    def get_touch_points(self, color_image, depth_image, hand_regions, detected_hands, foreground_mask):
+        if self.table_border is None:
+            self.table_border = np.array([(0, 0), (color_image.shape[1], 0),
+                                          (color_image.shape[1], color_image.shape[0]), (0, color_image.shape[1])])
 
         self.num_frame += 1
 
         self.depth_res_x = depth_image.shape[1]
         self.depth_res_y = depth_image.shape[0]
 
+        # If we do not yet have a depth model of the background, a new one will be created
         if not self.background_model_available and self.num_frame <= NUM_FRAMES_FOR_BACKGROUND_MODEL:
             self.create_background_model(depth_image)
             return []
-        else:
-            new_touch_points = self.find_touch_points(color_image, depth_image)
-            new_touch_points = self.compare_with_cnn_points(new_touch_points, hand_regions, detected_hands)
-            self.active_touch_points = self.merge_touch_points(new_touch_points)
 
-            self.draw_touch_points(color_image, self.active_touch_points, hand_regions)
+        new_touch_points = self.find_touch_points(color_image, depth_image, foreground_mask)
+        new_touch_points = self.compare_with_cnn_points(new_touch_points, hand_regions, detected_hands)
+        self.active_touch_points = self.merge_touch_points(new_touch_points)
 
-            # Experiment
-            # self.extract_arms_in_depth_image(depth_image)
+        self.draw_touch_points(color_image, self.active_touch_points, hand_regions)
 
-            return self.active_touch_points
+        return self.active_touch_points
 
     def compare_with_cnn_points(self, new_touch_points, hand_regions, detected_hands):
         points_inside = []
@@ -152,8 +154,6 @@ class TouchDetector:
                     if index_finger_candidate is not None:
                         points_inside.append(index_finger_candidate)
 
-
-
             # for point in new_touch_points:
             #     point_inside = False
             #     for hand_region in hand_regions:
@@ -169,12 +169,9 @@ class TouchDetector:
 
         return points_inside
 
-
-
-
     def create_background_model(self, depth_image):
         pos = self.num_frame - 1
-        print('[Touch Detector]: Storing frame ' + str(pos+1) + '/' + str(NUM_FRAMES_FOR_BACKGROUND_MODEL))
+        print('[TouchDetectionService]: Storing frame ' + str(pos+1) + '/' + str(NUM_FRAMES_FOR_BACKGROUND_MODEL))
 
         # TODO: Get dimensions from current frame
         if self.stored_background_values is None:
@@ -212,13 +209,13 @@ class TouchDetector:
         np.save('background_standard_deviation.npy', self.background_standard_deviation)
 
     # Inspired by https://webnautes.tistory.com/m/1378
-    def find_touch_points(self, color_image, depth_image):
+    def find_touch_points(self, color_image, depth_image, foreground_mask):
 
         # List to be filled by this method:
         touch_points = []
 
         # foreground_mask = self.foreground_mask_extractor.get_foreground_mask_basic(color_image)
-        foreground_mask = self.foreground_mask_extractor.get_foreground_mask_otsu(color_image)
+        #foreground_mask = self.foreground_mask_extractor.get_foreground_mask_otsu(color_image)
         foreground_mask = cv2.bitwise_not(foreground_mask)
         #foreground_mask = self.foreground_mask_extractor.get_foreground_mask(color_image)
         cv2.imshow('mask', foreground_mask)
@@ -264,26 +261,23 @@ class TouchDetector:
                         touch_points.append(TouchPoint(finger_candidate[0], finger_candidate[1], index,
                                                            max_distance_mm, center_point_palm[0],
                                                            center_point_palm[1]))
-                    continue
-                    if max_distance_mm < MAX_DIST_TOUCH:
-                        distance_between_points = distance.euclidean(center_point_palm, finger_candidate)
-                        if distance_between_points > 1.7 * palm_radius:
-                            if DEBUG_MODE:
-                                cv2.line(black_image, finger_candidate, center_point_palm, [0, 255, 0], 2)
-                            cv2.circle(black_image, finger_candidate, 10, touch_state, 2)
-                            touch_points.append(TouchPoint(finger_candidate[0], finger_candidate[1], index,
-                                                           max_distance_mm, center_point_palm[0],
-                                                           center_point_palm[1]))
-                        #else:
-                            #cv2.line(black_image, finger_candidate, center_point_palm, [255, 0, 0], 2)
 
-                        # TODO: Check if distance between points is realistic
+                    # if max_distance_mm < MAX_DIST_TOUCH:
+                    #     distance_between_points = distance.euclidean(center_point_palm, finger_candidate)
+                    #     if distance_between_points > 1.7 * palm_radius:
+                    #         if DEBUG_MODE:
+                    #             cv2.line(black_image, finger_candidate, center_point_palm, [0, 255, 0], 2)
+                    #         cv2.circle(black_image, finger_candidate, 10, touch_state, 2)
+                    #         touch_points.append(TouchPoint(finger_candidate[0], finger_candidate[1], index,
+                    #                                        max_distance_mm, center_point_palm[0],
+                    #                                        center_point_palm[1]))
+                    #     #else:
+                    #         #cv2.line(black_image, finger_candidate, center_point_palm, [255, 0, 0], 2)
+                    #
+                    #     # TODO: Check if distance between points is realistic
 
-        # black_image = self.table_surface_extractor.extract_table_area(black_image)
-        #black_image = cv2.flip(black_image, -1)
         cv2.imshow('Detected hands', black_image)
 
-        #print(touch_points)
         return touch_points
 
     def remove_pixels_outside_table_border(self, foreground_mask):
@@ -297,6 +291,7 @@ class TouchDetector:
 
         return foreground_mask
 
+    # Find contours that might be arms in the image
     def get_arm_candidates(self, foreground_mask):
         contours, hierarchy = cv2.findContours(foreground_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -323,6 +318,7 @@ class TouchDetector:
 
         return arm_candidates
 
+    # Find the largest inscribing circle in the contour. This is probably the palm of the hand
     def find_palm_in_hand(self, foreground_mask, arm_candidate):
         contour_mask = np.zeros(shape=foreground_mask.shape, dtype=np.uint8)
         cv2.fillPoly(contour_mask, pts=[arm_candidate], color=255)
@@ -338,6 +334,7 @@ class TouchDetector:
         return center_point_palm, palm_radius
 
     # Inspired by https://webnautes.tistory.com/m/1378
+    # Find Hull, Defects and Moments in the contour to detect the finger points
     def get_finger_points(self, arm_candidate):
 
         arm_candidate = cv2.approxPolyDP(arm_candidate, 0.02 * cv2.arcLength(arm_candidate, True), True)
@@ -390,6 +387,8 @@ class TouchDetector:
 
     # Implemented like described in paper "DIRECT: Making Touch Tracking on Ordinary Surfaces Practical with
     # Hybrid Depth-Infrared Sensing." by Xiao, R., Hudson, S., & Harrison, C. (2016).
+    # Check the neighouring pixels of each finger tip in the depth image to calculate the distance of the fingertip
+    # to the table
     def get_touch_state(self, point, depth_image):
         point_x = point[1]
         point_y = point[0]
@@ -413,6 +412,7 @@ class TouchDetector:
     # Depth-Infrared Sensing." by Xiao, R., Hudson, S., & Harrison, C. (2016). See:
     # https://github.com/nneonneo/direct-handtracking/blob/c199dd61ab097f3b3f155798c2519828352d9bdb/ofx/apps
     # /handTracking/direct/src/IRDepthTouchTracker.cpp
+    # Check for each new touch point if it has been present in previous frames and assign unique IDs
     def merge_touch_points(self, new_touch_points):
 
         distances = []
@@ -479,25 +479,21 @@ class TouchDetector:
 
         return final_touch_points
 
+    # Draw found touch points on the RGB image for debugging and preview purposes
     def draw_touch_points(self, color_image, touch_points, hand_regions):
 
-        #black_image = np.zeros(shape=(self.depth_res_y, self.depth_res_x, 3), dtype=np.uint8)
-        black_image = color_image
-
         for region in hand_regions:
-            cv2.rectangle(black_image, region[0], region[1], (0, 255, 0), 3)
+            cv2.rectangle(color_image, region[0], region[1], (0, 255, 0), 3)
 
         for touch_point in touch_points:
-            cv2.circle(black_image, touch_point.get_touch_coordinates(), 8,
+            cv2.circle(color_image, touch_point.get_touch_coordinates(), 8,
                        self.get_touch_color(touch_point.distance_to_table_mm), -1)
-            cv2.circle(black_image, touch_point.get_palm_center_coordinates(), 5, COLOR_PALM_CENTER, -1)
-            cv2.putText(black_image, text='{}: {}mm'.format(str(touch_point.id), str(touch_point.distance_to_table_mm)),
+            cv2.circle(color_image, touch_point.get_palm_center_coordinates(), 5, COLOR_PALM_CENTER, -1)
+            cv2.putText(color_image, text='{}: {}mm'.format(str(touch_point.id), str(touch_point.distance_to_table_mm)),
                         org=touch_point.get_touch_coordinates(),
                         fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=2, color=(0, 0, 0))
 
-        #black_image = self.table_surface_extractor.extract_table_area(black_image)
-        #black_image = cv2.flip(black_image, -1)
-        cv2.imshow('touch points', black_image)
+        cv2.imshow('touch points', color_image)
 
     @staticmethod
     def get_touch_color(distance_to_table_mm):
@@ -517,17 +513,6 @@ class TouchDetector:
         tuple_as_list[0] = int(tuple_as_list[0] / 848 * 1920)
         tuple_as_list[1] = int(tuple_as_list[1] / 480 * 1080)
         return tuple(tuple_as_list)
-
-    def moving_average_filter(self, image):
-        pass
-        #     if self.stored_depth_frame is None:
-        #         self.stored_depth_frame = image
-        #         return image
-        #     else:
-        #         combined_images = self.stored_depth_frame + image
-        #         averaged_image = combined_images/2
-        #         self.stored_depth_frame = image
-        #         return averaged_image
 
     def extract_arms_in_depth_image(self, depth_image):
 

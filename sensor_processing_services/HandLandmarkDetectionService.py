@@ -44,7 +44,7 @@ CONNECTIONS = [
 ]
 
 
-class HandTracker:
+class HandLandmarkDetectionService:
     """
     Class to use Google's Mediapipe HandTracking pipeline from Python.
     So far only detection of a single hand is supported.
@@ -93,6 +93,8 @@ class HandTracker:
             [256, 0],
             [0, 0],
         ]).astype('float32')
+
+        print('[HandLandmarkDetectionService]: Ready')
 
     def reset(self):
         """

@@ -14,20 +14,26 @@ import pyclbr
 
 from core.VIGITIABaseApplication import VIGITIABaseApplication
 
+# Folder path to search for applications
 APPLICATIONS_BASE_FOLDER = 'applications'
+
+# Name of the parent class that all toolkit applications inherit from
 APPLICATION_PARENT_CLASS = 'VIGITIABaseApplication'
 
+# Enable debug mode to get additional data printed to console
 DEBUG_MODE = False
 
+# Add the names of all applications that you dont want to render to this list
 #BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'VIGITIAPaintingApp', 'ButtonWidget']
 BLACKLIST = ['ImageWidget', 'VideoWidget', 'ButtonWidget', 'NutritionalValues']
 
 
 class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
-    """Responsible for drawing all applications on the same canvas (a fullscreen QMainWindow)
+    """ Responsible for drawing all applications on the same canvas (a fullscreen QMainWindow)
 
     """
 
+    # all active applications will be stored in that list
     applications = []
 
     def __init__(self):
@@ -68,14 +74,17 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
             Args:
                 application_name (str): The name of the application that has changed
         """
-        print('[VIGITIARenderingManager]:', application_name, 'has been updated')
+        if DEBUG_MODE:
+            print('[VIGITIARenderingManager]:', application_name, 'has been updated')
         self.update_application(application_name)
 
     def update_application(self, application_name):
         if self.applications is not None:
+            # Iterate over all applications
             for application in self.applications:
                 if application['name'] == application_name:
 
+                    # Update width and height
                     application['instance'].setGeometry(0, 0, application['instance'].get_width(),
                                                         application['instance'].get_height())
 
@@ -83,6 +92,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
                     if application['instance'].get_rotation() != 0:
                         application = self.rotate_applicaton(application)
 
+                    # Move application on canvas
                     if application['parent'] is None:
                         application['instance'].move(application['instance'].get_x(), application['instance'].get_y())
                     else:
@@ -100,11 +110,11 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
                             -origin_x + application['parent'].geometry().x() + application['instance'].get_x(),
                             -origin_y + application['parent'].geometry().y() + application['instance'].get_y())
 
-                    # TODO: Test
+                    # Update z-Position (lower or raise them on the canvas)
                     self.update_z_position_of_applications()
 
     def get_screen_resolution(self):
-        """Return the resolution of the QMainWindow
+        """ Return the resolution of the QMainWindow
 
         """
         return self.width, self.height
@@ -148,18 +158,10 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
         self.update_z_position_of_applications()
 
-        # Test of raising an application to the top
-        # TODO: Implement z-index feature
-        # for application in self.applications:
-        #     if application['name'] == 'ButtonWidget':
-        #         print('Bring painting app to front')
-        #         if application['parent'] is None:
-        #             application['instance'].raise_()
-        #         else:
-        #             application['parent'].raise_()
-
+    # Raise or lower applications on the canvas
     def update_z_position_of_applications(self):
 
+        # Check the current z-index of all applications
         list_of_z_indexes = []
 
         for application in self.applications:
@@ -195,11 +197,13 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
             graphics_view.setScene(scene)
 
+            # Embed application in a QGraphicsProxyWidget
             proxy = QGraphicsProxyWidget()
             proxy.setWidget(application['instance'])
             proxy.setTransformOriginPoint(proxy.boundingRect().center())
             scene.addItem(proxy)
 
+            # Apply the transformation -> Rotate
             proxy.setTransform(QTransform().rotate(angle))
 
             graphics_view.adjustSize()
@@ -209,33 +213,6 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         else:
             proxy = application['proxy']
             proxy.setTransform(QTransform().rotate(angle))
-
-        # TODO: Check if width/height of graphics_wiew > width/height of QMainWindow. If yes, scale down
-        # TODO: Notify application about new position, rotation and size
-        #
-        #print('Graphics view width:', graphics_view.width(), graphics_view.height())
-
-        #pts1 = np.float32([[100, 100], [200, 10], [10, 200], [200, 200]])
-        #pts2 = np.float32([[10, 10], [100, 110], [10, 100], [100, 100]])
-
-        #matrix = cv2.getPerspectiveTransform(pts1, pts2)
-
-        #print(matrix)
-
-        #matrix = [[1, 1,  1],
-        #          [1, 10,  1],
-        #          [1, 1,  1]]
-
-        #transform = QTransform()
-        #transform.setMatrix(matrix[0][0], matrix[0][1], matrix[0][2],
-        #                    matrix[1][0], matrix[1][1], matrix[1][2],
-        #                    matrix[2][0], matrix[2][1], matrix[2][2])
-        #proxy.setTransform(transform)
-
-        # Prove that transform works
-        #proxy.setTransform(QTransform().shear(2.0, 0))
-
-        #print('GW:', proxy.width(), proxy.height(), proxy.x(), proxy.y())
 
         return application
 
@@ -305,6 +282,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         if event.key() == Qt.Key_Escape:
             self.close_window()
 
+    # Terminate the main window
     def close_window(self):
         self.close()
         sys.exit(app.exec_)

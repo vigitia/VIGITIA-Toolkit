@@ -11,12 +11,12 @@ MOVEMENT_THRESH = 20
 DEBUG_MODE = True
 
 
-class MovementDetector:
+class MovementDetectionService:
 
     last_frame = None
 
     def __init__(self):
-        print('[Movement Detector]: Ready')
+        print('[Movement MovementDetectionService]: Ready')
 
 
     # Check if movement was detected within the frame

@@ -17,11 +17,11 @@ from sensor_processing_services.TableExtractionService import TableSurfaceExtrac
 from utility.get_ip import get_ip_address
 
 # Import Sensor Processing Services:
-from sensor_processing_services.FiducialsDetectionService import FiducialsDetector
+from sensor_processing_services.FiducialsDetectionService import FiducialsDetectionService
 from sensor_processing_services.BackgroundSubstractionService import ForegroundMaskExtractor
-from sensor_processing_services.TouchDetectionService import TouchDetector
-from sensor_processing_services.ObjectDetectionService import GenericObjectDetector
-from sensor_processing_services.HandLandmarkDetectionService import HandTracker
+from sensor_processing_services.TouchDetectionService import TouchDetectionService
+from sensor_processing_services.ObjectDetectionService import ObjectDetectionService
+from sensor_processing_services.HandLandmarkDetectionService import HandLandmarkDetectionService
 
 # TODO: Allow multiple
 TARGET_COMPUTER_IP = get_ip_address()
@@ -62,7 +62,7 @@ class VIGITIASensorProcessingController:
 
         camera_res_x, camera_res_y = self.camera.get_resolution()
         self.dimension = str(camera_res_x) + 'x' + str(camera_res_y)
-        print('Dimension', self.dimension)
+        print('[SensorProcessingController]: Dimension of main sensor: ', self.dimension)
 
         self.source = os.uname()[1]  # TODO: Not working on windows
 
@@ -73,13 +73,13 @@ class VIGITIASensorProcessingController:
     # Init all Sensor Processing Services here
     def init_sensor_data_processing_services(self):
         self.table_surface_extractor = TableSurfaceExtractor()
-        self.fiducials_detector = FiducialsDetector()
+        self.fiducials_detector = FiducialsDetectionService()
         #self.movement_detector = MovementDetector()
         self.foreground_mask_extractor = ForegroundMaskExtractor()
-        self.touch_detector = TouchDetector()
+        self.touch_detector = TouchDetectionService()
         #self.table_detector = TableDetector()
-        self.generic_object_detector = GenericObjectDetector()
-        self.hand_tracker = HandTracker()
+        self.generic_object_detector = ObjectDetectionService()
+        self.hand_tracker = HandLandmarkDetectionService()
 
     # The main application loop. Code parts for fps counter from
     # https://stackoverflow.com/questions/43761004/fps-how-to-divide-count-by-time-function-to-determine-fps
@@ -133,11 +133,12 @@ class VIGITIASensorProcessingController:
     # Call all selected sensor processing services for the current frame
     def run_sensor_processing_services(self, color_image, color_image_table, depth_image, depth_image_table):
         foreground_mask = self.get_foreground_mask(color_image_table)
-        # cv2.imshow('Binary Mask', foreground_mask)
+        if DEBUG_MODE:
+            cv2.imshow('Binary Mask of the foreground', foreground_mask)
 
         self.get_aruco_markers(color_image_table)
-        # self.get_detected_objects(color_image_table.copy(), foreground_mask)
-        self.get_touch_points(color_image_table, depth_image_table)
+        self.get_detected_objects(color_image_table.copy(), foreground_mask)
+        self.get_touch_points(color_image_table, depth_image_table, foreground_mask)
 
     # This function handles the streaming of all video frames
     def stream_frames(self, color_image, color_image_table, depth_image):
@@ -215,7 +216,7 @@ class VIGITIASensorProcessingController:
                                                       height=movement['bounding_rect_height'], area=0)
 
     # Find touch points on the table
-    def get_touch_points(self, color_image_table, depth_image_table):
+    def get_touch_points(self, color_image_table, depth_image_table, foreground_mask):
         touch_points = []
 
         # Use the CNN Hand tracker only every other frame to improve performance
@@ -231,7 +232,7 @@ class VIGITIASensorProcessingController:
             self.hand_regions = hand_regions
 
         # Find the touch points using the TouchDetectionService
-        touch_points = self.touch_detector.get_touch_points(color_image_table, depth_image_table, self.hand_regions, self.detected_hands)
+        touch_points = self.touch_detector.get_touch_points(color_image_table, depth_image_table, self.hand_regions, self.detected_hands, foreground_mask)
 
         # Send out a TUIO pointer message for each touch point
         for touch_point in touch_points:

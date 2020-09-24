@@ -9,10 +9,10 @@ import numpy as np
 DEBUG_MODE = True
 
 
-class GenericObjectDetector:
+class ObjectDetectionService:
 
     def __init__(self):
-        print('[Generic Object Detector] Service Ready')
+        print('[ObjectDetectionService]: Ready')
 
     def detect_objects_basic(self, frame, mask):
 
@@ -77,7 +77,6 @@ class GenericObjectDetector:
 
         cv2.imshow('labels', frame)
 
-
         return detected_objects
 
     def detect_extracted_object(self, extracted_object):
@@ -97,7 +96,7 @@ class GenericObjectDetector:
 
         return label, confidence
 
-    def extract_objects(self, frame, mask):
+    def extract_objects(self, frame, foreground_mask):
 
         MIN_CONTOUR_SIZE = 1000
         MAX_HIERARCHY_DEPTH = 10
@@ -105,11 +104,11 @@ class GenericObjectDetector:
         #mask = cv2.bitwise_not(mask)
 
         kernel = np.ones((9, 9), np.uint8)
-        mask = cv2.erode(mask, kernel, iterations=4)
+        foreground_mask = cv2.erode(foreground_mask, kernel, iterations=4)
         #mask = cv2.dilate(mask, kernel, iterations=3)
-        cv2.imshow('mask', mask)
+        cv2.imshow('mask', foreground_mask)
 
-        contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(foreground_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         contours_filtered = []
 
@@ -154,10 +153,5 @@ class GenericObjectDetector:
                     }
 
                     objects_extracted.append(object_info)
-
-        # try:
-        #     cv2.imshow('3', objects_extracted[3]['extracted_object'])
-        # except:
-        #     pass
 
         return objects_extracted
