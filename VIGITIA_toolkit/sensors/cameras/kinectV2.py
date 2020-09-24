@@ -112,7 +112,7 @@ class KinectV2:
             self.current_frame += 1
             print('Frame:', self.current_frame)
 
-            frames = self.listener.waitForNewFrame()
+            frames = self.listener.waitForNewFrame(1000)
             print('Frames arrived')
 
             color = frames["color"]
