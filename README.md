@@ -3,6 +3,7 @@
 Dieses Toolkit entstand im Rahmen der Masterarbeit von Vitus Maierhöfer im Forschungsprojekt VIGITIA 
 (https://vigitia.de/) am Lehrstuhl für Medieninformatik der Universität Regensburg.
 
+![Genereller Überblick über das Toolkit-Konzept](assets/toolkit_concept_basics.png)
 
 # Installationsanleitung (Linux):
 
