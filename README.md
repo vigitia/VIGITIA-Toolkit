@@ -1,10 +1,13 @@
 # VIGITIA Toolkit zum Erstellen von Projected-Augmented-Reality-Anwendungen auf Tischen
 
 Dieses Toolkit entstand im Rahmen der Masterarbeit von Vitus Maierhöfer im Forschungsprojekt VIGITIA 
-(https://vigitia.de/) am Lehrstuhl für Medieninformatik der Universität Regensburg
+(https://vigitia.de/) am Lehrstuhl für Medieninformatik der Universität Regensburg.
 
 
 # Installationsanleitung (Linux):
+
+Für das Toolkit müssen einige Abhängigkeiten installiert werden, siehe Anleitung hier. 
+Diese sind auch für Windows und macOS verfügbar und können entsprechend der Anleitungen auf den jeweiligen Homepages für diese Betriebssysteme installiert werden.
 
 #### Abhängigkeiten:
 
@@ -21,7 +24,8 @@ sudo apt-get install cmake git libgtk2.0-dev pkg-config libavcodec-dev libavform
 sudo apt-get install python-dev python-numpy libtbb2 libtbb-dev libjpeg-dev libpng-dev libtiff-dev libdc1394-22-dev
 ```
 
-####Installation von OpenCV in der korrekten Version mit GStreamer Support und dem opencv_contrib-Modul
+#### Installation von OpenCV in der korrekten Version mit GStreamer Support und dem opencv_contrib-Modul
+
 ```
 git clone https://github.com/opencv/opencv.git
 git clone https://github.com/opencv/opencv_contrib.git
@@ -47,7 +51,7 @@ sudo make install
 sudo ldconfig```
 
 ```
-#### Weitere Python-Bibliotheken
+#### Weitere nötige Python-Bibliotheken
 ```
 pip3 install PyQt5==5.10
 pip3 install pyrealsense2
@@ -62,13 +66,48 @@ pip3 install scikit-learn
 # Arbeiten mit dem Toolkit
 
 #### 1: Hardwaresetup
-...
+
+Für das Toolkit werden als Grundvoraussetzung ein Projektor und eine RGB-Kamera
+benötigt. Für die Erkennung von Touch-Events ist zudem mit den aktuell implementierten SensorProcessingServices eine beliebige Tiefenkamera von Nöten. Der Projektor muss so montiert werden, dass er auf die gewünschte Projektionsfläche projizieren kann. Für die Montage der Kamera ist nur entscheidend, dass der gesamte
+Projektionsbereich in deren Blickfeld liegt.
 
 #### 2: Kalibrieren des Systems
-...
+
+Starte calibration/TableSurfaceselector.py, um das Kalibrierungstool zu starten
 
 #### 3: Konfigurieren und Starten des SensorProcessingControllers
 ...
 
 #### 4: Konfigurieren und Starten des RenderingManagers
 ...
+
+#### 5: Eine eigene Anwendung implementieren
+
+Bestehende Anwendungen können zum Toolkit hinzugefügt werden, indem sie in den /applications-Ordner im Root-Verzeichnis des Toolkits verschoben werden. Um eine neue Anwendung zu implementieren, genügt es, ein neues Python-Skript in diesem Ordner anzulegen. Um sich das Schreiben von BoilerplateCode zu sparen, kann das vorgegebene Anwendungstemplate verwendet werden (siehe /templates/TookitApplication.py). Alternativ ist es auch möglich, eine der mit dem Toolkit bereitgestellten Beispielanwendungen für den gewünschen Anwendungsfall zu erweitern.
+
+#### 6: Einen neuen SensorProcessingService implementieren
+
+Falls das Toolkit eine gewünschte Funktionalität zum Verarbeiten der Sensordaten noch nicht bereitstellt, kann es aufgrund des modularen Designs jederzeit erweitert werden. Alle SensorProcessingServices befinden sich - analog zu Anwendungen - in einem eigenen Ordner im Root-Verzeichnis des Toolkits. Auch für einen Service wird ein Template bereitgestellt, das die nötigen Methodenrümpfe bereits beinhaltet. Neue SensorProcessingServices müssen im SensorProcessingController registriert werden. Anschließend werden sie von diesem mit den benötigten Sensordaten versorgt. Falls die verarbeiteten Daten über die TUIO-Schnittstelle ausgetauscht werden sollen, müssen diese noch in das TUIO-Nachrichtenformat konvertiert werden. Die bereits implementierten SensorProcessingServices zeigen anschaulich auf, wie dies funktioniert.
+
+#### 7: Vernetzung mehrerer interaktiver Tische
+Falls Daten an einen entfernten interaktiven Tisch gesendet werden sollen, muss je
+nach Art der auszutauschenden Daten nur eine neue Instanz eines TUIO-Servers
+oder eines Video-Streamers im SensorProcessingController angelegt werden. Dafür ist
+im Toolkit jeweils nur eine Zeile Code notwendig. Das Versenden von Daten über
+die implementierten Schnittstellen gestaltet sich ebenfalls als sehr einfach, wie folgendes Beispiel zeigt:
+
+```
+# Init a new TUIO-Server
+self.tuio_server = TUIOServer(TARGET_COMPUTER_IP, TARGET_COMPUTER_PORT)
+
+# Init a new Video Streamer
+self.video_streamer = VIGITIAVideoStreamer(TARGET_COMPUTER_IP, TARGET_COMPUTER_PORT)
+
+# Create and send a TUIO Bundle containing one Bounding Box Message
+self.tuio_server.start_tuio_bundle()
+self.tuio_server.add_bounding_box_message(s_id=0, x_pos=0, y_pos=0, angle=0, width=0, height=0, area=0)
+self.tuio_server.send_tuio_bundle()
+
+# Stream the current frame
+self.video_streamer.stream_frame(frame)
+```
