@@ -65,6 +65,19 @@ pip3 install scikit-learn
 
 # Arbeiten mit dem Toolkit
 
+## Kurzüberblick:
+
+Initial:
+ - Hardwaresetup bauen
+ - Kamera(s) im SensorProcessingController auswählen
+ - Kameras mti dem Kalibrierungstool kalibrieren
+ - Gewünschte SensorProcessingServices im SensorProcessingController auswählen
+ - Gewünschte Anwendungen zum /applications-Ordner hinzufügen
+ 
+Jedes Mal:
+ - SenserProcessingController starten, damit die Sensordaten ausgewertet und verschickt werden
+ - RenderingManager starten, damit die Anwendungen geladen und angezeigt werden
+
 #### 1: Hardwaresetup
 
 Für das Toolkit werden als Grundvoraussetzung ein Projektor und eine RGB-Kamera
@@ -76,10 +89,15 @@ Projektionsbereich in deren Blickfeld liegt.
 Starte calibration/TableSurfaceselector.py, um das Kalibrierungstool zu starten
 
 #### 3: Konfigurieren und Starten des SensorProcessingControllers
-...
+
+In der Klasse SensorProcessingController.py können aktive Kameras und SensorProcessingServices definiert werden. Der Code gibt hierbei Anleitungen und Erklärungen, wie dies funktioniert.
+
 
 #### 4: Konfigurieren und Starten des RenderingManagers
-...
+
+Startet man die Klasse RenderingManager.py, werden alle Anwendungen im /applications-Ordner automatisch geladen.
+Im Code der Klasse können Anwendungen zudem auf eine Blacklist gesetzt werden.
+
 
 #### 5: Eine eigene Anwendung implementieren
 
