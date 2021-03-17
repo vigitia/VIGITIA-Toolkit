@@ -9,7 +9,7 @@ import configparser
 # https://stackoverflow.com/questions/9763116/parse-a-tuple-from-a-string
 from ast import literal_eval as make_tuple  # Needed to convert strings stored in config file back to tuples
 
-from prototype.experiments.hand_tracker import HandTracker
+from hand_tracker import HandTracker
 
 # Built upon: https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/align-depth2color.py
 # Code for Hand Tracking and Models from https://github.com/metalwhale/hand_tracking
@@ -32,15 +32,15 @@ DEPTH_FPS = 30
 RGB_FPS = 30
 
 # Output image (currently needs to be 16x9 because the projector can project this)
-OUTPUT_IMAGE_WIDTH = 3840
-OUTPUT_IMAGE_HEIGHT = 2160
+OUTPUT_IMAGE_WIDTH = 1920
+OUTPUT_IMAGE_HEIGHT = 1080
 
 # Since the projection field of the projector is larger than the table,
 # we need to add black borders on at least two sides
-BORDER_TOP = 40  # px
+BORDER_TOP = 0  # px
 BORDER_BOTTOM = 0  # px
 BORDER_LEFT = 0  # px
-BORDER_RIGHT = 50  # px
+BORDER_RIGHT = 0  # px
 
 # Paths to the Models needed for hand tracking
 PALM_MODEL_PATH = "./models/palm_detection.tflite"
@@ -87,7 +87,7 @@ ARUCO_MARKER_SHIRT_M = 4
 ARUCO_MARKER_SHIRT_L = 8
 ARUCO_MARKER_TIMELINE_CONTROLLER = 42
 
-ARUCO_MARKER_STORAGE_IDS = [1, 2, 3, 5]
+ARUCO_MARKER_STORAGE_IDS = [36, 37, 40, 44]
 
 # Time until a marker is declared absent by the system (we wait a little to make sure it is not just obstructed by
 # something
