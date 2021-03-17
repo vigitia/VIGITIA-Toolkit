@@ -30,6 +30,9 @@ sudo apt-get install python-dev python-numpy libtbb2 libtbb-dev libjpeg-dev libp
 ```
 git clone https://github.com/opencv/opencv.git
 git clone https://github.com/opencv/opencv_contrib.git
+cd opencv_contrib 
+git checkout 4.4.0
+cd ..
 cd opencv/
 git checkout 4.4.0
 
