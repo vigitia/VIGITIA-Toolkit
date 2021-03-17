@@ -33,6 +33,9 @@ git clone https://github.com/opencv/opencv_contrib.git
 cd opencv/
 git checkout 4.4.0
 
+mkdir build
+cd build
+
 cmake -D CMAKE_BUILD_TYPE=RELEASE \
 -D CMAKE_INSTALL_PREFIX=/usr/local \
 -D INSTALL_PYTHON_EXAMPLES=ON \
@@ -47,7 +50,7 @@ cmake -D CMAKE_BUILD_TYPE=RELEASE \
 -D OPENCV_EXTRA_MODULES_PATH=/home/vigitia/opencv_contrib/modules /home/vigitia/opencv/ \
 -D BUILD_EXAMPLES=ON ..
 
-sudo make -j16
+sudo make -j<NUMBER OF CORES IN CPU, e.g. 4>
 sudo make install
 sudo ldconfig```
 
