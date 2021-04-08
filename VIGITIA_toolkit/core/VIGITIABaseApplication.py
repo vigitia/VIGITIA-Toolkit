@@ -79,17 +79,26 @@ class VIGITIABaseApplication:
             self.set_height(self.rendering_manager.get_screen_resolution()[1])
 
     def set_x(self, x):
-        self.x = x
-        self.rendering_manager.on_application_updated(self.get_name())
+        if not abs(self.x - x) < 5:
+            self.x = self.__smooth_movement(self.x, x)
+            self.rendering_manager.on_application_updated(self.get_name())
 
     def set_y(self, y):
-        self.y = y
-        self.rendering_manager.on_application_updated(self.get_name())
+        if not abs(self.y - y) < 5:
+            self.y = self.__smooth_movement(self.y, y)
+            self.rendering_manager.on_application_updated(self.get_name())
 
     def set_position(self, x, y):
-        self.x = x
-        self.y = y
-        self.rendering_manager.on_application_updated(self.get_name())
+        something_to_update = False
+        if not abs(self.x - x) < 5:
+            self.x = self.__smooth_movement(self.x, x)
+            something_to_update = True
+        if not abs(self.y - y) < 5:
+            self.y = self.__smooth_movement(self.y, y)
+            something_to_update = True
+
+        if something_to_update:
+            self.rendering_manager.on_application_updated(self.get_name())
 
     def set_dimensions(self, width, height):
         self.width = width
@@ -111,6 +120,7 @@ class VIGITIABaseApplication:
     def set_z_index(self, z_index):
         self.z_index = z_index
         self.rendering_manager.on_application_updated(self.get_name())
+
 
     """
     Functions for receiving data from the VIGITIA Sensor Data Interface
@@ -136,3 +146,13 @@ class VIGITIABaseApplication:
 
     def on_new_video_frame(self, frame, name, origin_ip, port):
         pass
+
+    """
+        Private helper functions
+    """
+
+    # Simple smoothing of widget movement by calculating the mean between old and new value
+    def __smooth_movement(self, old_value, new_value):
+        new_value = int(abs((old_value + new_value) / 2))
+        return new_value
+
