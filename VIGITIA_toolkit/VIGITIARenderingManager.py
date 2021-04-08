@@ -290,5 +290,6 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setStyle("fusion")
     window = VIGITIARenderingManager()
     sys.exit(app.exec_())
