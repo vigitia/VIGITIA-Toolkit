@@ -24,11 +24,11 @@ APPLICATIONS_BASE_FOLDER = 'applications'
 APPLICATION_PARENT_CLASS = 'VIGITIABaseApplication'
 
 # Enable debug mode to get additional data printed to console
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 # Add the names of all applications that you dont want to render to this list
 #BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'PaintingWidget', 'ButtonWidget']
-BLACKLIST = ['ImageWidget', 'VideoWidget', 'ButtonWidget', 'Patterns', 'PaintingWidget', 'BrowserWidget']
+BLACKLIST = ['VideoWidget', 'ButtonWidget', 'Patterns', 'NutritionalValues', 'ImageWidget', 'PaintingWidget']
 
 
 class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
@@ -50,15 +50,17 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         self.showFullScreen()  # Application should run in Fullscreen
 
         # Define width and height as global variables
-        self.width = QApplication.desktop().screenGeometry().width()
-        self.height = QApplication.desktop().screenGeometry().height()
+        #self.width = QApplication.desktop().screenGeometry().width()
+        #self.height = QApplication.desktop().screenGeometry().height()
+        self.width = 3840
+        self.height = 2160
 
         # Attention: The window resolution might not be the same as the screen resolution
         # Screen scaling can influence the resolution
         print('[VIGITIARenderingManager]: Main Window width:', self.width, 'height:', self.height)
 
         # The QMainWindow should have a black background so that no light will be projected if no application is shown
-        self.setStyleSheet("background-color: black;")
+        self.setStyleSheet("background-color: transparent;")
 
         # Define a parent widget that will contain all applications
         parent_widget = QWidget(self)
@@ -69,7 +71,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         # Load applications and add them to the canvas
         self.add_applications(parent_widget)
 
-    def on_application_updated(self, application_name):
+    def update_application(self, application_name, rotate=True):
         """ This function is called if an application changes its size, position or rotation.
 
             The RenderingManager is notified to redraw the application.
@@ -77,41 +79,21 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
             Args:
                 application_name (str): The name of the application that has changed
         """
-        if DEBUG_MODE:
-            print('[VIGITIARenderingManager]:', application_name, 'has been updated')
-        self.update_application(application_name)
-
-    def update_application(self, application_name):
         if self.applications is not None:
-            # Iterate over all applications
+            # Iterate over all applications to find the correct one
             for application in self.applications:
                 if application['name'] == application_name:
+
+                    # Rotate application
+                    if rotate:
+                        application = self.rotate_applicaton(application)
 
                     # Update width and height
                     application['instance'].setGeometry(0, 0, application['instance'].get_width(),
                                                         application['instance'].get_height())
 
-                    # Rotate application
-                    if application['instance'].get_rotation() != 0:
-                        application = self.rotate_applicaton(application)
-
                     # Move application on canvas
-                    if application['parent'] is None:
-                        application['instance'].move(application['instance'].get_x(), application['instance'].get_y())
-                    else:
-
-                        # Set parent of rotated widget to fullscreen to make sure that the rotated widget fits
-                        application['parent'].setGeometry(0, 0, self.width, self.height)
-
-                        # Since the rotated widget is now placed in the center of the parent instead of at the origin,
-                        # we move the entire parent so that the rotated widget is back at 0,0
-                        origin_x = self.width / 2 - application['instance'].frameGeometry().width() / 2
-                        origin_y = self.height / 2 - application['instance'].frameGeometry().height() / 2
-
-                        # Now we move the rotated widget including its parent to the desired position
-                        application['parent'].move(
-                            -origin_x + application['parent'].geometry().x() + application['instance'].get_x(),
-                            -origin_y + application['parent'].geometry().y() + application['instance'].get_y())
+                    application['parent'].move(application['instance'].get_x(), application['instance'].get_y())
 
                     # Update z-Position (lower or raise them on the canvas)
                     self.update_z_position_of_applications()
@@ -130,34 +112,20 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         for application in self.applications:
             print('[VIGITIARenderingManager]: Placing Application "{}" on canvas.'.format(application['name']))
 
+            application = self.embed_application_in_graphics_view(application)
+
+            # Rotate applications
+            self.rotate_applicaton(application)
+
             application['instance'].setGeometry(0, 0, application['instance'].get_width(),
                                                 application['instance'].get_height())
 
-            # Rotate applications
-            if application['instance'].get_rotation() != 0:
-                application = self.rotate_applicaton(application)
+            if DEBUG_MODE:
+                application['parent'].setStyleSheet('border: 3px solid #FF0000')
 
-            if application['parent'] is None:
-                if DEBUG_MODE:
-                    application['instance'].setStyleSheet('border: 3px solid #FF0000')
-                application['instance'].move(application['instance'].get_x(), application['instance'].get_y())
-                application['instance'].setParent(parent_widget)
-            else:
-                if DEBUG_MODE:
-                    application['parent'].setStyleSheet('border: 3px solid #FF0000')
-                application['parent'].setParent(parent_widget)
+            application['parent'].setParent(parent_widget)
+            application['parent'].move(application['instance'].get_x(), application['instance'].get_y())
 
-                # Set parent of rotated widget to fullscreen to make sure that the rotated widget fits
-                application['parent'].setGeometry(0, 0, self.width, self.height)
-
-                # Since the rotated widget is now placed in the center of the parent instead of at the origin,
-                # we move the entire parent so that the rotated widget is back at 0,0
-                origin_x = self.width/2 - application['instance'].frameGeometry().width()/2
-                origin_y = self.height/2 - application['instance'].frameGeometry().height()/2
-
-                # Now we move the rotated widget inluding its parent to the desired position
-                application['parent'].move(-origin_x + application['parent'].geometry().x() + application['instance'].get_x(),
-                                           -origin_y + application['parent'].geometry().y() + application['instance'].get_y())
 
         self.update_z_position_of_applications()
 
@@ -186,34 +154,69 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         """Allows the rotation of an application (a QT Widget)
 
         """
+        try:
+            application['parent'].setGeometry(0, 0, self.width, self.height)
 
-        angle = application['instance'].rotation
-        if application['proxy'] is None:
-            graphics_view = QGraphicsView()
-            scene = QGraphicsScene(graphics_view)
+            angle = application['instance'].rotation
+            print('Rotating to :', angle)
+            print('instance before:', application['instance'].rect().bottomRight().y())
+            print('Parent before:', application['parent'].frameGeometry())
+            center_x = application['instance'].frameGeometry().width()/2
+            center_y = application['instance'].frameGeometry().height()/2
+            print(center_x, center_y)
+            #application['proxy'].setTransform(QTransform().translate(-center_x, -center_y))
 
-            # Disable scrollbars
-            graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-            graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            application['proxy'].setTransformOriginPoint(QPointF(center_x, center_y))
+            application['proxy'].setTransform(QTransform().rotate(angle))
+            #application['proxy'].setRotation(angle)
+            application['parent'].adjustSize()
 
-            graphics_view.setScene(scene)
+            print('Parent after:', application['parent'].frameGeometry())
 
-            # Embed application in a QGraphicsProxyWidget
-            proxy = QGraphicsProxyWidget()
-            proxy.setWidget(application['instance'])
-            proxy.setTransformOriginPoint(proxy.boundingRect().center())
-            scene.addItem(proxy)
+            #print(application['parent'].sizeHint(), application['instance'].sizeHint(), application['instance'].frameGeometry(), application['instance'].geometry(), application['instance'].frameSize(), application['instance'].maximumSize())
 
-            # Apply the transformation -> Rotate
-            proxy.setTransform(QTransform().rotate(angle))
+            #application['proxy'].setTransform(QTransform().translate(-center_x, -center_y))
+        except AttributeError as e:
+            print(e)
 
-            graphics_view.adjustSize()
+        return application
 
-            application['parent'] = graphics_view
-            application['proxy'] = proxy
-        else:
-            proxy = application['proxy']
-            proxy.setTransform(QTransform().rotate(angle))
+    def embed_application_in_graphics_view(self, application):
+        graphics_view = QGraphicsView()
+
+        #graphics_view.setStyleSheet('border: 3px solid #FFFF00')
+
+        #graphics_view.setFrameShape(0)
+
+        # Disable scrollbars
+        graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        #graphics_view.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+
+        scene = QGraphicsScene(graphics_view)
+        graphics_view.setScene(scene)
+
+        #graphics_view.setStyleSheet("background-color: transparent;")
+
+        #graphics_view.setGeometry(0, 0, application['instance'].get_width(), application['instance'].get_height())
+
+        # Embed application in a QGraphicsProxyWidget
+        proxy = QGraphicsProxyWidget()
+        #proxy.setGeometry(QRectF(QPoint(0, 0), QPoint(self.width, self.height)))
+
+        #print(graphics_view.geometry(), proxy.geometry())
+
+        proxy.setWidget(application['instance'])
+        #proxy.setTransformOriginPoint(proxy.boundingRect().center())
+        scene.addItem(proxy)
+
+        # Set initial size of graphics view
+        #graphics_view.setGeometry(0, 0, self.width, self.height)  # Fullscreen
+        #graphics_view.setGeometry(0, 0, application['instance'].get_width()*2, application['instance'].get_height()*2)
+        #graphics_view.adjustSize()
+
+        application['parent'] = graphics_view
+        application['proxy'] = proxy
 
         return application
 
