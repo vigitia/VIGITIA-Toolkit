@@ -22,7 +22,7 @@ class VIGITIABaseApplication:
         self.y = 0  # y-pos of top-left corner in canvas
         self.width = 0  # If set to 0, the application will be shown fullscreen
         self.height = 0  # If set to 0, the application will be shown fullscreen
-        self.rotation = 0  # 0 - 360
+        self.rotation = -1  # 0 - 360
 
         self.rendering_manager = None
 
@@ -81,12 +81,12 @@ class VIGITIABaseApplication:
     def set_x(self, x):
         if not abs(self.x - x) < 5:
             self.x = self.__smooth_movement(self.x, x)
-            self.rendering_manager.on_application_updated(self.get_name())
+            self.rendering_manager.update_application(self.get_name())
 
     def set_y(self, y):
         if not abs(self.y - y) < 5:
             self.y = self.__smooth_movement(self.y, y)
-            self.rendering_manager.on_application_updated(self.get_name())
+            self.rendering_manager.update_application(self.get_name())
 
     def set_position(self, x, y):
         something_to_update = False
@@ -98,28 +98,33 @@ class VIGITIABaseApplication:
             something_to_update = True
 
         if something_to_update:
-            self.rendering_manager.on_application_updated(self.get_name())
+            self.rendering_manager.update_application(self.get_name())
 
     def set_dimensions(self, width, height):
         self.width = width
         self.height = height
-        self.rendering_manager.on_application_updated(self.get_name())
+        self.rendering_manager.update_application(self.get_name())
 
     def set_width(self, width):
         self.width = width
-        self.rendering_manager.on_application_updated(self.get_name())
+        self.rendering_manager.update_application(self.get_name())
 
     def set_height(self, height):
         self.height = height
-        self.rendering_manager.on_application_updated(self.get_name())
+        self.rendering_manager.update_application(self.get_name())
 
     def set_rotation(self, rotation):
-        self.rotation = rotation
-        self.rendering_manager.on_application_updated(self.get_name())
+        if self.rotation == -1:
+            self.rotation = rotation
+            self.rendering_manager.update_application(self.get_name(), rotate=True)
+
+        if not abs(self.rotation - rotation) < 5 and not abs(self.rotation - rotation) > 100:
+            self.rotation = self.__smooth_movement(self.rotation, rotation)
+            self.rendering_manager.update_application(self.get_name(), rotate=True)
 
     def set_z_index(self, z_index):
         self.z_index = z_index
-        self.rendering_manager.on_application_updated(self.get_name())
+        self.rendering_manager.update_application(self.get_name())
 
 
     """
