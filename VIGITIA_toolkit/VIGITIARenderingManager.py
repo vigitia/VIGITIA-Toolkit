@@ -28,7 +28,7 @@ DEBUG_MODE = True
 
 # Add the names of all applications that you dont want to render to this list
 #BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'PaintingWidget', 'ButtonWidget']
-BLACKLIST = ['VideoWidget', 'ButtonWidget', 'Patterns', 'NutritionalValues', 'ImageWidget', 'PaintingWidget']
+BLACKLIST = ['VideoWidget', 'ButtonWidget', 'Patterns', 'NutritionalValues', 'ImageWidget', 'PaintingWidget', 'BrowserWidget', 'BrowserWidget2']
 
 
 class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
@@ -154,28 +154,23 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         """Allows the rotation of an application (a QT Widget)
 
         """
-        try:
-            application['parent'].setGeometry(0, 0, self.width, self.height)
 
-            angle = application['instance'].rotation
+        angle = application['instance'].rotation
+        if not 0 <= angle <= 360:
+            return application
+
+        try:
             print('Rotating to :', angle)
-            print('instance before:', application['instance'].rect().bottomRight().y())
-            print('Parent before:', application['parent'].frameGeometry())
+
             center_x = application['instance'].frameGeometry().width()/2
             center_y = application['instance'].frameGeometry().height()/2
             print(center_x, center_y)
-            #application['proxy'].setTransform(QTransform().translate(-center_x, -center_y))
 
-            application['proxy'].setTransformOriginPoint(QPointF(center_x, center_y))
-            application['proxy'].setTransform(QTransform().rotate(angle))
-            #application['proxy'].setRotation(angle)
+            application['proxy'].setTransformOriginPoint(self.mapFromGlobal(QPoint(center_x, center_y)))
+            application['proxy'].setRotation(angle)
+
             application['parent'].adjustSize()
 
-            print('Parent after:', application['parent'].frameGeometry())
-
-            #print(application['parent'].sizeHint(), application['instance'].sizeHint(), application['instance'].frameGeometry(), application['instance'].geometry(), application['instance'].frameSize(), application['instance'].maximumSize())
-
-            #application['proxy'].setTransform(QTransform().translate(-center_x, -center_y))
         except AttributeError as e:
             print(e)
 
@@ -183,10 +178,6 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
     def embed_application_in_graphics_view(self, application):
         graphics_view = QGraphicsView()
-
-        #graphics_view.setStyleSheet('border: 3px solid #FFFF00')
-
-        #graphics_view.setFrameShape(0)
 
         # Disable scrollbars
         graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -196,18 +187,10 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         scene = QGraphicsScene(graphics_view)
         graphics_view.setScene(scene)
 
-        #graphics_view.setStyleSheet("background-color: transparent;")
-
-        #graphics_view.setGeometry(0, 0, application['instance'].get_width(), application['instance'].get_height())
-
         # Embed application in a QGraphicsProxyWidget
         proxy = QGraphicsProxyWidget()
-        #proxy.setGeometry(QRectF(QPoint(0, 0), QPoint(self.width, self.height)))
-
-        #print(graphics_view.geometry(), proxy.geometry())
 
         proxy.setWidget(application['instance'])
-        #proxy.setTransformOriginPoint(proxy.boundingRect().center())
         scene.addItem(proxy)
 
         # Set initial size of graphics view
