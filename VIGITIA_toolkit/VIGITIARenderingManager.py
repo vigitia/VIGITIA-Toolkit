@@ -281,6 +281,9 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
     # Handle Key-press events
     def keyPressEvent(self, event):
+        for application in self.applications:
+            application['instance'].on_key_pressed(event)
+
         # Close the application if the ESC button is pressed
         if event.key() == Qt.Key_Escape:
             self.close_window()

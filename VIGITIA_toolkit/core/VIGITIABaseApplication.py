@@ -152,6 +152,10 @@ class VIGITIABaseApplication:
     def on_new_video_frame(self, frame, name, origin_ip, port):
         pass
 
+    # Forward key press events from the QMainWindow to the applications
+    def on_key_pressed(self, event):
+        pass
+
     """
         Private helper functions
     """
