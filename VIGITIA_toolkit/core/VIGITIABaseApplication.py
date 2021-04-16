@@ -165,3 +165,23 @@ class VIGITIABaseApplication:
         new_value = int(abs((old_value + new_value) / 2))
         return new_value
 
+    def __allow_update(self, update_type):
+        now = time.time()
+        allow_update = False
+        if update_type is 'rotate':
+            time_since_last_update = now - self.time_since_last_rotation
+        elif update_type is 'move':
+            time_since_last_update = now - self.time_since_last_movement
+        else:
+            # TODO: Handle invalid key error
+            return
+        print('time', time_since_last_update)
+        if time_since_last_update > MIN_TIME_BEWEEN_UPDATES:
+            allow_update = True
+            if update_type is 'rotate':
+                self.time_since_last_rotation = now
+            elif update_type is 'move':
+                self.time_since_last_movement = now
+
+        return allow_update
+
