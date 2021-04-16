@@ -13,6 +13,8 @@ from pythonosc.dispatcher import Dispatcher
 # Port where this application will listen for incoming TUIO messages
 PORT = 8000
 
+DEBUG_MODE = False
+
 
 # The Singleton class is implemented like described here:
 # https://medium.com/better-programming/singleton-in-python-5eaa66618e3d
@@ -81,6 +83,7 @@ class VIGITIASensorDataInterface:
         dispatcher.map("/tuio2/ctl", self.on_new_control_message, needs_reply_address=True)
         dispatcher.map("/tuio2/alv", self.on_new_alive_message, needs_reply_address=True)
 
+        print('IP, PORT', self.ip, PORT)
         osc_udp_server = ThreadingOSCUDPServer((self.ip, PORT), dispatcher)
 
         print('[SensorDataInterface]: Listening on {} for incoming TUIO messages'.format(osc_udp_server.server_address))
@@ -110,7 +113,8 @@ class VIGITIASensorDataInterface:
         if self.camera_resolution is None:
             self.set_camera_resolution(messages[4])
 
-        #print('New frame arrived:', messages)
+        if DEBUG_MODE:
+            print('New frame arrived:', messages)
         origin_ip = messages[0][0]
 
         self.bundles[origin_ip] = {
@@ -165,6 +169,9 @@ class VIGITIASensorDataInterface:
         # Translate coordinates from camera space to screen space
         #x_translated, y_translated = self.translate_coordinates(messages[5], messages[6])
 
+        if DEBUG_MODE:
+            print(messages)
+
         origin_ip = messages[0][0]
         token_message = {
             'session_id': messages[2],
@@ -209,7 +216,10 @@ class VIGITIASensorDataInterface:
         self.bundles[origin_ip]['bounding_boxes'].append(bounding_box_message)
 
     def on_new_data_message(self, *messages):
-        # print(messages)
+
+        if DEBUG_MODE:
+            print(messages)
+
         origin_ip = messages[0][0]
         self.bundles[origin_ip]['data'].append(messages[2:])
 
@@ -231,7 +241,9 @@ class VIGITIASensorDataInterface:
                 self.init_video_stream_receiver(stream_name, origin_ip, stream_port)
 
     def on_new_control_message(self, *messages):
-        #print(messages)
+        if DEBUG_MODE:
+            print(messages)
+
         # Send control messages directly because they are currently not in a bundle (sent from a smartphone)
         for subscriber in self.subscribers:
             subscriber.on_new_control_messages(messages)
@@ -241,7 +253,8 @@ class VIGITIASensorDataInterface:
         active_session_ids = messages[2:]
         self.bundles[origin_ip]['active_session_ids'].append(active_session_ids)
 
-        #print(self.bundles[origin_ip])
+        if DEBUG_MODE:
+            print(self.bundles[origin_ip])
 
         # Send new data to all subscribers
         try:
