@@ -1,5 +1,11 @@
 
+import time
+
+from PyQt5.QtCore import pyqtSignal
+
 from VIGITIA_toolkit.core.VIGITIASensorDataInterface import VIGITIASensorDataInterface
+
+MIN_TIME_BEWEEN_UPDATES = 0.1  # sec
 
 
 class VIGITIABaseApplication:
@@ -15,6 +21,8 @@ class VIGITIABaseApplication:
 
     """
 
+    new_angle = pyqtSignal(str)
+
     def __init__(self):
 
         self.name = ''
@@ -22,7 +30,7 @@ class VIGITIABaseApplication:
         self.y = 0  # y-pos of top-left corner in canvas
         self.width = 0  # If set to 0, the application will be shown fullscreen
         self.height = 0  # If set to 0, the application will be shown fullscreen
-        self.rotation = -1  # 0 - 360
+        self.rotation = 0  # 0 - 360
 
         self.rendering_manager = None
 
@@ -30,6 +38,10 @@ class VIGITIABaseApplication:
 
         self.data_interface = VIGITIASensorDataInterface.Instance()
         self.data_interface.register_subscriber(self)
+
+        # self.last_update = 0
+        self.time_since_last_movement = 0
+        self.time_since_last_rotation = 0
 
     """
     Getter Functions
@@ -78,57 +90,72 @@ class VIGITIABaseApplication:
         if self.get_height() <= 0 or self.get_height() > self.rendering_manager.get_screen_resolution()[1]:
             self.set_height(self.rendering_manager.get_screen_resolution()[1])
 
+        self.new_angle.connect(self.rendering_manager.rotate_applicaton)
+
     def set_x(self, x):
-        if not abs(self.x - x) < 5:
+        if self.__allow_update('move'):
             self.x = self.__smooth_movement(self.x, x)
-            self.rendering_manager.update_application(self.get_name())
+            self.rendering_manager.update_position(self.get_name())
 
     def set_y(self, y):
-        if not abs(self.y - y) < 5:
+        if self.__allow_update('move'):
             self.y = self.__smooth_movement(self.y, y)
-            self.rendering_manager.update_application(self.get_name())
+            self.rendering_manager.update_position(self.get_name())
 
     def set_position(self, x, y):
-        something_to_update = False
-        if not abs(self.x - x) < 5:
-            self.x = self.__smooth_movement(self.x, x)
-            something_to_update = True
-        if not abs(self.y - y) < 5:
-            self.y = self.__smooth_movement(self.y, y)
-            something_to_update = True
+        if self.__allow_update('move'):
+            self.x = x
+            self.y = y
+            self.rendering_manager.update_position(self.get_name())
+        # something_to_update = False
+        # if not abs(self.x - x) < 5:
+        #     self.x = self.__smooth_movement(self.x, x)
+        #     something_to_update = True
+        # if not abs(self.y - y) < 5:
+        #     self.y = self.__smooth_movement(self.y, y)
+        #     something_to_update = True
 
-        if something_to_update:
-            self.rendering_manager.update_application(self.get_name())
+        # if something_to_update:
+        #     self.rendering_manager.update_application(self.get_name())
+
+
+    def set_width(self, width):
+        self.width = width
+        self.rendering_manager.update_geometry(self.get_name())
+
+    def set_height(self, height):
+        self.height = height
+        self.rendering_manager.update_geometry(self.get_name())
 
     def set_dimensions(self, width, height):
         self.width = width
         self.height = height
-        self.rendering_manager.update_application(self.get_name())
+        self.rendering_manager.update_geometry(self.get_name())
 
-    def set_width(self, width):
-        self.width = width
-        self.rendering_manager.update_application(self.get_name())
+    def set_rotation(self, rotation, force_update=False):
+        new_rotation = int(rotation) % 360
+        if new_rotation != self.rotation and abs(self.rotation - rotation) >= 5:
+            if self.__allow_update('rotate'):
+                self.rotation = new_rotation
 
-    def set_height(self, height):
-        self.height = height
-        self.rendering_manager.update_application(self.get_name())
+                self.new_angle.emit(self.get_name())
+                #self.rendering_manager.rotate_applicaton(self.get_name())
 
-    def set_rotation(self, rotation):
-        if self.rotation == -1:
-            self.rotation = rotation
-            self.rendering_manager.update_application(self.get_name(), rotate=True)
-
-        if not abs(self.rotation - rotation) < 5 and not abs(self.rotation - rotation) > 100:
-            self.rotation = self.__smooth_movement(self.rotation, rotation)
-            self.rendering_manager.update_application(self.get_name(), rotate=True)
+        # TODO: Implement correct smoothing of values and error handling here
+        # if not abs(self.rotation - rotation) < 5 and not abs(self.rotation - rotation) > 100:
+        #     self.rotation = rotation % 360
+        #     self.rotation = self.__smooth_movement(self.rotation, rotation)
+        #     self.rendering_manager.update_application(self.get_name(), rotate=True)
 
     def set_z_index(self, z_index):
         self.z_index = z_index
-        self.rendering_manager.update_application(self.get_name())
+        #self.rendering_manager.update_application(self.get_name())
+        self.rendering_manager.update_z_position_of_applications()
 
 
     """
-    Functions for receiving data from the VIGITIA Sensor Data Interface
+        Functions for receiving data from the VIGITIA Sensor Data Interface
+        These will be implemented as needed by the applications
     """
 
     def on_new_tuio_bundle(self, data):
