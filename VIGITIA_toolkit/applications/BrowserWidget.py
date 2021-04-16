@@ -85,6 +85,24 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
     def js_callback(self, result):
         print('Python called back:', result)
 
+    def on_new_token_messages(self, data):
+        # print('Tokens:', data)
+        for token in data:
+            if token['component_id'] == 4:
+                angle = token['angle']
+                self.set_rotation(angle)
+                #self.set_position(token['x_pos'], token['y_pos'])
+                #self.set_x(token['x_pos'])
+                #self.set_y(token['y_pos'])
+
+    def on_key_pressed(self, event):
+        if event.key() == Qt.Key_F1:
+            #self.set_rotation(self.rotation + 10)
+            self.set_rotation(random.randint(0, 359))
+        if event.key() == Qt.Key_F2:
+            #self.set_position(self.get_x() - 10, self.get_y())
+            self.set_position(1845, 750)
+
     # Use Touch events in the application: Convert the pointer messages to mouse click events
     def on_new_pointer_messages(self, messages):
         for message in messages:
