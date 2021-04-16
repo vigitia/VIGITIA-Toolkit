@@ -28,7 +28,7 @@ DEBUG_MODE = True
 
 # Add the names of all applications that you dont want to render to this list
 #BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'PaintingWidget', 'ButtonWidget']
-BLACKLIST = ['VideoWidget', 'ButtonWidget', 'Patterns', 'NutritionalValues', 'ImageWidget', 'PaintingWidget', 'BrowserWidget', 'BrowserWidget2']
+BLACKLIST = ['VideoWidget', 'ButtonWidget', 'Patterns', 'NutritionalValues', 'ImageWidget', 'PaintingWidget', 'DemoWidget', 'BrowserWidget2']
 
 
 class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
@@ -71,32 +71,52 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         # Load applications and add them to the canvas
         self.add_applications(parent_widget)
 
-    def update_application(self, application_name, rotate=True):
-        """ This function is called if an application changes its size, position or rotation.
+    # def update_application(self, application_name, rotate=False):
+    #     """ This function is called if an application changes its size, position or rotation.
+    #
+    #         The RenderingManager is notified to redraw the application.
+    #
+    #         Args:
+    #             application_name (str): The name of the application that has changed
+    #     """
+    #
+    #     if self.applications is not None:
+    #         # Iterate over all applications to find the correct one
+    #         for application in self.applications:
+    #             if application['name'] == application_name and application['parent'] is not None:
+    #
+    #                 print('X update', application['name'])
+    #                 # Rotate application
+    #                 if rotate:
+    #                     application = self.rotate_applicaton(application['name'])
+    #
+    #                 # Update width and height
+    #                 application['instance'].setGeometry(0, 0, application['instance'].get_width(),
+    #                                                     application['instance'].get_height())
+    #
+    #                 # Move application on canvas
+    #                 # application['parent'].move(application['instance'].get_x(), application['instance'].get_y())
+    #                 application['parent'].move(-self.width + application['instance'].get_x(),
+    #                                            -self.height + application['instance'].get_y())
+    #
+    #                 # print("Move to:", -self.width + application['instance'].get_x(), -self.height + application['instance'].get_y())
+    #
+    #                 # Update z-Position (lower or raise them on the canvas)
+    #                 self.update_z_position_of_applications()
 
-            The RenderingManager is notified to redraw the application.
+    def update_geometry(self, application_name):
+        # Iterate over all applications to find the correct one
+        for application in self.applications:
+            if application['name'] == application_name and application['parent'] is not None:
+                application['instance'].setGeometry(0, 0, application['instance'].get_width(),
+                                                    application['instance'].get_height())
 
-            Args:
-                application_name (str): The name of the application that has changed
-        """
-        if self.applications is not None:
-            # Iterate over all applications to find the correct one
-            for application in self.applications:
-                if application['name'] == application_name:
-
-                    # Rotate application
-                    if rotate:
-                        application = self.rotate_applicaton(application)
-
-                    # Update width and height
-                    application['instance'].setGeometry(0, 0, application['instance'].get_width(),
-                                                        application['instance'].get_height())
-
-                    # Move application on canvas
-                    application['parent'].move(application['instance'].get_x(), application['instance'].get_y())
-
-                    # Update z-Position (lower or raise them on the canvas)
-                    self.update_z_position_of_applications()
+    def update_position(self, application_name):
+        # Iterate over all applications to find the correct one
+        for application in self.applications:
+            if application['name'] == application_name and application['parent'] is not None:
+                application['parent'].move(-self.width + application['instance'].get_x(),
+                                           -self.height + application['instance'].get_y())
 
     def get_screen_resolution(self):
         """ Return the resolution of the QMainWindow
@@ -106,6 +126,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
     # Add all desired applications to the canvas
     def add_applications(self, parent_widget):
+        print('X Add')
         self.applications = self.find_available_applications()
 
         # TODO: Combine with update applications function
@@ -115,16 +136,19 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
             application = self.embed_application_in_graphics_view(application)
 
             # Rotate applications
-            self.rotate_applicaton(application)
+            self.rotate_applicaton(application['name'])
 
             application['instance'].setGeometry(0, 0, application['instance'].get_width(),
                                                 application['instance'].get_height())
+
+            #print(application['instance'].get_width())
 
             if DEBUG_MODE:
                 application['parent'].setStyleSheet('border: 3px solid #FF0000')
 
             application['parent'].setParent(parent_widget)
-            application['parent'].move(application['instance'].get_x(), application['instance'].get_y())
+            application['parent'].move(-self.width + application['instance'].get_x(),
+                                       -self.height + application['instance'].get_y())
 
 
         self.update_z_position_of_applications()
@@ -150,31 +174,38 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
                 application['parent'].raise_()
 
     # Based on https://stackoverflow.com/questions/58020983/rotate-the-widget-for-some-degree
-    def rotate_applicaton(self, application):
+    def rotate_applicaton(self, application_name):
+        print('X rotate')
         """Allows the rotation of an application (a QT Widget)
 
         """
 
-        angle = application['instance'].rotation
-        if not 0 <= angle <= 360:
-            return application
+        for application in self.applications:
+            if application['name'] == application_name and application['parent'] is not None:
 
-        try:
-            print('Rotating to :', angle)
+                angle = application['instance'].rotation
+                if not 0 <= angle <= 360:
+                    return application
 
-            center_x = application['instance'].frameGeometry().width()/2
-            center_y = application['instance'].frameGeometry().height()/2
-            print(center_x, center_y)
+                try:
+                    print('Rotating to :', angle)
 
-            application['proxy'].setTransformOriginPoint(self.mapFromGlobal(QPoint(center_x, center_y)))
-            application['proxy'].setRotation(angle)
+                    center_x = application['instance'].frameGeometry().width()/2
+                    center_y = application['instance'].frameGeometry().height()/2
 
-            application['parent'].adjustSize()
+                    application['proxy'].setTransformOriginPoint(QPoint(center_x, center_y))
+                    #application['proxy'].setTransformOriginPoint(self.mapFromGlobal(QPoint(center_x, center_y)))
+                    application['proxy'].setRotation(angle)
 
-        except AttributeError as e:
-            print(e)
+                    #print(application['parent'].sizeHint())
+                    #application['parent'].adjustSize()
 
-        return application
+                    # application['parent'].fitInView(0, 0, self.width, self.height, Qt.KeepAspectRatio)
+
+                except AttributeError as e:
+                    print(e)
+
+                return application
 
     def embed_application_in_graphics_view(self, application):
         graphics_view = QGraphicsView()
@@ -182,6 +213,11 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         # Disable scrollbars
         graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        graphics_view.setFrameStyle(0)
+
+        graphics_view.setFixedSize(self.width*2, self.height*2)
+
         #graphics_view.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
 
         scene = QGraphicsScene(graphics_view)
@@ -194,8 +230,8 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         scene.addItem(proxy)
 
         # Set initial size of graphics view
-        #graphics_view.setGeometry(0, 0, self.width, self.height)  # Fullscreen
-        #graphics_view.setGeometry(0, 0, application['instance'].get_width()*2, application['instance'].get_height()*2)
+        #graphics_view.setGeometry(0, 0, application['instance'].get_width(), application['instance'].get_height())
+        graphics_view.setGeometry(0, 0, application['instance'].get_width()*2, application['instance'].get_height()*2)
         #graphics_view.adjustSize()
 
         application['parent'] = graphics_view
