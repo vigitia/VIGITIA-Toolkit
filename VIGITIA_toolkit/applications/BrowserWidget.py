@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import random
 
 from PyQt5.QtCore import Qt, QUrl, QCoreApplication, QPoint, QObject, QVariant, pyqtSlot, QEvent
 from PyQt5.QtGui import QMouseEvent, QKeySequence
@@ -43,11 +44,11 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
         self.set_name(self.__class__.__name__)
         self.set_rendering_manager(rendering_manager)
 
-        self.x = 500
-        self.y = 300
-        self.width = 1000
-        self.height = 700
-        self.rotation = 315
+        self.x = 2500
+        self.y = 1000
+        self.width = 1920
+        self.height = 1080
+        self.rotation = 0
         self.z_index = 100
 
         # Prevent ESC from beeing blocked by BrowserWidget
@@ -74,7 +75,8 @@ class BrowserWidget(QWebEngineView, VIGITIABaseApplication):
         self.loadFinished.connect(self.loadFinishedHandler)
 
     def initUI(self):
-        self.setGeometry(0, 0, self.width, self.height)
+        pass
+        #self.setGeometry(0, 0, self.width, self.height)
 
     @pyqtSlot()
     def loadFinishedHandler(self):
