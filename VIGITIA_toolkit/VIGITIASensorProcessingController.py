@@ -9,6 +9,7 @@ import cv2
 
 from VIGITIA_toolkit.data_transportation.VIGITIAVideoStreamer import VIGITIAVideoStreamer
 from VIGITIA_toolkit.sensors.cameras.realsense_D435_camera import RealsenseD435Camera
+from VIGITIA_toolkit.sensors.cameras.GenericWebcam import GenericWebcam
 
 from VIGITIA_toolkit.data_transportation.TUIOServer import TUIOServer  # Import TUIO Server
 
@@ -25,11 +26,17 @@ from VIGITIA_toolkit.sensor_processing_services.HandLandmarkDetectionService imp
 
 # TODO: Allow multiple
 TARGET_COMPUTER_IP = get_ip_address()
-# TARGET_COMPUTER_IP = '132.199.199.67'
+print(TARGET_COMPUTER_IP)
 
 TARGET_COMPUTER_PORT = 8000
 
 DEBUG_MODE = False
+
+FLIP_IMAGE = True  # Necessary if the camera is upside down
+
+ENABLE_MARKER_DETECTOR = True
+ENABLE_OBJECT_DETECTOR = False
+ENABLE_TOUCH_DETECTOR = False
 
 
 class VIGITIASensorProcessingController:
@@ -53,6 +60,7 @@ class VIGITIASensorProcessingController:
 
     def init_cameras(self):
         # TODO: Select camera via GUI
+        #self.camera = GenericWebcam()
         self.camera = RealsenseD435Camera()
         self.camera.init_video_capture()
         self.camera.start()
@@ -95,13 +103,17 @@ class VIGITIASensorProcessingController:
             if FLIP_IMAGE:
                 color_image = cv2.flip(color_image, -1)
                 # TODO: Flip depth image
+
             # Only continue if needed frames are available
             if color_image is not None:
                 self.frame_id += 1
 
                 # Pre-process camera frames
                 color_image_table = self.table_surface_extractor.extract_table_area(color_image)
-                depth_image_table = self.table_surface_extractor.extract_table_area(depth_image)
+                if depth_image is not None:
+                    depth_image_table = self.table_surface_extractor.extract_table_area(depth_image)
+                else:
+                    depth_image_table = None
 
                 if DEBUG_MODE:
                     # Preview frames
@@ -135,13 +147,19 @@ class VIGITIASensorProcessingController:
 
     # Call all selected sensor processing services for the current frame
     def run_sensor_processing_services(self, color_image, color_image_table, depth_image, depth_image_table):
-        foreground_mask = self.get_foreground_mask(color_image_table)
-        if DEBUG_MODE:
-            cv2.imshow('Binary Mask of the foreground', foreground_mask)
 
-        self.get_aruco_markers(color_image_table)
-        self.get_detected_objects(color_image_table.copy(), foreground_mask)
-        self.get_touch_points(color_image_table, depth_image_table, foreground_mask)
+        foreground_mask = None
+        if ENABLE_OBJECT_DETECTOR or ENABLE_TOUCH_DETECTOR:
+            foreground_mask = self.get_foreground_mask(color_image_table)
+            if DEBUG_MODE:
+                cv2.imshow('Binary Mask of the foreground', foreground_mask)
+
+        if ENABLE_MARKER_DETECTOR:
+            self.get_aruco_markers(color_image_table)
+        if ENABLE_OBJECT_DETECTOR:
+            self.get_detected_objects(color_image_table.copy(), foreground_mask)
+        if ENABLE_TOUCH_DETECTOR:
+            self.get_touch_points(color_image_table, depth_image_table, foreground_mask)
 
     # This function handles the streaming of all video frames
     def stream_frames(self, color_image, color_image_table, depth_image):
@@ -155,8 +173,7 @@ class VIGITIASensorProcessingController:
 
     # Some SensorProcessingServices need the foreground mask. Request it here and pass it over to them.
     def get_foreground_mask(self, color_image_table):
-        mask = self.foreground_mask_extractor.get_foreground_mask_otsu(color_image_table)
-        return mask
+        return self.foreground_mask_extractor.get_foreground_mask_otsu(color_image_table)
 
     # Get data from the GenericObjectDetectionService and convert it to TUIO messages
     def get_detected_objects(self, color_image_table, foreground_mask):
@@ -194,6 +211,9 @@ class VIGITIASensorProcessingController:
         aruco_markers = self.fiducials_detector.detect_fiducials(color_image_table)
 
         for marker in aruco_markers:
+
+            print(marker)
+
             # TODO: Correct IDs
             self.tuio_server.add_token_message(s_id=int(marker['id']), tu_id=0, c_id=int(marker['id']),
                                                x_pos=int(marker['centroid'][0]),
