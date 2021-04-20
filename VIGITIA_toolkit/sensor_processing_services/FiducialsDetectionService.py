@@ -9,6 +9,8 @@ import numpy as np
 ADAPTIVE_THRESH_CONSTANT = 10  # TODO: Find best value
 ARUCO_DICT = aruco.DICT_4X4_100
 
+DEBUG_MODE = True
+
 
 class FiducialsDetectionService:
 
@@ -24,7 +26,7 @@ class FiducialsDetectionService:
     def init_aruco_tracking(self):
         self.aruco_dictionary = aruco.Dictionary_get(ARUCO_DICT)
         self.aruco_detector_parameters = aruco.DetectorParameters_create()
-        self.aruco_detector_parameters.adaptiveThreshConstant = ADAPTIVE_THRESH_CONSTANT
+        self.aruco_detector_parameters.adaptiveThreshConstant = ADAPTIVE_THRESH_CONSTANT  #TODO: Find best value here
 
     # Code for tracking Aruco markers based on https://github.com/njanirudh/Aruco_Tracker
     def detect_fiducials(self, frame_color):
@@ -34,8 +36,16 @@ class FiducialsDetectionService:
 
         aruco_markers = []
 
+        if DEBUG_MODE:
+            preview = frame_color.copy()
+            # draw a square around the markers
+            aruco.drawDetectedMarkers(preview, corners, ids)
+
+            cv2.imshow('marker', preview)
+
         # check if the ids list is not empty
         if np.all(ids is not None):
+
             for i in range(len(ids)):
                 aruco_marker = {'id': ids[i][0],
                                 'angle': self.calculate_aruco_marker_rotation(corners[i][0], frame_color),
