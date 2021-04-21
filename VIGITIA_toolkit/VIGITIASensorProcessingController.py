@@ -30,7 +30,7 @@ print(TARGET_COMPUTER_IP)
 
 TARGET_COMPUTER_PORT = 8000
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 FLIP_IMAGE = True  # Necessary if the camera is upside down
 
@@ -148,14 +148,12 @@ class VIGITIASensorProcessingController:
     # Call all selected sensor processing services for the current frame
     def run_sensor_processing_services(self, color_image, color_image_table, depth_image, depth_image_table):
 
-        foreground_mask = None
-        if ENABLE_OBJECT_DETECTOR or ENABLE_TOUCH_DETECTOR:
-            foreground_mask = self.get_foreground_mask(color_image_table)
-            if DEBUG_MODE:
-                cv2.imshow('Binary Mask of the foreground', foreground_mask)
+        foreground_mask = self.get_foreground_mask(color_image_table)
+        if DEBUG_MODE:
+            cv2.imshow('Binary Mask of the foreground', foreground_mask)
 
         if ENABLE_MARKER_DETECTOR:
-            self.get_aruco_markers(color_image_table)
+            self.get_aruco_markers(color_image_table, foreground_mask)
         if ENABLE_OBJECT_DETECTOR:
             self.get_detected_objects(color_image_table.copy(), foreground_mask)
         if ENABLE_TOUCH_DETECTOR:
@@ -207,8 +205,8 @@ class VIGITIASensorProcessingController:
                                                       width=detected_object['width'],
                                                       height=detected_object['height'], area=0)
 
-    def get_aruco_markers(self, color_image_table):
-        aruco_markers = self.fiducials_detector.detect_fiducials(color_image_table)
+    def get_aruco_markers(self, color_image_table,  foreground_mask):
+        aruco_markers = self.fiducials_detector.detect_fiducials(color_image_table, foreground_mask)
 
         for marker in aruco_markers:
 
