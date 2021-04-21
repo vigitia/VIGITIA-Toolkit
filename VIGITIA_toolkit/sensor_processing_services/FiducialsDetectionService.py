@@ -26,13 +26,15 @@ class FiducialsDetectionService:
     def init_aruco_tracking(self):
         self.aruco_dictionary = aruco.Dictionary_get(ARUCO_DICT)
         self.aruco_detector_parameters = aruco.DetectorParameters_create()
-        self.aruco_detector_parameters.adaptiveThreshConstant = ADAPTIVE_THRESH_CONSTANT  #TODO: Find best value here
+        # self.aruco_detector_parameters.adaptiveThreshConstant = ADAPTIVE_THRESH_CONSTANT  #TODO: Find best value here
 
     # Code for tracking Aruco markers based on https://github.com/njanirudh/Aruco_Tracker
-    def detect_fiducials(self, frame_color):
+    def detect_fiducials(self, frame_color, foreground_mask):
         gray = cv2.cvtColor(frame_color, cv2.COLOR_BGR2GRAY)
-        corners, ids, rejected_points = aruco.detectMarkers(gray, self.aruco_dictionary,
-                                                            parameters=self.aruco_detector_parameters)
+        if foreground_mask is not None:
+            corners, ids, rejected_points = aruco.detectMarkers(foreground_mask, self.aruco_dictionary, parameters=self.aruco_detector_parameters)
+        else:
+            corners, ids, rejected_points = aruco.detectMarkers(gray, self.aruco_dictionary, parameters=self.aruco_detector_parameters)
 
         aruco_markers = []
 
