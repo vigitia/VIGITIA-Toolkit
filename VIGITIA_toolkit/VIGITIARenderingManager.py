@@ -63,46 +63,13 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         self.setStyleSheet("background-color: transparent;")
 
         # Define a parent widget that will contain all applications
-        parent_widget = QWidget(self)
-        parent_widget.setStyleSheet("background-color: transparent;")
-        parent_widget.setFixedSize(self.width, self.height)
-        self.setCentralWidget(parent_widget)
+        self.parent_widget = QWidget(self)
+        self.parent_widget.setStyleSheet("background-color: transparent;")
+        self.parent_widget.setFixedSize(self.width, self.height)
+        self.setCentralWidget(self.parent_widget)
 
         # Load applications and add them to the canvas
-        self.add_applications(parent_widget)
-
-    # def update_application(self, application_name, rotate=False):
-    #     """ This function is called if an application changes its size, position or rotation.
-    #
-    #         The RenderingManager is notified to redraw the application.
-    #
-    #         Args:
-    #             application_name (str): The name of the application that has changed
-    #     """
-    #
-    #     if self.applications is not None:
-    #         # Iterate over all applications to find the correct one
-    #         for application in self.applications:
-    #             if application['name'] == application_name and application['parent'] is not None:
-    #
-    #                 print('X update', application['name'])
-    #                 # Rotate application
-    #                 if rotate:
-    #                     application = self.rotate_applicaton(application['name'])
-    #
-    #                 # Update width and height
-    #                 application['instance'].setGeometry(0, 0, application['instance'].get_width(),
-    #                                                     application['instance'].get_height())
-    #
-    #                 # Move application on canvas
-    #                 # application['parent'].move(application['instance'].get_x(), application['instance'].get_y())
-    #                 application['parent'].move(-self.width + application['instance'].get_x(),
-    #                                            -self.height + application['instance'].get_y())
-    #
-    #                 # print("Move to:", -self.width + application['instance'].get_x(), -self.height + application['instance'].get_y())
-    #
-    #                 # Update z-Position (lower or raise them on the canvas)
-    #                 self.update_z_position_of_applications()
+        self.add_applications()
 
     def update_geometry(self, application_name):
         # Iterate over all applications to find the correct one
@@ -125,33 +92,44 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         return self.width, self.height
 
     # Add all desired applications to the canvas
-    def add_applications(self, parent_widget):
-        print('X Add')
-        self.applications = self.find_available_applications()
+    def add_applications(self):
+        self.applications = self.find_all_available_applications()
 
         # TODO: Combine with update applications function
         for application in self.applications:
-            print('[VIGITIARenderingManager]: Placing Application "{}" on canvas.'.format(application['name']))
+            self.add_new_application(application)
 
-            application = self.embed_application_in_graphics_view(application)
+    def add_application_by_name(self, application_name):
+        application = self.find_all_available_applications(application_name=application_name)
 
-            # Rotate applications
-            self.rotate_applicaton(application['name'])
+        self.add_new_application(application)
 
-            application['instance'].setGeometry(0, 0, application['instance'].get_width(),
-                                                application['instance'].get_height())
+    def add_new_application(self, application):
+        print('[VIGITIARenderingManager]: Placing Application "{}" on canvas.'.format(application['name']))
 
-            #print(application['instance'].get_width())
+        application = self.embed_application_in_graphics_view(application)
 
-            if DEBUG_MODE:
-                application['parent'].setStyleSheet('border: 3px solid #FF0000')
+        # Rotate applications
+        self.rotate_applicaton(application['name'])
 
-            application['parent'].setParent(parent_widget)
-            application['parent'].move(-self.width + application['instance'].get_x(),
-                                       -self.height + application['instance'].get_y())
+        application['instance'].setGeometry(0, 0, application['instance'].get_width(),
+                                            application['instance'].get_height())
 
+        if DEBUG_MODE:
+            application['parent'].setStyleSheet('border: 3px solid #FF0000')
+
+        application['parent'].setParent(self.parent_widget)
+        application['parent'].move(-self.width + application['instance'].get_x(),
+                                   -self.height + application['instance'].get_y())
 
         self.update_z_position_of_applications()
+
+    def update_application_dimensions(self, application_name):
+        for application in self.applications:
+            if application['name'] == application_name and application['parent'] is not None:
+
+                application['instance'].setGeometry(0, 0, application['instance'].get_width(),
+                                                    application['instance'].get_height())
 
     # Raise or lower applications on the canvas
     def update_z_position_of_applications(self):
@@ -239,7 +217,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
         return application
 
-    def find_available_applications(self):
+    def find_all_available_applications(self, application_name=None):
         """ Checking the folder APPLICATIONS_BASE_FOLDER for all classes that inherit from the superclass
             'VIGITIAApplication'.
             These are the applications that are currently available for display
@@ -268,35 +246,46 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
                 for item in module_info.values():
                     class_name = item.name  # The name of the found class
+
                     my_class = getattr(module, class_name)
                     superclasses = my_class.mro()
                     # Check if the class has the required superclass
                     for superclass in superclasses:
                         if superclass.__name__ == APPLICATION_PARENT_CLASS:
 
-                            if class_name not in BLACKLIST:
+                            application = {
+                                'name': class_name,
+                                'instance': None,  # Pass the RenderingManager on to the class
+                                'parent': None,
+                                'proxy': None
+                            }
 
-                                try:
-                                    instance = my_class(self)
-                                except:
-                                    print('[VIGITIARenderingManager]: ERROR IN APPLICATION ', class_name)
-                                    print('[VIGITIARenderingManager]: Fix the following problem and try again:')
-                                    traceback.print_exc()
-                                    self.close()
-                                    sys.exit(1)
+                            if application_name is None:
+                                if class_name not in BLACKLIST:
 
-                                application = {
-                                    'name': class_name,
-                                    'instance': instance,  # Pass the RenderingManager on to the class
-                                    'parent': None,
-                                    'proxy': None
-                                }
+                                    application['instance'] = self.__get_instance_of_class(my_class, class_name)
 
-                                applications.append(application)
-                            else:
-                                print('[VIGITIARenderingManager]: Not adding "{}" because it is on the Blacklist.'.format(class_name))
+                                    applications.append(application)
+                                else:
+                                    print('[VIGITIARenderingManager]: Not adding "{}" because it is on the Blacklist.'.format(class_name))
+
+                            elif application_name == class_name:
+                                application['instance'] = self.__get_instance_of_class(my_class, class_name)
+                                return application
 
         return applications
+
+    def __get_instance_of_class(self, my_class, class_name):
+        try:
+            instance = my_class(self)
+        except:
+            print('[VIGITIARenderingManager]: ERROR IN APPLICATION ', class_name)
+            print('[VIGITIARenderingManager]: Fix the following problem and try again:')
+            traceback.print_exc()
+            self.close()
+            sys.exit(1)
+
+        return instance
 
     # Handle Key-press events
     def keyPressEvent(self, event):
