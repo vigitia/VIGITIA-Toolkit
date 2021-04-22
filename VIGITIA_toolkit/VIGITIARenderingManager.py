@@ -124,6 +124,14 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
         self.update_z_position_of_applications()
 
+    def remove_application(self, application_name):
+        print('Trying to remove application', application_name)
+        for application in self.applications:
+            if application['name'] == application_name:
+                application['parent'].deleteLater()
+                self.applications.remove(application)
+                return
+
     def update_application_dimensions(self, application_name):
         for application in self.applications:
             if application['name'] == application_name and application['parent'] is not None:
