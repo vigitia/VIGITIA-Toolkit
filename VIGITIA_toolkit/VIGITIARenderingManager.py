@@ -27,8 +27,8 @@ DEBUG_MODE = True
 
 # Add the names of all applications that you dont want to render to this list
 #BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'PaintingWidget', 'ButtonWidget']
-BLACKLIST = ['VideoWidget', 'ButtonWidget', 'Patterns', 'NutritionalValues', 'ImageWidget', 'PaintingWidget', 'BrowserWidget', 'BrowserWidget2', 'DemoWidget']
-
+#BLACKLIST = ['VideoWidget', 'ButtonWidget', 'Patterns', 'NutritionalValues', 'ImageWidget', 'PaintingWidget', 'BrowserWidget', 'BrowserWidget2', 'DemoWidget']
+AUTOSTART_APPS = ['ApplicationController']
 
 class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
     """ Responsible for drawing all applications on the same canvas (a fullscreen QMainWindow)
@@ -269,7 +269,8 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
                             }
 
                             if application_name is None:
-                                if class_name not in BLACKLIST:
+                                if class_name in AUTOSTART_APPS:
+                                #if class_name not in BLACKLIST:
                                     application['instance'] = self.__get_instance_of_class(my_class, class_name)
                                     applications.append(application)
                                 # else:
