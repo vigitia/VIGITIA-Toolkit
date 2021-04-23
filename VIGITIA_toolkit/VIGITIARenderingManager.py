@@ -12,7 +12,6 @@ from importlib import import_module
 import pyclbr
 
 # The following import needs to be present otherwise the rendering manager will throw an error
-# from PyQt5.QtWebEngineWidgets import *
 from PyQt5.QtWebEngineWidgets import *
 
 from VIGITIA_toolkit.core.VIGITIABaseApplication import VIGITIABaseApplication
@@ -28,7 +27,7 @@ DEBUG_MODE = True
 
 # Add the names of all applications that you dont want to render to this list
 #BLACKLIST = ['ImageWidget', 'VideoWidget', 'BrowserWidget', 'PaintingWidget', 'ButtonWidget']
-BLACKLIST = ['VideoWidget', 'ButtonWidget', 'Patterns', 'NutritionalValues', 'ImageWidget', 'PaintingWidget', 'DemoWidget', 'BrowserWidget2']
+BLACKLIST = ['VideoWidget', 'ButtonWidget', 'Patterns', 'NutritionalValues', 'ImageWidget', 'PaintingWidget', 'BrowserWidget', 'BrowserWidget2', 'DemoWidget']
 
 
 class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
@@ -42,11 +41,11 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
     def __init__(self):
         super().__init__()
         self.set_name(self.__class__.__name__)
-        self.set_rendering_manager(self)
+        self.set_rendering_manager(self)  # Treat RenderingManager as a toolkit application as well
         self.initUI()
 
     def initUI(self):
-        # TODO: Define screen where the QMainWindow should be displayed
+        # TODO: Define screen where the QMainWindow should be displayed if there is more than one screen
         self.showFullScreen()  # Application should run in Fullscreen
 
         # Define width and height as global variables
@@ -62,14 +61,17 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         # The QMainWindow should have a black background so that no light will be projected if no application is shown
         self.setStyleSheet("background-color: transparent;")
 
+        self.init_parent_widget()
+
+        # Load applications and add them to the canvas
+        self.add_applications()
+
+    def init_parent_widget(self):
         # Define a parent widget that will contain all applications
         self.parent_widget = QWidget(self)
         self.parent_widget.setStyleSheet("background-color: transparent;")
         self.parent_widget.setFixedSize(self.width, self.height)
         self.setCentralWidget(self.parent_widget)
-
-        # Load applications and add them to the canvas
-        self.add_applications()
 
     def update_geometry(self, application_name):
         # Iterate over all applications to find the correct one
@@ -93,13 +95,14 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
     # Add all desired applications to the canvas
     def add_applications(self):
-        self.applications = self.find_all_available_applications()
+        applications = self.find_all_available_applications()
 
         # TODO: Combine with update applications function
-        for application in self.applications:
+        for application in applications:
             self.add_new_application(application)
 
     def add_application_by_name(self, application_name):
+        print('Adding new application', application_name)
         application = self.find_all_available_applications(application_name=application_name)
 
         self.add_new_application(application)
@@ -124,8 +127,12 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
         self.update_z_position_of_applications()
 
+        self.applications.append(application)
+
+        application['parent'].show()
+
     def remove_application(self, application_name):
-        print('Trying to remove application', application_name)
+        print('Remove application', application_name)
         for application in self.applications:
             if application['name'] == application_name:
                 application['parent'].deleteLater()
@@ -161,7 +168,6 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
     # Based on https://stackoverflow.com/questions/58020983/rotate-the-widget-for-some-degree
     def rotate_applicaton(self, application_name):
-        print('X rotate')
         """Allows the rotation of an application (a QT Widget)
 
         """
@@ -174,8 +180,6 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
                     return application
 
                 try:
-                    print('Rotating to :', angle)
-
                     center_x = application['instance'].frameGeometry().width()/2
                     center_y = application['instance'].frameGeometry().height()/2
 
@@ -185,7 +189,6 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
                     #print(application['parent'].sizeHint())
                     #application['parent'].adjustSize()
-
                     # application['parent'].fitInView(0, 0, self.width, self.height, Qt.KeepAspectRatio)
 
                 except AttributeError as e:
@@ -199,9 +202,7 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         # Disable scrollbars
         graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
         graphics_view.setFrameStyle(0)
-
         graphics_view.setFixedSize(self.width*2, self.height*2)
 
         #graphics_view.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
@@ -211,7 +212,6 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
         # Embed application in a QGraphicsProxyWidget
         proxy = QGraphicsProxyWidget()
-
         proxy.setWidget(application['instance'])
         scene.addItem(proxy)
 
@@ -270,12 +270,10 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
 
                             if application_name is None:
                                 if class_name not in BLACKLIST:
-
                                     application['instance'] = self.__get_instance_of_class(my_class, class_name)
-
                                     applications.append(application)
-                                else:
-                                    print('[VIGITIARenderingManager]: Not adding "{}" because it is on the Blacklist.'.format(class_name))
+                                # else:
+                                #     print('[VIGITIARenderingManager]: Not adding "{}" because it is on the Blacklist.'.format(class_name))
 
                             elif application_name == class_name:
                                 application['instance'] = self.__get_instance_of_class(my_class, class_name)
@@ -304,7 +302,10 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         if event.key() == Qt.Key_Escape:
             self.close_window()
 
-    # Terminate the main window
+        if event.key() == Qt.Key_B:
+            self.add_application_by_name('BrowserWidget')
+
+            # Terminate the main window
     def close_window(self):
         self.close()
         sys.exit(app.exec_)
