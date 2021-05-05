@@ -5,7 +5,7 @@ from PyQt5.QtCore import pyqtSignal
 
 from VIGITIA_toolkit.core.VIGITIASensorDataInterface import VIGITIASensorDataInterface
 
-MIN_TIME_BEWEEN_UPDATES = 0.1  # sec
+#MIN_TIME_BEWEEN_UPDATES = 0.01  # sec
 
 
 class VIGITIABaseApplication:
@@ -39,7 +39,6 @@ class VIGITIABaseApplication:
         self.data_interface = VIGITIASensorDataInterface.Instance()
         self.data_interface.register_subscriber(self)
 
-        # self.last_update = 0
         self.time_since_last_movement = 0
         self.time_since_last_rotation = 0
 
@@ -84,29 +83,31 @@ class VIGITIABaseApplication:
     def set_rendering_manager(self, rendering_manager):
         self.rendering_manager = rendering_manager
 
+        self.new_angle.connect(self.rendering_manager.rotate_applicaton)
+
+    def preset_dimensions(self):
         # If width or height is set to 0, make the application fullscreen. Also handle value <0 or larger than canvas
         if self.get_width() <= 0 or self.get_width() > self.rendering_manager.get_screen_resolution()[0]:
             self.set_width(self.rendering_manager.get_screen_resolution()[0])
         if self.get_height() <= 0 or self.get_height() > self.rendering_manager.get_screen_resolution()[1]:
             self.set_height(self.rendering_manager.get_screen_resolution()[1])
 
-        self.new_angle.connect(self.rendering_manager.rotate_applicaton)
-
     def set_x(self, x):
-        if self.__allow_update('move'):
-            self.x = self.__smooth_movement(self.x, x)
-            self.rendering_manager.update_position(self.get_name())
+        # if self.__allow_update('move'):
+        self.x = self.__smooth_movement(self.x, x)
+        self.rendering_manager.update_position(self.get_name())
 
     def set_y(self, y):
-        if self.__allow_update('move'):
-            self.y = self.__smooth_movement(self.y, y)
-            self.rendering_manager.update_position(self.get_name())
+        #if self.__allow_update('move'):
+        self.y = self.__smooth_movement(self.y, y)
+        self.rendering_manager.update_position(self.get_name())
 
     def set_position(self, x, y):
-        if self.__allow_update('move'):
-            self.x = x
-            self.y = y
-            self.rendering_manager.update_position(self.get_name())
+        # if self.__allow_update('move'):
+        self.x = x
+        self.y = y
+        self.rendering_manager.update_position(self.get_name())
+
         # something_to_update = False
         # if not abs(self.x - x) < 5:
         #     self.x = self.__smooth_movement(self.x, x)
@@ -135,11 +136,10 @@ class VIGITIABaseApplication:
     def set_rotation(self, rotation, force_update=False):
         new_rotation = int(rotation) % 360
         if new_rotation != self.rotation and abs(self.rotation - rotation) >= 5:
-            if self.__allow_update('rotate'):
-                self.rotation = new_rotation
+            #if self.__allow_update('rotate'):
+            self.rotation = new_rotation
 
-                self.new_angle.emit(self.get_name())
-                #self.rendering_manager.rotate_applicaton(self.get_name())
+            self.new_angle.emit(self.get_name())
 
         # TODO: Implement correct smoothing of values and error handling here
         # if not abs(self.rotation - rotation) < 5 and not abs(self.rotation - rotation) > 100:
@@ -192,23 +192,23 @@ class VIGITIABaseApplication:
         new_value = int(abs((old_value + new_value) / 2))
         return new_value
 
-    def __allow_update(self, update_type):
-        now = time.time()
-        allow_update = False
-        if update_type is 'rotate':
-            time_since_last_update = now - self.time_since_last_rotation
-        elif update_type is 'move':
-            time_since_last_update = now - self.time_since_last_movement
-        else:
-            # TODO: Handle invalid key error
-            return
-        print('time', time_since_last_update)
-        if time_since_last_update > MIN_TIME_BEWEEN_UPDATES:
-            allow_update = True
-            if update_type is 'rotate':
-                self.time_since_last_rotation = now
-            elif update_type is 'move':
-                self.time_since_last_movement = now
-
-        return allow_update
+    # def __allow_update(self, update_type):
+    #     now = time.time()
+    #     allow_update = False
+    #     if update_type is 'rotate':
+    #         time_since_last_update = now - self.time_since_last_rotation
+    #     elif update_type is 'move':
+    #         time_since_last_update = now - self.time_since_last_movement
+    #     else:
+    #         # TODO: Handle invalid key error
+    #         return
+    #     print('time', time_since_last_update)
+    #     if time_since_last_update > MIN_TIME_BEWEEN_UPDATES:
+    #         allow_update = True
+    #         if update_type is 'rotate':
+    #             self.time_since_last_rotation = now
+    #         elif update_type is 'move':
+    #             self.time_since_last_movement = now
+    #
+    #     return allow_update
 

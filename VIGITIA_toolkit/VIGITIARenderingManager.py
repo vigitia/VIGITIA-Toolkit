@@ -110,7 +110,10 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
     def add_new_application(self, application):
         print('[VIGITIARenderingManager]: Placing Application "{}" on canvas.'.format(application['name']))
 
+        application['instance'].preset_dimensions()
+
         application = self.embed_application_in_graphics_view(application)
+
 
         # Rotate applications
         self.rotate_applicaton(application['name'])
@@ -118,12 +121,16 @@ class VIGITIARenderingManager(QMainWindow, VIGITIABaseApplication):
         application['instance'].setGeometry(0, 0, application['instance'].get_width(),
                                             application['instance'].get_height())
 
+
         if DEBUG_MODE:
-            application['parent'].setStyleSheet('border: 3px solid #FF0000')
+            application['instance'].setStyleSheet('border: 1px solid #FF0000')
 
         application['parent'].setParent(self.parent_widget)
-        application['parent'].move(-self.width + application['instance'].get_x(),
-                                   -self.height + application['instance'].get_y())
+
+
+        print(self.width, self.height)
+        application['parent'].move(-0.5*self.width + application['instance'].get_x(),
+                                   -0.5*self.height + application['instance'].get_y())
 
         self.update_z_position_of_applications()
 
