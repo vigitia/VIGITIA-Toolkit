@@ -21,8 +21,8 @@ class DrawingCoach(QSvgWidget, VIGITIABaseApplication):
         self.set_name(self.__class__.__name__)  # Register the application with their name
         self.set_rendering_manager(rendering_manager)  # Register the rendering manager
 
-        self.width = 620
-        self.height = 450
+        self.width = 720
+        self.height = 535
 
         self.move_image_signal.connect(self.move_image)
 
@@ -31,7 +31,7 @@ class DrawingCoach(QSvgWidget, VIGITIABaseApplication):
     def initUI(self):
         self.setGeometry(0, 0, self.width, self.height)  # Initialize the application dimensions
 
-        # self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_TranslucentBackground)
 
         svg_img = os.path.join(os.path.dirname(__file__), os.path.join('assets', 'world_map.svg'))
 
