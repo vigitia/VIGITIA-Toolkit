@@ -87,7 +87,7 @@ class VIGITIASensorProcessingController:
         self.touch_detector = TouchDetectionService()
         #self.table_detector = TableDetector()
         self.generic_object_detector = ObjectDetectionService()
-        self.hand_tracker = HandLandmarkDetectionService()
+        #self.hand_tracker = HandLandmarkDetectionService()
 
     # The main application loop. Code parts for fps counter from
     # https://stackoverflow.com/questions/43761004/fps-how-to-divide-count-by-time-function-to-determine-fps
