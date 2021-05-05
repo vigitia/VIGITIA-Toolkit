@@ -56,7 +56,10 @@ class GenericWebcam(VIGITIACameraBase):
 
     def get_frames(self):
         with self.read_lock:
-            return self.frame
+            return self.frame, None
+
+    def get_resolution(self):
+        return RES_X, RES_Y
 
     def stop(self):
         self.started = False
