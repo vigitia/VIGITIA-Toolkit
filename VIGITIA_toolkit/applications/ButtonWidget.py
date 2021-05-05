@@ -20,8 +20,8 @@ class ButtonWidget(QWidget, VIGITIABaseApplication):
 
         self.x = self.get_screen_resolution()[0]/5
         self.y = self.get_screen_resolution()[1]/5
-        self.width = 200
-        self.height = 200
+        self.width = 600
+        self.height = 700
         self.rotation = 0
 
         self.initUI()
@@ -115,8 +115,16 @@ class ButtonWidget(QWidget, VIGITIABaseApplication):
     def mouseReleaseEvent(self, event):
         print('Mouse released: ( %d, %d )' % (event.x(), event.y()))
 
+    def on_new_token_messages(self, data):
+        # print('Tokens:', data)
+        for token in data:
+            if token['component_id'] == 4:
+                self.set_rotation(token['angle'])
+                #self.set_x(token['x_pos'])
+                #self.set_y(token['y_pos'])
 
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    ex = ButtonWidget()
-    sys.exit(app.exec_())
+
+# if __name__ == '__main__':
+#     app = QApplication(sys.argv)
+#     ex = ButtonWidget()
+#     sys.exit(app.exec_())
