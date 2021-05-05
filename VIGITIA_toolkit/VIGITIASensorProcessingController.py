@@ -100,10 +100,6 @@ class VIGITIASensorProcessingController:
             # Get frames from cameras
             color_image, depth_image = self.camera.get_frames()
 
-            if FLIP_IMAGE:
-                color_image = cv2.flip(color_image, -1)
-                # TODO: Flip depth image
-
             # Only continue if needed frames are available
             if color_image is not None:
                 self.frame_id += 1
@@ -114,6 +110,10 @@ class VIGITIASensorProcessingController:
                     depth_image_table = self.table_surface_extractor.extract_table_area(depth_image)
                 else:
                     depth_image_table = None
+
+                if FLIP_IMAGE:
+                    color_image_table = cv2.flip(color_image_table, -1)
+                    # TODO: Flip depth image
 
                 if DEBUG_MODE:
                     # Preview frames
