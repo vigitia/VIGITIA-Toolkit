@@ -24,10 +24,18 @@ class ApplicationController(QWidget, VIGITIABaseApplication):
         self.set_name(self.__class__.__name__)  # Register the application with their name
         self.set_rendering_manager(rendering_manager)  # Register the rendering manager
 
-        self.set_dimensions(0, 0)
-        self.z_index = 1
+        self.initUI()
+
+        self.width = 1
+        self.height = 1
 
         self.init_signals()
+
+    def initUI(self):
+        self.setGeometry(0, 0, self.get_width(), self.get_height())  # Initialize the application dimensions
+
+        # Make the background transparent to allow stacking of applications
+        self.setStyleSheet("background-color: transparent;")
 
     def init_signals(self):
         self.add_application.connect(self.rendering_manager.add_application_by_name)
