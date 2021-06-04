@@ -4,6 +4,7 @@
 import os
 import sys
 import time
+import ctypes
 
 import cv2
 
@@ -25,10 +26,10 @@ from VIGITIA_toolkit.sensor_processing_services.ObjectDetectionService import Ob
 from VIGITIA_toolkit.sensor_processing_services.HandLandmarkDetectionService import HandLandmarkDetectionService
 
 # TODO: Allow multiple
-TARGET_COMPUTER_IP = get_ip_address()
+TARGET_COMPUTER_IP = '10.61.3.117' #get_ip_address()
 print(TARGET_COMPUTER_IP)
 
-TARGET_COMPUTER_PORT = 8000
+TARGET_COMPUTER_PORT = 3333 #8000
 
 DEBUG_MODE = True
 
@@ -36,7 +37,7 @@ FLIP_IMAGE = True  # Necessary if the camera is upside down
 
 ENABLE_MARKER_DETECTOR = True
 ENABLE_OBJECT_DETECTOR = False
-ENABLE_TOUCH_DETECTOR = False
+ENABLE_TOUCH_DETECTOR = True
 
 
 class VIGITIASensorProcessingController:
@@ -69,10 +70,27 @@ class VIGITIASensorProcessingController:
         self.tuio_server = TUIOServer(TARGET_COMPUTER_IP, TARGET_COMPUTER_PORT)
 
         camera_res_x, camera_res_y = self.camera.get_resolution()
-        self.dimension = str(camera_res_x) + 'x' + str(camera_res_y)
-        print('[SensorProcessingController]: Dimension of main sensor: ', self.dimension)
+        print(camera_res_x, camera_res_y)
 
+        self.dimension = self.get_dimension(camera_res_x, camera_res_y)
         self.source = os.uname()[1]  # TODO: Not working on windows
+
+    def get_dimension(self, res_x, res_y):
+        left = ctypes.c_uint32(res_x << 16)
+        right = ctypes.c_uint32(res_y)
+        out = left.value | right.value
+
+        out_string = "{0:b}".format(out)
+
+        #out_string.zfill(32 - len("{0:b}".format(out)))
+
+        for i in range(32 - len("{0:b}".format(out))):
+            out_string = '0' + out_string
+
+        print('[SensorProcessingController]: Dimension of main sensor: ', out_string)
+        out = int(out_string, 2)
+
+        return out
 
     def init_video_streamers(self):
         # TODO: Let user select in GUI what video should be streamed
@@ -87,7 +105,7 @@ class VIGITIASensorProcessingController:
         self.touch_detector = TouchDetectionService()
         #self.table_detector = TableDetector()
         self.generic_object_detector = ObjectDetectionService()
-        #self.hand_tracker = HandLandmarkDetectionService()
+        self.hand_tracker = HandLandmarkDetectionService()
 
     # The main application loop. Code parts for fps counter from
     # https://stackoverflow.com/questions/43761004/fps-how-to-divide-count-by-time-function-to-determine-fps
@@ -210,19 +228,45 @@ class VIGITIASensorProcessingController:
 
         for marker in aruco_markers:
 
-            print(marker)
+            print(marker['id'])
+
+            self.tuio_server.add_symbol_message(s_id=int(marker['id']), tu_id=0, c_id=0, group='0', data='__TangibleDemo__')
 
             # TODO: Correct IDs
             self.tuio_server.add_token_message(s_id=int(marker['id']), tu_id=0, c_id=int(marker['id']),
-                                               x_pos=int(marker['centroid'][0]),
-                                               y_pos=int(marker['centroid'][1]),
-                                               angle=marker['angle'])
+                                               x_pos=float(marker['corners'][0][0]),
+                                               y_pos=float(marker['corners'][0][1]),
+                                               angle=float(marker['angle']))
 
-            # TODO: SEND ALSO BOUNDING BOX:
-            self.tuio_server.add_bounding_box_message(s_id=int(marker['id']), x_pos=0,
-                                                      y_pos=0, angle=0,
-                                                      width=0,
-                                                      height=0, area=0)
+
+            # # TODO: SEND ALSO BOUNDING BOX:
+            self.tuio_server.add_bounding_box_message(s_id=int(marker['id']), x_pos=float(marker['corners'][0][0]),
+                                                      y_pos=float(marker['corners'][0][1]),
+                                                      angle=float(marker['angle']),
+                                                      width=50.,
+                                                      height=50., area=0.)
+
+
+            self.tuio_server.add_symbol_message(s_id=int(marker['id'] + 1), tu_id=0, c_id=0, group='0', data='__TangibleDemo__')
+
+            # TODO: Correct IDs
+            self.tuio_server.add_token_message(s_id=int(marker['id'] + 1), tu_id=0, c_id=int(marker['id']),
+                                               x_pos=1000.,
+                                               y_pos=600.,
+                                               angle=float(marker['angle']))
+
+
+            # # TODO: SEND ALSO BOUNDING BOX:
+            self.tuio_server.add_bounding_box_message(s_id=int(marker['id'] + 1), x_pos=1000.,
+                                                      y_pos=600.,
+                                                      angle=float(marker['angle']),
+                                                      width=50.,
+                                                      height=50., area=0.)
+
+
+            # self.tuio_server.add_pointer_message(s_id=int(marker['id']), tu_id=0, c_id=int(marker['id']), x_pos=touch_point.x,
+            #                                      y_pos=touch_point.y, angle=0, shear=0, radius=0,
+            #                                      press=touch_point.is_touching)
 
     # Call the MovementDetectionService that finds areas where movement is happening above the table
     def get_movements(self, color_image_table):
@@ -239,6 +283,8 @@ class VIGITIASensorProcessingController:
     # Find touch points on the table
     def get_touch_points(self, color_image_table, depth_image_table, foreground_mask):
         touch_points = []
+
+        print('Touch')
 
         # Use the CNN Hand tracker only every other frame to improve performance
         if self.frame_id % 2 == 0:
@@ -258,9 +304,13 @@ class VIGITIASensorProcessingController:
         # Send out a TUIO pointer message for each touch point
         for touch_point in touch_points:
             # TODO: Add correct Type/User and Component ID
-            self.tuio_server.add_pointer_message(s_id=touch_point.id, tu_id=0, c_id=0, x_pos=touch_point.x,
-                                                 y_pos=touch_point.y, angle=0, shear=0, radius=0,
-                                                 press=touch_point.is_touching)
+
+            self.tuio_server.add_symbol_message(s_id=int(touch_point.id), tu_id=0, c_id=0, group='0',
+                                                data='__TangibleDemo__')
+
+            self.tuio_server.add_pointer_message(s_id=int(touch_point.id), tu_id=0, c_id=0, x_pos=float(touch_point.x),
+                                                 y_pos=float(touch_point.y), angle=0., shear=0., radius=0.,
+                                                 press=float(touch_point.is_touching))
 
     # Use the calibration data to extract the table area from the camera frame
     def get_table_border(self):

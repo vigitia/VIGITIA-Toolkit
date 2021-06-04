@@ -52,8 +52,9 @@ class TUIOServer:
         time_now_ms = int(round(time.time() * 1000))
         frame_time_tag = time_now_ms - self.start_time_ms
 
+
         frame_message = osc_message_builder.OscMessageBuilder(address="/tuio2/frm")
-        frame_message.add_arg(self.current_frame_id)  #
+        frame_message.add_arg(int(self.current_frame_id))  #
         frame_message.add_arg(frame_time_tag)  # OSC 64bit time tag
         frame_message.add_arg(dimension)
         frame_message.add_arg(source)
@@ -91,9 +92,14 @@ class TUIOServer:
         token_message.add_arg(angle)
         self.current_tuio_frame_bundle.add_content(token_message.build())
 
+    alive_ids = []
+
     # /tuio2/ptr s_id tu_id c_id x_pos y_pos angle shear radius press [x_vel y_vel p_vel m_acc p_acc]
     # /tuio2/ptr int32 int32 int32 float float float float float [float float float float float]
     def add_pointer_message(self, s_id, tu_id, c_id, x_pos, y_pos, angle, shear, radius, press):
+
+        self.alive_ids.append(s_id)
+
         pointer_message = osc_message_builder.OscMessageBuilder(address="/tuio2/ptr")
         pointer_message.add_arg(int(s_id))
         pointer_message.add_arg(int(tu_id))  # tu_id refers to type/user and can be 0 for now
@@ -257,9 +263,18 @@ class TUIOServer:
         # TODO: Add a list of all active session IDs to the alive message
         # This also means that components that are still present -> 'alive' but have not updated at the current frame
         # should be included in the alive message but no other TUIO messages need to be sent.
-        alive_message.add_arg(0)
+        alive_message.add_arg(5)
+        alive_message.add_arg(6)
+
+        for alive_id in self.alive_ids:
+            alive_message.add_arg(alive_id)
+
+        self.alive_ids = []
+
         self.current_tuio_frame_bundle.add_content(alive_message.build())
 
-        self.udp_client.send(self.current_tuio_frame_bundle.build())
+        bundle = self.current_tuio_frame_bundle.build()
+
+        self.udp_client.send(bundle)
 
         self.current_tuio_frame_bundle = None
