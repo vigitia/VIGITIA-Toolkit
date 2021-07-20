@@ -113,9 +113,15 @@ class TUIOServer:
         self.current_tuio_frame_bundle.add_content(pointer_message.build())
 
     # /tuio2/ocg s_id x_p0 y_p0 ... x_pN y_pN
-    def add_outer_contour_geometry_message(self, s_id):
-        # TODO: Implement if needed
-        pass
+    def add_outer_contour_geometry_message(self, s_id, coordinates):
+        self.alive_ids.append(s_id)
+
+        ocg_message = osc_message_builder.OscMessageBuilder(address="/tuio2/ocg")
+        ocg_message.add_arg(int(s_id))
+        for coordinate in coordinates:
+            ocg_message.add_arg(float(coordinate))
+
+        self.current_tuio_frame_bundle.add_content(ocg_message.build())
 
     # /tuio2/bnd s_id x_pos y_pos angle width height area
     def add_bounding_box_message(self, s_id, x_pos, y_pos, angle, width, height, area):
