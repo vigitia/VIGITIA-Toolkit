@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+import ctypes
 import time
 from pythonosc import udp_client
 from pythonosc import osc_bundle_builder
@@ -35,6 +35,23 @@ class TUIOServer:
         """
         self.udp_client = udp_client.SimpleUDPClient(ip, port)
         self.start_time_ms = int(round(time.time() * 1000))
+
+    def get_dimension(self, res_x, res_y):
+        left = ctypes.c_uint32(res_x << 16)
+        right = ctypes.c_uint32(res_y)
+        out = left.value | right.value
+
+        out_string = "{0:b}".format(out)
+
+        #out_string.zfill(32 - len("{0:b}".format(out)))
+
+        for i in range(32 - len("{0:b}".format(out))):
+            out_string = '0' + out_string
+
+        print('[SensorProcessingController]: Dimension of main sensor: ', out_string)
+        out = int(out_string, 2)
+
+        return out
 
     def init_tuio_frame(self, dimension, source):
         """ FRM (frame message)
