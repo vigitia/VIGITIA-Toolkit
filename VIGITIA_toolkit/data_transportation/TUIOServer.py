@@ -273,6 +273,40 @@ class TUIOServer:
 
         self.current_tuio_frame_bundle.add_content(control_message.build())
 
+    def add_lia_message(self, s_id, physical_association, s_idN):
+        """ LIA (link association)
+
+            /tuio2/lia s_id bool s_id0 l_id0 ... s_idN l_idN
+
+            The LIA message is used for describing the topologies of constructive assemblies comprised of physical
+            objects that allow the establishment of direct mechanical connections between them. The explicit
+            declaration of physical object connections can for example be employed for environments, which are not
+            capable of reporting spatial object relations. Additionally these connector associations can be used to
+            encode collisions of physical objects, without the need for the additional transmission of the detailed
+            object geometries for later collision detection.
+            - The initial session ID specifies the reference object with a following
+            - variable length list of a ID tuple that lists all component session IDs that are connected to
+            the reference component as well as a coupled Link ID which identifies the input and output ports.
+
+            This link attribute is comprised of two 16bit unsigned integer values embedded into a single 32bit integer value,
+            which specify the output port within the initial two bytes and the input port of the connected component
+            within the last two bytes. Alternatively the link association can also be used to establish logical
+            connections between individual components, the provided boolean value determines if the association is
+            physical (true) or logical (false).
+
+            (Source: http://www.tuio.org/?tuio20)
+        """
+        print('id:', s_id, s_idN)
+
+        lia_message = osc_message_builder.OscMessageBuilder(address="/tuio2/lia")
+        lia_message.add_arg(int(s_id))
+        lia_message.add_arg(bool(physical_association))
+        for arg in s_idN:
+            lia_message.add_arg(int(arg))
+            lia_message.add_arg(int(0))
+
+        self.current_tuio_frame_bundle.add_content(lia_message.build())
+
     def start_tuio_bundle(self, dimension, source):
         """ Start building a new TUIO bundle"""
         self.current_tuio_frame_bundle = osc_bundle_builder.OscBundleBuilder(osc_bundle_builder.IMMEDIATELY)
@@ -283,11 +317,14 @@ class TUIOServer:
 
     def send_tuio_bundle(self):
         alive_message = osc_message_builder.OscMessageBuilder(address="/tuio2/alv")
+
         # TODO: Add a list of all active session IDs to the alive message
         # This also means that components that are still present -> 'alive' but have not updated at the current frame
         # should be included in the alive message but no other TUIO messages need to be sent.
-        alive_message.add_arg(5)
-        alive_message.add_arg(6)
+
+        # Remove duplicates
+        self.alive_ids = list(dict.fromkeys(self.alive_ids))
+        print('Alive IDs', self.alive_ids)
 
         for alive_id in self.alive_ids:
             alive_message.add_arg(alive_id)
