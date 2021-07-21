@@ -1,6 +1,8 @@
 import functools
 import os
 import sys
+import pprint
+
 import PyPDF2
 from VIGITIA_toolkit.utility.get_ip import get_ip_address
 from VIGITIA_toolkit.data_transportation.TUIOServer import TUIOServer  # Import TUIO Server
@@ -9,6 +11,7 @@ TARGET_COMPUTER_IP = '10.61.3.117'
 print(TARGET_COMPUTER_IP)
 
 TARGET_COMPUTER_PORT = 3333
+
 
 class PdfReader:
 
@@ -29,32 +32,50 @@ class PdfReader:
         s_id = 0
 
         for highlight in highlights:
-            self.tuio_server.add_symbol_message(s_id, tu_id=0, c_id=0, group='0', data='__Highlight__')
-            self.tuio_server.add_token_message(s_id, tu_id=0, c_id=0, x_pos=0.0, y_pos=0.0, angle=0.0)
-            self.tuio_server.add_outer_contour_geometry_message(s_id, highlight['quad_points'])
-            s_id += 1
+
+            current_ids = []
+
+            for rectangle in highlight['quad_points']:
+                print(rectangle)
+                self.tuio_server.add_symbol_message(s_id, tu_id=0, c_id=0, group='0', data='__Highlight__')
+                self.tuio_server.add_token_message(s_id, tu_id=0, c_id=0, x_pos=0.0, y_pos=0.0, angle=0.0)
+                self.tuio_server.add_outer_contour_geometry_message(s_id, rectangle)
+                current_ids.append(s_id)
+                s_id += 1
+            # If the current highlight consists of more than one rectangle: Send TUIO link association message
+            if len(current_ids) > 1:
+                # Tell the receiver what IDs are linked
+                self.tuio_server.add_lia_message(current_ids.pop(0), True, current_ids)
 
         self.tuio_server.send_tuio_bundle()
 
     def get_annotations(self):
         src = r'/home/vitus/Desktop/Toolkit/VIGITIA-Interaction-Prototype/assets/paper_annot.pdf'
 
-        input1 = PyPDF2.PdfFileReader(open(src, "rb"))
-        nPages = input1.getNumPages()
+        input_pdf = PyPDF2.PdfFileReader(open(src, "rb"))
+        page_width = input_pdf.getPage(0).mediaBox[2]
+        page_height = input_pdf.getPage(0).mediaBox[3]
+
+        print(page_width, page_height)
+
+
+        num_pages = input_pdf.getNumPages()
 
         highlights = []
 
-        for i in range(nPages):
-            page0 = input1.getPage(i)
+        for i in range(num_pages):
+            current_page = input_pdf.getPage(i)
             try:
-                for annot in page0['/Annots']:
-                    annot_dict = annot.getObject()
-
+                for annotations in current_page['/Annots']:
+                    annot_dict = annotations.getObject()
                     # print(annot_dict)
+
+                    # Select all elements of type "Hightlight"
                     if annot_dict['/Subtype'] == '/Highlight':
+                        print(annot_dict)
                         highlight = {
                             #'rect': self.sort_points(self.translate_points(annot_dict['/Rect'])),
-                            'quad_points': self.sort_points(self.translate_points(annot_dict['/QuadPoints'])),
+                            'quad_points': self.sort_points(self.translate_points(annot_dict['/QuadPoints'], page_width, page_height)),
                             'color': annot_dict['/C'],
                             'annotator': annot_dict['/T']
                         }
@@ -65,15 +86,11 @@ class PdfReader:
 
         return highlights
 
-    def translate_points(self, points_list):
+    def translate_points(self, points_list, page_width, page_height):
 
-        page_width = 600
-        page_height = 800
-
+        # Currently flipping points along horizontal axis
         for i, point in enumerate(points_list):
-            if i & 1 == 0:
-                points_list[i] = float(page_width - point)
-            else:
+            if i & 1 != 0:
                 points_list[i] = float(page_height - point)
 
         return points_list
@@ -81,7 +98,7 @@ class PdfReader:
     def sort_points(self, points_list):
 
         num_rects = int(len(points_list) / 8)
-        print(num_rects)
+        # print(num_rects)
 
         sorted_points = []
 
@@ -93,108 +110,11 @@ class PdfReader:
             bottom_right = rect_points[4:6]
             bottom_left = rect_points[6:8]
 
-            sorted_points += top_left + bottom_left + bottom_right + top_right
-
-        if num_rects > 1:
-            print(sorted_points)
-            sorted_points = self.merge_rectangles(sorted_points, num_rects)
+            # sorted_points += top_left + bottom_left + bottom_right + top_right
+            sorted_points.append([top_left[0], top_left[1], bottom_left[0], bottom_left[1], bottom_right[0], bottom_right[1], top_right[0], top_right[1]])
 
         return sorted_points
 
-    # https://stackoverflow.com/questions/13746284/merging-multiple-adjacent-rectangles-into-one-polygon
-    def merge_rectangles(self, old_points, num_rects):
-
-        rect = []
-
-        for i in range(num_rects):
-            rect_points = old_points[i * 8:(i + 1) * 8]
-
-            converted = [[rect_points[0], rect_points[1]], [rect_points[4], rect_points[5]]]
-            rect.append(converted)
-
-        rect = tuple(rect)
-        #print(rect)
-
-        # # These rectangles resemble the OP's illustration.
-        # rect = ([[0, 10], [10, 0]],
-        #         [[10, 13], [19, 0]],
-        #         [[19, 10], [23, 0]])
-
-        points = set()
-        for (x1, y1), (x2, y2) in rect:
-            for pt in ((x1, y1), (x2, y1), (x2, y2), (x1, y2)):
-                if pt in points:  # Shared vertice, remove it.
-                    points.remove(pt)
-                else:
-                    points.add(pt)
-        points = list(points)
-
-        def y_then_x(a, b):
-            if a[1] < b[1] or (a[1] == b[1] and a[0] < b[0]):
-                return -1
-            elif a == b:
-                return 0
-            else:
-                return 1
-
-        sort_x = sorted(points)
-        sort_y = sorted(points, key=functools.cmp_to_key(y_then_x))
-
-        edges_h = {}
-        edges_v = {}
-
-        i = 0
-        while i < len(points):
-            curr_y = sort_y[i][1]
-            while i < len(points) and sort_y[i][1] == curr_y:
-                edges_h[sort_y[i]] = sort_y[i + 1]
-                edges_h[sort_y[i + 1]] = sort_y[i]
-                i += 2
-
-        i = 0
-        while i < len(points):
-            curr_x = sort_x[i][0]
-            while i < len(points) and sort_x[i][0] == curr_x:
-                edges_v[sort_x[i]] = sort_x[i + 1]
-                edges_v[sort_x[i + 1]] = sort_x[i]
-                i += 2
-
-        # Get all the polygons.
-        p = []
-        while edges_h:
-            # We can start with any point.
-            polygon = [(edges_h.popitem()[0], 0)]
-            while True:
-                curr, e = polygon[-1]
-                if e == 0:
-                    next_vertex = edges_v.pop(curr)
-                    polygon.append((next_vertex, 1))
-                else:
-                    next_vertex = edges_h.pop(curr)
-                    polygon.append((next_vertex, 0))
-                if polygon[-1] == polygon[0]:
-                    # Closed polygon
-                    polygon.pop()
-                    break
-            # Remove implementation-markers from the polygon.
-            poly = [point for point, _ in polygon]
-            for vertex in poly:
-                if vertex in edges_h: edges_h.pop(vertex)
-                if vertex in edges_v: edges_v.pop(vertex)
-
-            p.append(poly)
-
-        new_points = []
-
-        for poly in p:
-            #print(poly)
-            for pair in poly:
-                new_points.append(pair[0])
-                new_points.append(pair[1])
-
-        print(new_points)
-
-        return new_points
 
 def main():
     PdfReader()
